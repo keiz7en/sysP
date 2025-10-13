@@ -1,0 +1,487 @@
+import React, {useState, useEffect} from 'react'
+import {motion} from 'framer-motion'
+import toast from 'react-hot-toast'
+
+interface DashboardData {
+    teacher_info: {
+        name: string
+        employee_id: string
+        department: string
+        experience_years: number
+        teaching_rating: number
+    }
+    statistics: {
+        total_courses: number
+        total_students: number
+        active_students: number
+        completion_rate: number
+    }
+    recent_enrollments: Array<{
+        student_name: string
+        student_id: string
+        course_title: string
+        enrollment_date: string
+        progress: number
+    }>
+}
+
+const TeacherHome: React.FC = () => {
+    const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        fetchDashboardData()
+    }, [])
+
+    const fetchDashboardData = async () => {
+        try {
+            setLoading(true)
+            const token = localStorage.getItem('auth_token')
+            const response = await fetch('http://localhost:8000/api/teachers/dashboard/', {
+                headers: {
+                    'Authorization': `Token ${token}`,
+                    'Content-Type': 'application/json',
+                }
+            })
+
+            if (response.ok) {
+                const data = await response.json()
+                setDashboardData(data)
+            } else {
+                toast.error('Failed to fetch dashboard data')
+            }
+        } catch (error) {
+            console.error('Error fetching dashboard data:', error)
+            toast.error('Error loading dashboard')
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    if (loading) {
+        return (
+            <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                height: '400px'
+            }}>
+                <div style={{fontSize: '1.2rem', color: '#6b7280'}}>
+                    Loading dashboard...
+                </div>
+            </div>
+        )
+    }
+
+    if (!dashboardData) {
+        return (
+            <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                height: '400px'
+            }}>
+                <div style={{fontSize: '1.2rem', color: '#6b7280'}}>
+                    No dashboard data available
+                </div>
+            </div>
+        )
+    }
+
+    return (
+        <div style={{padding: '2rem', maxWidth: '1200px', margin: '0 auto'}}>
+            {/* Welcome Header */}
+            <motion.div
+                initial={{opacity: 0, y: -20}}
+                animate={{opacity: 1, y: 0}}
+                style={{marginBottom: '2rem'}}
+            >
+                <h1 style={{
+                    fontSize: '2.5rem',
+                    fontWeight: '700',
+                    color: '#1f2937',
+                    marginBottom: '0.5rem'
+                }}>
+                    Welcome back, {dashboardData.teacher_info.name}! 👋
+                </h1>
+                <p style={{
+                    fontSize: '1.1rem',
+                    color: '#6b7280',
+                    marginBottom: '0'
+                }}>
+                    Here's your teaching dashboard overview
+                </p>
+            </motion.div>
+
+            {/* Teacher Info Card */}
+            <motion.div
+                initial={{opacity: 0, y: 20}}
+                animate={{opacity: 1, y: 0}}
+                transition={{delay: 0.1}}
+                style={{
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    color: 'white',
+                    padding: '2rem',
+                    borderRadius: '12px',
+                    marginBottom: '2rem'
+                }}
+            >
+                <div
+                    style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '2rem'}}>
+                    <div>
+                        <h3 style={{fontSize: '1.2rem', fontWeight: '600', marginBottom: '0.5rem'}}>
+                            👨‍🏫 Teacher Information
+                        </h3>
+                        <p style={{margin: 0, opacity: 0.9}}>
+                            Employee ID: {dashboardData.teacher_info.employee_id}
+                        </p>
+                        <p style={{margin: 0, opacity: 0.9}}>
+                            Department: {dashboardData.teacher_info.department}
+                        </p>
+                    </div>
+                    <div>
+                        <h3 style={{fontSize: '1.2rem', fontWeight: '600', marginBottom: '0.5rem'}}>
+                            📊 Performance
+                        </h3>
+                        <p style={{margin: 0, opacity: 0.9}}>
+                            Experience: {dashboardData.teacher_info.experience_years} years
+                        </p>
+                        <p style={{margin: 0, opacity: 0.9}}>
+                            Rating: {dashboardData.teacher_info.teaching_rating.toFixed(1)}/5.0 ⭐
+                        </p>
+                    </div>
+                </div>
+            </motion.div>
+
+            {/* Statistics Cards */}
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                gap: '1.5rem',
+                marginBottom: '2rem'
+            }}>
+                <motion.div
+                    initial={{opacity: 0, y: 20}}
+                    animate={{opacity: 1, y: 0}}
+                    transition={{delay: 0.2}}
+                    style={{
+                        background: 'white',
+                        padding: '1.5rem',
+                        borderRadius: '12px',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                        border: '1px solid #e5e7eb'
+                    }}
+                >
+                    <div style={{
+                        fontSize: '2rem',
+                        fontWeight: '700',
+                        color: '#3b82f6',
+                        marginBottom: '0.5rem'
+                    }}>
+                        {dashboardData.statistics.total_courses}
+                    </div>
+                    <div style={{
+                        fontSize: '0.9rem',
+                        color: '#6b7280',
+                        fontWeight: '500'
+                    }}>
+                        📚 Total Courses
+                    </div>
+                </motion.div>
+
+                <motion.div
+                    initial={{opacity: 0, y: 20}}
+                    animate={{opacity: 1, y: 0}}
+                    transition={{delay: 0.3}}
+                    style={{
+                        background: 'white',
+                        padding: '1.5rem',
+                        borderRadius: '12px',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                        border: '1px solid #e5e7eb'
+                    }}
+                >
+                    <div style={{
+                        fontSize: '2rem',
+                        fontWeight: '700',
+                        color: '#10b981',
+                        marginBottom: '0.5rem'
+                    }}>
+                        {dashboardData.statistics.total_students}
+                    </div>
+                    <div style={{
+                        fontSize: '0.9rem',
+                        color: '#6b7280',
+                        fontWeight: '500'
+                    }}>
+                        👥 Total Students
+                    </div>
+                </motion.div>
+
+                <motion.div
+                    initial={{opacity: 0, y: 20}}
+                    animate={{opacity: 1, y: 0}}
+                    transition={{delay: 0.4}}
+                    style={{
+                        background: 'white',
+                        padding: '1.5rem',
+                        borderRadius: '12px',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                        border: '1px solid #e5e7eb'
+                    }}
+                >
+                    <div style={{
+                        fontSize: '2rem',
+                        fontWeight: '700',
+                        color: '#f59e0b',
+                        marginBottom: '0.5rem'
+                    }}>
+                        {dashboardData.statistics.active_students}
+                    </div>
+                    <div style={{
+                        fontSize: '0.9rem',
+                        color: '#6b7280',
+                        fontWeight: '500'
+                    }}>
+                        ✅ Active Students
+                    </div>
+                </motion.div>
+
+                <motion.div
+                    initial={{opacity: 0, y: 20}}
+                    animate={{opacity: 1, y: 0}}
+                    transition={{delay: 0.5}}
+                    style={{
+                        background: 'white',
+                        padding: '1.5rem',
+                        borderRadius: '12px',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                        border: '1px solid #e5e7eb'
+                    }}
+                >
+                    <div style={{
+                        fontSize: '2rem',
+                        fontWeight: '700',
+                        color: '#8b5cf6',
+                        marginBottom: '0.5rem'
+                    }}>
+                        {dashboardData.statistics.completion_rate.toFixed(1)}%
+                    </div>
+                    <div style={{
+                        fontSize: '0.9rem',
+                        color: '#6b7280',
+                        fontWeight: '500'
+                    }}>
+                        🎯 Completion Rate
+                    </div>
+                </motion.div>
+            </div>
+
+            {/* Recent Enrollments */}
+            <motion.div
+                initial={{opacity: 0, y: 20}}
+                animate={{opacity: 1, y: 0}}
+                transition={{delay: 0.6}}
+                style={{
+                    background: 'white',
+                    borderRadius: '12px',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                    border: '1px solid #e5e7eb',
+                    overflow: 'hidden',
+                    marginBottom: '2rem'
+                }}
+            >
+                <div style={{
+                    padding: '1.5rem',
+                    borderBottom: '1px solid #e5e7eb',
+                    background: '#f9fafb'
+                }}>
+                    <h3 style={{margin: 0, fontSize: '1.25rem', fontWeight: '600', color: '#1f2937'}}>
+                        📝 Recent Student Enrollments
+                    </h3>
+                </div>
+
+                {dashboardData.recent_enrollments.length === 0 ? (
+                    <div style={{
+                        padding: '3rem',
+                        textAlign: 'center',
+                        color: '#6b7280'
+                    }}>
+                        No recent enrollments
+                    </div>
+                ) : (
+                    <div style={{padding: '1rem'}}>
+                        {dashboardData.recent_enrollments.map((enrollment, index) => (
+                            <motion.div
+                                key={`${enrollment.student_id}-${index}`}
+                                initial={{opacity: 0, x: -20}}
+                                animate={{opacity: 1, x: 0}}
+                                transition={{delay: 0.7 + (index * 0.1)}}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    padding: '1rem',
+                                    marginBottom: '0.5rem',
+                                    backgroundColor: '#f9fafb',
+                                    borderRadius: '8px',
+                                    border: '1px solid #e5e7eb'
+                                }}
+                            >
+                                <div style={{flex: 1}}>
+                                    <div style={{
+                                        fontSize: '0.9rem',
+                                        fontWeight: '600',
+                                        color: '#1f2937',
+                                        marginBottom: '0.25rem'
+                                    }}>
+                                        {enrollment.student_name}
+                                    </div>
+                                    <div style={{
+                                        fontSize: '0.8rem',
+                                        color: '#6b7280'
+                                    }}>
+                                        ID: {enrollment.student_id} • {enrollment.course_title}
+                                    </div>
+                                </div>
+
+                                <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
+                                    <div style={{textAlign: 'right'}}>
+                                        <div style={{fontSize: '0.8rem', color: '#6b7280'}}>
+                                            Progress
+                                        </div>
+                                        <div style={{
+                                            fontSize: '0.9rem',
+                                            fontWeight: '600',
+                                            color: '#3b82f6'
+                                        }}>
+                                            {enrollment.progress.toFixed(0)}%
+                                        </div>
+                                    </div>
+
+                                    <div style={{textAlign: 'right'}}>
+                                        <div style={{fontSize: '0.8rem', color: '#6b7280'}}>
+                                            Enrolled
+                                        </div>
+                                        <div style={{fontSize: '0.8rem', color: '#1f2937'}}>
+                                            {new Date(enrollment.enrollment_date).toLocaleDateString()}
+                                        </div>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        ))}
+                    </div>
+                )}
+            </motion.div>
+
+            {/* Quick Actions */}
+            <motion.div
+                initial={{opacity: 0, y: 20}}
+                animate={{opacity: 1, y: 0}}
+                transition={{delay: 0.8}}
+                style={{
+                    background: 'white',
+                    borderRadius: '12px',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                    border: '1px solid #e5e7eb',
+                    padding: '1.5rem'
+                }}
+            >
+                <h3 style={{
+                    margin: '0 0 1rem 0',
+                    fontSize: '1.25rem',
+                    fontWeight: '600',
+                    color: '#1f2937'
+                }}>
+                    ⚡ Quick Actions
+                </h3>
+
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                    gap: '1rem'
+                }}>
+                    <button
+                        onClick={() => window.location.href = '/teacher/students'}
+                        style={{
+                            padding: '1rem',
+                            backgroundColor: '#3b82f6',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#2563eb'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#3b82f6'}
+                    >
+                        <div style={{fontSize: '1.5rem', marginBottom: '0.5rem'}}>👥</div>
+                        <div style={{fontWeight: '600', marginBottom: '0.25rem'}}>Manage Students</div>
+                        <div style={{fontSize: '0.8rem', opacity: 0.9}}>Add, view, and remove students</div>
+                    </button>
+
+                    <button
+                        onClick={() => window.location.href = '/teacher/courses'}
+                        style={{
+                            padding: '1rem',
+                            backgroundColor: '#10b981',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#059669'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#10b981'}
+                    >
+                        <div style={{fontSize: '1.5rem', marginBottom: '0.5rem'}}>📚</div>
+                        <div style={{fontWeight: '600', marginBottom: '0.25rem'}}>View Courses</div>
+                        <div style={{fontSize: '0.8rem', opacity: 0.9}}>Manage your course content</div>
+                    </button>
+
+                    <button
+                        style={{
+                            padding: '1rem',
+                            backgroundColor: '#f59e0b',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#d97706'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#f59e0b'}
+                    >
+                        <div style={{fontSize: '1.5rem', marginBottom: '0.5rem'}}>📝</div>
+                        <div style={{fontWeight: '600', marginBottom: '0.25rem'}}>Create Assessment</div>
+                        <div style={{fontSize: '0.8rem', opacity: 0.9}}>Design tests and quizzes</div>
+                    </button>
+
+                    <button
+                        style={{
+                            padding: '1rem',
+                            backgroundColor: '#8b5cf6',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#7c3aed'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#8b5cf6'}
+                    >
+                        <div style={{fontSize: '1.5rem', marginBottom: '0.5rem'}}>📊</div>
+                        <div style={{fontWeight: '600', marginBottom: '0.25rem'}}>Analytics</div>
+                        <div style={{fontSize: '0.8rem', opacity: 0.9}}>View performance reports</div>
+                    </button>
+                </div>
+            </motion.div>
+        </div>
+    )
+}
+
+export default TeacherHome
