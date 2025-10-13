@@ -564,12 +564,16 @@ const LoginScreen = ({onLogin}: { onLogin: (type: 'student' | 'teacher', email: 
     )
 }
 
-// Enhanced Features Explorer
-const FeaturesExplorer = ({onBack}: { onBack: () => void }) => {
+// --- Enhanced Features Explorer (revamped for full category page navigation) ---
+const FeaturesExplorer = ({onBack, onCategorySelect}: {
+    onBack: () => void,
+    onCategorySelect: (categoryId: string) => void
+}) => {
     const [selectedCategory, setSelectedCategory] = useState(0)
 
     const featureCategories = [
         {
+            id: 'student_records',
             title: 'Student Information & Academic Records',
             icon: '📊',
             color: '#6366f1',
@@ -596,6 +600,7 @@ const FeaturesExplorer = ({onBack}: { onBack: () => void }) => {
             ]
         },
         {
+            id: 'adaptive_learning',
             title: 'Personalized & Adaptive Learning',
             icon: '🧠',
             color: '#8b5cf6',
@@ -622,6 +627,7 @@ const FeaturesExplorer = ({onBack}: { onBack: () => void }) => {
             ]
         },
         {
+            id: 'teacher_management',
             title: 'Teacher & Course Management',
             icon: '👨‍🏫',
             color: '#ec4899',
@@ -648,6 +654,7 @@ const FeaturesExplorer = ({onBack}: { onBack: () => void }) => {
             ]
         },
         {
+            id: 'career_guidance',
             title: 'Career Guidance & Employability',
             icon: '💼',
             color: '#10b981',
@@ -674,6 +681,7 @@ const FeaturesExplorer = ({onBack}: { onBack: () => void }) => {
             ]
         },
         {
+            id: 'academic_automation',
             title: 'Academic Automation & Assessment',
             icon: '⚡',
             color: '#f59e0b',
@@ -700,6 +708,7 @@ const FeaturesExplorer = ({onBack}: { onBack: () => void }) => {
             ]
         },
         {
+            id: 'research_insights',
             title: 'Research & Policy Insights',
             icon: '🔬',
             color: '#ef4444',
@@ -726,6 +735,7 @@ const FeaturesExplorer = ({onBack}: { onBack: () => void }) => {
             ]
         },
         {
+            id: 'engagement_accessibility',
             title: 'Engagement & Accessibility',
             icon: '♿',
             color: '#8b5cf6',
@@ -884,6 +894,21 @@ const FeaturesExplorer = ({onBack}: { onBack: () => void }) => {
                                         {currentCategory.description}
                                     </p>
                                 </div>
+                                <button
+                                    onClick={() => onCategorySelect(currentCategory.id)}
+                                    style={{
+                                        padding: '12px 24px',
+                                        backgroundColor: currentCategory.color,
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '12px',
+                                        cursor: 'pointer',
+                                        fontWeight: 600,
+                                        marginLeft: 'auto'
+                                    }}
+                                >
+                                    View Full System
+                                </button>
                             </div>
                         </div>
 
@@ -1105,12 +1130,14 @@ const Dashboard = ({userState, onExploreFeatures}: { userState: UserState, onExp
 )
 
 // Main App with User State Management
-type AppPhase = 'loading' | 'welcome_back' | 'onboarding' | 'login' | 'app' | 'features'
+type AppPhase = 'loading' | 'welcome_back' | 'onboarding' | 'login' | 'app' | 'features' | 'category_page'
 type UserType = 'student' | 'teacher'
 
 function App() {
     const [phase, setPhase] = useState<AppPhase>('loading')
     const [userState, setUserState] = useState<UserState>(defaultUserState)
+    const [selectedCategoryId, setSelectedCategoryId] = useState<string>('')
+
 
     useEffect(() => {
         // Check for existing user state
@@ -1177,6 +1204,12 @@ function App() {
         }
         saveUserState(updatedState)
         setPhase('app')
+    }
+
+    // --- Dedicated category page routing logic ---
+    const handleCategorySelect = (categoryId: string) => {
+        setSelectedCategoryId(categoryId)
+        setPhase('category_page')
     }
 
     return (
@@ -1255,11 +1288,2215 @@ function App() {
                         animate={{opacity: 1}}
                         exit={{opacity: 0}}
                     >
-                        <FeaturesExplorer onBack={() => setPhase('app')}/>
+                        <FeaturesExplorer
+                            onBack={() => setPhase('app')}
+                            onCategorySelect={handleCategorySelect}
+                        />
+                    </motion.div>
+                )}
+
+                {phase === 'category_page' && (
+                    <motion.div
+                        key="category_page"
+                        initial={{opacity: 0}}
+                        animate={{opacity: 1}}
+                        exit={{opacity: 0}}
+                    >
+                        {selectedCategoryId === 'student_records' && (
+                            <StudentRecordsPage onBack={() => setPhase('features')}/>
+                        )}
+                        {selectedCategoryId === 'adaptive_learning' && (
+                            <AdaptiveLearningPage onBack={() => setPhase('features')}/>
+                        )}
+                        {selectedCategoryId === 'teacher_management' && (
+                            <TeacherManagementPage onBack={() => setPhase('features')}/>
+                        )}
+                        {selectedCategoryId === 'career_guidance' && (
+                            <CareerGuidancePage onBack={() => setPhase('features')}/>
+                        )}
+                        {selectedCategoryId === 'academic_automation' && (
+                            <AcademicAutomationPage onBack={() => setPhase('features')}/>
+                        )}
+                        {selectedCategoryId === 'research_insights' && (
+                            <ResearchInsightsPage onBack={() => setPhase('features')}/>
+                        )}
+                        {selectedCategoryId === 'engagement_accessibility' && (
+                            <EngagementAccessibilityPage onBack={() => setPhase('features')}/>
+                        )}
                     </motion.div>
                 )}
             </AnimatePresence>
         </Router>
+    )
+}
+
+// --- Teacher Management Page ---
+const TeacherManagementPage = ({onBack}) => {
+    const [selectedTeacher, setSelectedTeacher] = React.useState(null)
+    const [activeTab, setActiveTab] = React.useState('profile')
+
+    const mockTeachers = [
+        {
+            id: 1,
+            name: 'Dr. Emily Carter',
+            email: 'emily.carter@edu.edu',
+            teacherId: 'T2023001',
+            expertise: ['Machine Learning', 'AI', 'Statistics'],
+            avatar: '',
+            effectiveness: 94,
+            years: 8,
+            courses: ['CS301', 'CS350'],
+            analytics: {
+                feedbackScore: 4.7,
+                materialsDigitized: 42,
+                speechToTextUsage: 'High'
+            }
+        }
+    ]
+
+    return (
+        <div style={{
+            minHeight: '100vh',
+            backgroundColor: '#f8fafc',
+            fontFamily: 'Inter, sans-serif'
+        }}>
+            {/* Header */}
+            <div style={{
+                background: 'linear-gradient(135deg, #ec4899, #6366f1)',
+                color: 'white',
+                padding: '2rem'
+            }}>
+                <button
+                    onClick={onBack}
+                    style={{
+                        background: 'rgba(255,255,255,0.2)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '12px',
+                        padding: '12px 20px',
+                        cursor: 'pointer',
+                        fontWeight: 500,
+                        marginBottom: '1rem'
+                    }}
+                >
+                    ← Back to Features
+                </button>
+
+                <h1 style={{fontSize: '2.5rem', marginBottom: '0.5rem', fontWeight: 700}}>
+                    Teacher & Course Management
+                </h1>
+                <p style={{fontSize: '1.1rem', opacity: 0.9}}>
+                    Digital teacher profiles and AI-automated course management
+                </p>
+            </div>
+
+            <div style={{maxWidth: '1400px', margin: '0 auto', padding: '2rem'}}>
+                <div style={{display: 'grid', gridTemplateColumns: '300px 1fr', gap: '2rem'}}>
+                    {/* Teacher List */}
+                    <div style={{
+                        backgroundColor: 'white',
+                        borderRadius: '16px',
+                        padding: '1.5rem',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                        height: 'fit-content'
+                    }}>
+                        <h3 style={{marginBottom: '1rem', color: '#1e293b'}}>Teachers</h3>
+
+                        {mockTeachers.map((teacher) => (
+                            <div
+                                key={teacher.id}
+                                onClick={() => setSelectedTeacher(teacher)}
+                                style={{
+                                    padding: '1rem',
+                                    borderRadius: '12px',
+                                    backgroundColor: selectedTeacher?.id === teacher.id ? '#ec4899' : '#f8fafc',
+                                    color: selectedTeacher?.id === teacher.id ? 'white' : '#1e293b',
+                                    cursor: 'pointer',
+                                    marginBottom: '0.5rem',
+                                    transition: 'all 0.2s'
+                                }}
+                            >
+                                <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
+                                    <div style={{
+                                        width: '40px',
+                                        height: '40px',
+                                        backgroundColor: selectedTeacher?.id === teacher.id ? 'rgba(255,255,255,0.2)' : '#ec4899',
+                                        borderRadius: '50%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '1.2rem',
+                                        color: 'white'
+                                    }}>
+                                    </div>
+                                    <div>
+                                        <div style={{fontWeight: 600, fontSize: '0.9rem'}}>
+                                            {teacher.name}
+                                        </div>
+                                        <div style={{fontSize: '0.8rem', opacity: 0.8}}>
+                                            {teacher.teacherId}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style={{
+                                    marginTop: '0.5rem',
+                                    fontSize: '0.8rem',
+                                    display: 'flex',
+                                    justifyContent: 'space-between'
+                                }}>
+                                    <span>Effectiveness: {teacher.effectiveness}%</span>
+                                    <span style={{
+                                        backgroundColor: '#6366f1',
+                                        color: 'white',
+                                        padding: '0.1rem 0.5rem',
+                                        borderRadius: '10px',
+                                        fontSize: '0.7rem'
+                                    }}>
+                                        Active
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Teacher Details */}
+                    {selectedTeacher ? (
+                        <div>
+                            {/* Teacher Header */}
+                            <div style={{
+                                backgroundColor: 'white',
+                                borderRadius: '16px',
+                                padding: '2rem',
+                                marginBottom: '2rem',
+                                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                            }}>
+                                <div style={{display: 'flex', alignItems: 'center', gap: '2rem'}}>
+                                    <div style={{
+                                        width: '100px',
+                                        height: '100px',
+                                        backgroundColor: '#ec4899',
+                                        borderRadius: '50%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '3rem',
+                                        color: 'white'
+                                    }}>
+                                    </div>
+                                    <div style={{flex: 1}}>
+                                        <h2 style={{fontSize: '2rem', fontWeight: 700, color: '#1e293b', margin: 0}}>
+                                            {selectedTeacher.name}
+                                        </h2>
+                                        <p style={{color: '#64748b', margin: '0.5rem 0'}}>
+                                            {selectedTeacher.expertise.join(', ')}
+                                        </p>
+                                        <div style={{display: 'flex', gap: '2rem', marginTop: '1rem'}}>
+                                            <div>
+                                                <div style={{fontSize: '1.5rem', fontWeight: 700, color: '#6366f1'}}>
+                                                    {selectedTeacher.effectiveness}%
+                                                </div>
+                                                <div style={{fontSize: '0.9rem', color: '#64748b'}}>Effectiveness</div>
+                                            </div>
+                                            <div>
+                                                <div style={{fontSize: '1.5rem', fontWeight: 700, color: '#ec4899'}}>
+                                                    {selectedTeacher.years}
+                                                </div>
+                                                <div style={{fontSize: '0.9rem', color: '#64748b'}}>Years Teaching</div>
+                                            </div>
+                                            <div>
+                                                <div style={{fontSize: '1.5rem', fontWeight: 700, color: '#f59e0b'}}>
+                                                    {selectedTeacher.courses.length}
+                                                </div>
+                                                <div style={{fontSize: '0.9rem', color: '#64748b'}}>Courses</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div style={{
+                                        backgroundColor: '#ec489910',
+                                        color: '#ec4899',
+                                        padding: '0.5rem 1rem',
+                                        borderRadius: '20px',
+                                        fontWeight: 600
+                                    }}>
+                                        AI Profile
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Tabs */}
+                            <div style={{
+                                backgroundColor: 'white',
+                                borderRadius: '16px',
+                                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                                overflow: 'hidden'
+                            }}>
+                                <div style={{
+                                    display: 'flex',
+                                    backgroundColor: '#f8fafc',
+                                    borderBottom: '1px solid #e2e8f0'
+                                }}>
+                                    {[
+                                        {id: 'profile', label: 'Profile', icon: ''},
+                                        {id: 'analytics', label: 'Analytics', icon: ''},
+                                        {id: 'courses', label: 'Courses', icon: ''},
+                                        {id: 'speech', label: 'Speech-to-Text', icon: ''}
+                                    ].map((tab) => (
+                                        <button
+                                            key={tab.id}
+                                            onClick={() => setActiveTab(tab.id)}
+                                            style={{
+                                                flex: 1,
+                                                padding: '1rem',
+                                                backgroundColor: activeTab === tab.id ? 'white' : 'transparent',
+                                                color: activeTab === tab.id ? '#ec4899' : '#64748b',
+                                                border: 'none',
+                                                cursor: 'pointer',
+                                                fontWeight: activeTab === tab.id ? 600 : 400,
+                                                borderBottom: activeTab === tab.id ? '2px solid #ec4899' : 'none'
+                                            }}
+                                        >
+                                            <span style={{marginRight: '0.5rem'}}>{tab.icon}</span>
+                                            {tab.label}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                <div style={{padding: '2rem'}}>
+                                    {activeTab === 'profile' && (
+                                        <div>
+                                            <h3 style={{marginBottom: '1.5rem', color: '#1e293b'}}>Digital Profile</h3>
+                                            <div style={{
+                                                display: 'grid',
+                                                gridTemplateColumns: 'repeat(2, 1fr)',
+                                                gap: '1.5rem'
+                                            }}>
+                                                <div>
+                                                    <div style={{fontWeight: 600, color: '#64748b'}}>Email</div>
+                                                    <div style={{color: '#1e293b'}}>{selectedTeacher.email}</div>
+                                                </div>
+                                                <div>
+                                                    <div style={{fontWeight: 600, color: '#64748b'}}>Expertise</div>
+                                                    <div
+                                                        style={{color: '#1e293b'}}>{selectedTeacher.expertise.join(', ')}</div>
+                                                </div>
+                                                <div>
+                                                    <div style={{fontWeight: 600, color: '#64748b'}}>Courses</div>
+                                                    <div
+                                                        style={{color: '#1e293b'}}>{selectedTeacher.courses.join(', ')}</div>
+                                                </div>
+                                                <div>
+                                                    <div style={{fontWeight: 600, color: '#64748b'}}>Feedback Score
+                                                    </div>
+                                                    <div
+                                                        style={{color: '#1e293b'}}>{selectedTeacher.analytics.feedbackScore} /
+                                                        5
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {activeTab === 'analytics' && (
+                                        <div>
+                                            <h3 style={{marginBottom: '1.5rem', color: '#1e293b'}}>Teacher
+                                                Analytics</h3>
+                                            <div style={{
+                                                display: 'grid',
+                                                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                                                gap: '1.5rem'
+                                            }}>
+                                                <div style={{
+                                                    backgroundColor: '#6366f110',
+                                                    borderRadius: '12px',
+                                                    padding: '1.5rem',
+                                                    borderLeft: '4px solid #6366f1'
+                                                }}>
+                                                    <h4 style={{color: '#6366f1', marginBottom: '0.5rem'}}>Material
+                                                        Digitization</h4>
+                                                    <div
+                                                        style={{fontWeight: 700, fontSize: '1.5rem', color: '#6366f1'}}>
+                                                        {selectedTeacher.analytics.materialsDigitized}
+                                                    </div>
+                                                    <div style={{color: '#64748b', fontSize: '0.9rem'}}>Materials
+                                                        Digitized
+                                                    </div>
+                                                </div>
+                                                <div style={{
+                                                    backgroundColor: '#10b98110',
+                                                    borderRadius: '12px',
+                                                    padding: '1.5rem',
+                                                    borderLeft: '4px solid #10b981'
+                                                }}>
+                                                    <h4 style={{
+                                                        color: '#10b981',
+                                                        marginBottom: '0.5rem'
+                                                    }}>Speech-to-Text</h4>
+                                                    <div
+                                                        style={{fontWeight: 700, fontSize: '1.5rem', color: '#10b981'}}>
+                                                        {selectedTeacher.analytics.speechToTextUsage}
+                                                    </div>
+                                                    <div style={{color: '#64748b', fontSize: '0.9rem'}}>Usage</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {activeTab === 'courses' && (
+                                        <div>
+                                            <h3 style={{marginBottom: '1.5rem', color: '#1e293b'}}>Teacher's
+                                                Courses</h3>
+                                            <ul>
+                                                {selectedTeacher.courses.map((code, idx) => (
+                                                    <li key={idx}
+                                                        style={{
+                                                            backgroundColor: '#ec489910',
+                                                            color: '#ec4899',
+                                                            padding: '0.5rem 1rem',
+                                                            borderRadius: '12px',
+                                                            marginBottom: '0.5rem',
+                                                            display: 'inline-block'
+                                                        }}
+                                                    >{code}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+
+                                    {activeTab === 'speech' && (
+                                        <div>
+                                            <h3 style={{marginBottom: '1.5rem', color: '#1e293b'}}>Speech-to-Text
+                                                Usage</h3>
+                                            <div style={{
+                                                padding: '1.5rem',
+                                                backgroundColor: '#f8fafc',
+                                                borderRadius: '12px',
+                                            }}>
+                                                <div>
+                                                    <strong>Voice Notes:</strong> AI automatically transcribes lectures
+                                                    and notes.<br/>
+                                                    <strong>Accessibility:</strong> Supports students with disability
+                                                    needs.<br/>
+                                                    <strong>Integration:</strong> Course transcriptions available for
+                                                    students.<br/>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div style={{
+                            backgroundColor: 'white',
+                            borderRadius: '16px',
+                            padding: '4rem',
+                            textAlign: 'center',
+                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                        }}>
+                            <div style={{fontSize: '4rem', marginBottom: '1rem'}}></div>
+                            <h3 style={{color: '#64748b', fontSize: '1.2rem'}}>
+                                Select a teacher to view their profile and analytics
+                            </h3>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// --- Academic Automation Page ---
+const AcademicAutomationPage = ({onBack}) => {
+    const [activeTab, setActiveTab] = React.useState('ocr')
+
+    return (
+        <div style={{
+            minHeight: '100vh',
+            backgroundColor: '#f8fafc',
+            fontFamily: 'Inter, sans-serif'
+        }}>
+            {/* Header */}
+            <div style={{
+                background: 'linear-gradient(135deg, #f59e0b, #6366f1)',
+                color: 'white',
+                padding: '2rem'
+            }}>
+                <button
+                    onClick={onBack}
+                    style={{
+                        background: 'rgba(255,255,255,0.2)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '12px',
+                        padding: '12px 20px',
+                        cursor: 'pointer',
+                        fontWeight: 500,
+                        marginBottom: '1rem'
+                    }}
+                >
+                    ← Back to Features
+                </button>
+
+                <h1 style={{fontSize: '2.5rem', marginBottom: '0.5rem', fontWeight: 700}}>
+                    Academic Automation & Assessment
+                </h1>
+                <p style={{fontSize: '1.1rem', opacity: 0.9}}>
+                    OCR and AI-powered automated grading systems
+                </p>
+            </div>
+
+            <div style={{maxWidth: '1400px', margin: '0 auto', padding: '2rem'}}>
+                <div style={{
+                    backgroundColor: 'white',
+                    borderRadius: '16px',
+                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
+                    padding: '1rem',
+                    marginBottom: '2rem',
+                    display: 'flex',
+                    gap: '1rem'
+                }}>
+                    {[
+                        {id: 'ocr', label: 'OCR Mark Entry', icon: ''},
+                        {id: 'essay', label: 'AI Essay Scoring', icon: ''},
+                        {id: 'obe', label: 'OBE Mapping', icon: ''}
+                    ].map((tab) => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            style={{
+                                flex: 1,
+                                padding: '1rem',
+                                backgroundColor: activeTab === tab.id ? '#f59e0b' : 'transparent',
+                                color: activeTab === tab.id ? 'white' : '#64748b',
+                                border: 'none',
+                                borderRadius: '12px',
+                                cursor: 'pointer',
+                                fontWeight: activeTab === tab.id ? 600 : 400,
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            <span style={{marginRight: '0.5rem'}}>{tab.icon}</span>
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
+                {activeTab === 'ocr' && (
+                    <div style={{
+                        backgroundColor: 'white',
+                        borderRadius: '16px',
+                        padding: '2rem',
+                        boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
+                    }}>
+                        <h3 style={{marginBottom: '1.5rem', color: '#1e293b'}}>OCR Mark Entry System</h3>
+                        <p style={{color: '#64748b', marginBottom: '1rem'}}>
+                            Upload scanned answer sheets and let AI automatically extract grades.
+                        </p>
+                        <div style={{
+                            border: '2px dashed #e2e8f0',
+                            borderRadius: '12px',
+                            padding: '3rem',
+                            textAlign: 'center',
+                            backgroundColor: '#f8fafc'
+                        }}>
+                            <div style={{fontSize: '2rem', marginBottom: '1rem'}}>📋</div>
+                            <button
+                                onClick={() => toast.success('Uploading and processing scanned sheets...')}
+                                style={{
+                                    padding: '12px 24px',
+                                    backgroundColor: '#f59e0b',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '12px',
+                                    cursor: 'pointer',
+                                    fontWeight: 600
+                                }}
+                            >
+                                Upload Sheets
+                            </button>
+                        </div>
+                        <div style={{
+                            marginTop: '2rem',
+                            backgroundColor: '#f59e0b10',
+                            borderRadius: '12px',
+                            padding: '1.5rem'
+                        }}>
+                            <h4 style={{color: '#f59e0b', marginBottom: '0.5rem'}}>Automated Grade Entry</h4>
+                            <p style={{color: '#64748b', fontSize: '0.9rem'}}>
+                                AI extracts marks with 99.6% accuracy. Manual entry reduced by 85%.
+                            </p>
+                        </div>
+                    </div>
+                )}
+                {activeTab === 'essay' && (
+                    <div style={{
+                        backgroundColor: 'white',
+                        borderRadius: '16px',
+                        padding: '2rem',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                    }}>
+                        <h3 style={{marginBottom: '1.5rem', color: '#1e293b'}}>AI Essay Scoring</h3>
+                        <p style={{color: '#64748b', marginBottom: '1rem'}}>
+                            Submit essays to get instant, unbiased grades powered by transformer NLP models.
+                        </p>
+                        <div style={{
+                            border: '2px dashed #e2e8f0',
+                            borderRadius: '12px',
+                            padding: '3rem',
+                            textAlign: 'center',
+                            backgroundColor: '#f8fafc'
+                        }}>
+                            <div style={{fontSize: '2rem', marginBottom: '1rem'}}>✍️</div>
+                            <button
+                                onClick={() => toast.success('Essay submitted. AI scoring in progress...')}
+                                style={{
+                                    padding: '12px 24px',
+                                    backgroundColor: '#f59e0b',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '12px',
+                                    cursor: 'pointer',
+                                    fontWeight: 600
+                                }}
+                            >
+                                Submit Essay
+                            </button>
+                        </div>
+                        <div style={{
+                            marginTop: '2rem',
+                            backgroundColor: '#f59e0b10',
+                            borderRadius: '12px',
+                            padding: '1.5rem'
+                        }}>
+                            <h4 style={{color: '#f59e0b', marginBottom: '0.5rem'}}>Results & Feedback</h4>
+                            <ul style={{color: '#64748b', fontSize: '0.9rem'}}>
+                                <li>Consistency & Unbiased grading</li>
+                                <li>Grammar & Creativity evaluation</li>
+                                <li>Instant actionable feedback</li>
+                            </ul>
+                        </div>
+                    </div>
+                )}
+                {activeTab === 'obe' && (
+                    <div style={{
+                        backgroundColor: 'white',
+                        borderRadius: '16px',
+                        padding: '2rem',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                    }}>
+                        <h3 style={{marginBottom: '1.5rem', color: '#1e293b'}}>Outcome Based Education Mapping</h3>
+                        <p style={{color: '#64748b', marginBottom: '1rem'}}>
+                            Link student achievements directly to learning objectives and program outcomes.
+                        </p>
+                        <div style={{
+                            backgroundColor: '#6366f110',
+                            borderRadius: '12px',
+                            padding: '1.5rem'
+                        }}>
+                            <h4 style={{color: '#6366f1', marginBottom: '0.5rem'}}>Quality Assurance</h4>
+                            <ul style={{color: '#64748b', fontSize: '0.9rem'}}>
+                                <li>Learning outcome tracking per course</li>
+                                <li>Objective alignment & optimizations</li>
+                                <li>Continuous improvement suggestions</li>
+                            </ul>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+}
+
+// --- Research & Policy Insights Page ---
+const ResearchInsightsPage = ({onBack}) => {
+    const [activeTab, setActiveTab] = React.useState('prediction')
+
+    return (
+        <div style={{
+            minHeight: '100vh',
+            backgroundColor: '#f8fafc',
+            fontFamily: 'Inter, sans-serif'
+        }}>
+            {/* Header */}
+            <div style={{
+                background: 'linear-gradient(135deg, #ef4444, #6366f1)',
+                color: 'white',
+                padding: '2rem'
+            }}>
+                <button
+                    onClick={onBack}
+                    style={{
+                        background: 'rgba(255,255,255,0.2)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '12px',
+                        padding: '12px 20px',
+                        cursor: 'pointer',
+                        fontWeight: 500,
+                        marginBottom: '1rem'
+                    }}
+                >
+                    ← Back to Features
+                </button>
+
+                <h1 style={{fontSize: '2.5rem', marginBottom: '0.5rem', fontWeight: 700}}>
+                    Research & Policy Insights
+                </h1>
+                <p style={{fontSize: '1.1rem', opacity: 0.9}}>
+                    Machine learning models for educational insights and policy guidance
+                </p>
+            </div>
+            <div style={{maxWidth: '1400px', margin: '0 auto', padding: '2rem'}}>
+                <div style={{
+                    backgroundColor: 'white',
+                    borderRadius: '16px',
+                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
+                    padding: '1rem',
+                    marginBottom: '2rem',
+                    display: 'flex',
+                    gap: '1rem'
+                }}>
+                    {[
+                        {id: 'prediction', label: 'Predictive Analytics', icon: ''},
+                        {id: 'policy', label: 'Policy Intelligence', icon: ''},
+                        {id: 'language', label: 'Multi-language Analysis', icon: ''}
+                    ].map((tab) => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            style={{
+                                flex: 1,
+                                padding: '1rem',
+                                backgroundColor: activeTab === tab.id ? '#ef4444' : 'transparent',
+                                color: activeTab === tab.id ? 'white' : '#64748b',
+                                border: 'none',
+                                borderRadius: '12px',
+                                cursor: 'pointer',
+                                fontWeight: activeTab === tab.id ? 600 : 400,
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            <span style={{marginRight: '0.5rem'}}>{tab.icon}</span>
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
+                {activeTab === 'prediction' && (
+                    <div style={{
+                        backgroundColor: 'white',
+                        borderRadius: '16px',
+                        padding: '2rem',
+                        boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
+                    }}>
+                        <h3 style={{marginBottom: '1.5rem', color: '#1e293b'}}>Predictive Analytics</h3>
+                        <div style={{
+                            backgroundColor: '#ef444410',
+                            borderRadius: '12px',
+                            padding: '1.5rem'
+                        }}>
+                            <h4 style={{color: '#ef4444', marginBottom: '0.5rem'}}>Student Performance Prediction</h4>
+                            <p style={{color: '#64748b', fontSize: '0.9rem'}}>
+                                ML model forecasts GPA improvement by 2.4% next semester. Dropout risk down to 8%.
+                            </p>
+                            <button
+                                onClick={() => toast.success('Generating updated predictions...')}
+                                style={{
+                                    padding: '12px 24px',
+                                    backgroundColor: '#ef4444',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '12px',
+                                    cursor: 'pointer',
+                                    fontWeight: 600,
+                                    marginTop: '1rem'
+                                }}
+                            >
+                                Refresh Predictions
+                            </button>
+                        </div>
+                    </div>
+                )}
+                {activeTab === 'policy' && (
+                    <div style={{
+                        backgroundColor: 'white',
+                        borderRadius: '16px',
+                        padding: '2rem',
+                        boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
+                    }}>
+                        <h3 style={{marginBottom: '1.5rem', color: '#1e293b'}}>Policy Intelligence</h3>
+                        <div style={{
+                            backgroundColor: '#ef444410',
+                            borderRadius: '12px',
+                            padding: '1.5rem'
+                        }}>
+                            <h4 style={{color: '#ef4444', marginBottom: '0.5rem'}}>Evidence-Based Policy</h4>
+                            <ul style={{color: '#64748b', fontSize: '0.9rem'}}>
+                                <li>97% completion rate after policy changes</li>
+                                <li>ML models signal successful outcomes</li>
+                                <li>Actionable strategic improvements</li>
+                            </ul>
+                        </div>
+                    </div>
+                )}
+                {activeTab === 'language' && (
+                    <div style={{
+                        backgroundColor: 'white',
+                        borderRadius: '16px',
+                        padding: '2rem',
+                        boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
+                    }}>
+                        <h3 style={{marginBottom: '1.5rem', color: '#1e293b'}}>Multi-language Impact Analysis</h3>
+                        <div style={{
+                            backgroundColor: '#ef444410',
+                            borderRadius: '12px',
+                            padding: '1.5rem'
+                        }}>
+                            <h4 style={{color: '#ef4444', marginBottom: '0.5rem'}}>Language Effectiveness</h4>
+                            <ul style={{color: '#64748b', fontSize: '0.9rem'}}>
+                                <li>English instruction increases STEM achievement by 14%</li>
+                                <li>Cultural adaptation efforts triple completion rates</li>
+                                <li>Inclusive policies optimized per region</li>
+                            </ul>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+}
+
+// --- Engagement & Accessibility Page ---
+const EngagementAccessibilityPage = ({onBack}) => {
+    const [activeTab, setActiveTab] = React.useState('analytics')
+
+    return (
+        <div style={{
+            minHeight: '100vh',
+            backgroundColor: '#f8fafc',
+            fontFamily: 'Inter, sans-serif'
+        }}>
+            {/* Header */}
+            <div style={{
+                background: 'linear-gradient(135deg, #8b5cf6, #6366f1)',
+                color: 'white',
+                padding: '2rem'
+            }}>
+                <button
+                    onClick={onBack}
+                    style={{
+                        background: 'rgba(255,255,255,0.2)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '12px',
+                        padding: '12px 20px',
+                        cursor: 'pointer',
+                        fontWeight: 500,
+                        marginBottom: '1rem'
+                    }}
+                >
+                    ← Back to Features
+                </button>
+                <h1 style={{fontSize: '2.5rem', marginBottom: '0.5rem', fontWeight: 700}}>
+                    Engagement & Accessibility
+                </h1>
+                <p style={{fontSize: '1.1rem', opacity: 0.9}}>
+                    AI-powered engagement monitoring and accessibility features
+                </p>
+            </div>
+            <div style={{maxWidth: '1400px', margin: '0 auto', padding: '2rem'}}>
+                <div style={{
+                    backgroundColor: 'white',
+                    borderRadius: '16px',
+                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
+                    padding: '1rem',
+                    marginBottom: '2rem',
+                    display: 'flex',
+                    gap: '1rem'
+                }}>
+                    {[
+                        {id: 'analytics', label: 'Engagement Analytics', icon: ''},
+                        {id: 'voice', label: 'Voice Recognition', icon: ''},
+                        {id: 'interface', label: 'Adaptive Interface', icon: ''}
+                    ].map((tab) => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            style={{
+                                flex: 1,
+                                padding: '1rem',
+                                backgroundColor: activeTab === tab.id ? '#8b5cf6' : 'transparent',
+                                color: activeTab === tab.id ? 'white' : '#64748b',
+                                border: 'none',
+                                borderRadius: '12px',
+                                cursor: 'pointer',
+                                fontWeight: activeTab === tab.id ? 600 : 400,
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            <span style={{marginRight: '0.5rem'}}>{tab.icon}</span>
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
+                {activeTab === 'analytics' && (
+                    <div style={{
+                        backgroundColor: 'white',
+                        borderRadius: '16px',
+                        padding: '2rem',
+                        boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
+                    }}>
+                        <h3 style={{marginBottom: '1.5rem', color: '#1e293b'}}>Engagement Analytics</h3>
+                        <div style={{
+                            backgroundColor: '#8b5cf610',
+                            borderRadius: '12px',
+                            padding: '1.5rem'
+                        }}>
+                            <h4 style={{color: '#8b5cf6', marginBottom: '0.5rem'}}>Interaction Tracking</h4>
+                            <ul style={{color: '#64748b', fontSize: '0.9rem'}}>
+                                <li>AI tracks lesson engagement patterns</li>
+                                <li>Session optimization suggestions</li>
+                                <li>Adaptive content pacing</li>
+                            </ul>
+                            <button
+                                onClick={() => toast.success('Updating engagement analytics...')}
+                                style={{
+                                    padding: '12px 24px',
+                                    backgroundColor: '#8b5cf6',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '12px',
+                                    cursor: 'pointer',
+                                    fontWeight: 600,
+                                    marginTop: '1rem'
+                                }}
+                            >
+                                Refresh Metrics
+                            </button>
+                        </div>
+                    </div>
+                )}
+                {activeTab === 'voice' && (
+                    <div style={{
+                        backgroundColor: 'white',
+                        borderRadius: '16px',
+                        padding: '2rem',
+                        boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
+                    }}>
+                        <h3 style={{marginBottom: '1.5rem', color: '#1e293b'}}>Voice Recognition System</h3>
+                        <div style={{
+                            backgroundColor: '#8b5cf610',
+                            borderRadius: '12px',
+                            padding: '1.5rem'
+                        }}>
+                            <h4 style={{color: '#8b5cf6', marginBottom: '0.5rem'}}>Voice-to-Text Features</h4>
+                            <ul style={{color: '#64748b', fontSize: '0.9rem'}}>
+                                <li>Automated form filling</li>
+                                <li>Lecture transcription</li>
+                                <li>Disability accessibility support</li>
+                            </ul>
+                        </div>
+                    </div>
+                )}
+                {activeTab === 'interface' && (
+                    <div style={{
+                        backgroundColor: 'white',
+                        borderRadius: '16px',
+                        padding: '2rem',
+                        boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
+                    }}>
+                        <h3 style={{marginBottom: '1.5rem', color: '#1e293b'}}>Adaptive Interface</h3>
+                        <div style={{
+                            backgroundColor: '#8b5cf610',
+                            borderRadius: '12px',
+                            padding: '1.5rem'
+                        }}>
+                            <h4 style={{color: '#8b5cf6', marginBottom: '0.5rem'}}>Personalized User Experience</h4>
+                            <ul style={{color: '#64748b', fontSize: '0.9rem'}}>
+                                <li>UI adapts based on user accessibility needs</li>
+                                <li>Inclusive design for disabilities</li>
+                                <li>Custom color, font, interaction preferences</li>
+                            </ul>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+}
+
+// --- Student Information & Academic Records Page ---
+const StudentRecordsPage = ({onBack}: { onBack: () => void }) => {
+    const [selectedStudent, setSelectedStudent] = React.useState<any>(null)
+    const [activeTab, setActiveTab] = React.useState('profile')
+
+    const mockStudents = [
+        {
+            id: 1,
+            name: 'Sarah Johnson',
+            email: 'sarah.johnson@student.edu',
+            studentId: 'ST2023001',
+            gpa: 3.85,
+            year: 'Sophomore',
+            major: 'Computer Science',
+            avatar: '👩‍🎓',
+            attendanceRate: 94,
+            riskLevel: 'Low',
+            analytics: {
+                strengths: ['Mathematics', 'Programming', 'Problem Solving'],
+                weaknesses: ['Writing', 'Communication'],
+                dropoutRisk: 12,
+                performanceTrend: 'Improving'
+            },
+            courses: [
+                {code: 'CS201', name: 'Data Structures', grade: 'A-', credits: 3},
+                {code: 'MATH250', name: 'Statistics', grade: 'B+', credits: 4},
+                {code: 'ENG102', name: 'Technical Writing', grade: 'B', credits: 3}
+            ]
+        },
+        {
+            id: 2,
+            name: 'Michael Chen',
+            email: 'michael.chen@student.edu',
+            studentId: 'ST2023002',
+            gpa: 3.42,
+            year: 'Junior',
+            major: 'Business Administration',
+            avatar: '👨‍🎓',
+            attendanceRate: 87,
+            riskLevel: 'Medium',
+            analytics: {
+                strengths: ['Leadership', 'Analytics', 'Strategy'],
+                weaknesses: ['Mathematics', 'Research'],
+                dropoutRisk: 28,
+                performanceTrend: 'Stable'
+            },
+            courses: [
+                {code: 'BUS301', name: 'Marketing', grade: 'A', credits: 3},
+                {code: 'BUS250', name: 'Finance', grade: 'C+', credits: 4},
+                {code: 'STAT201', name: 'Business Statistics', grade: 'B-', credits: 3}
+            ]
+        }
+    ]
+
+    return (
+        <div style={{
+            minHeight: '100vh',
+            backgroundColor: '#f8fafc',
+            fontFamily: 'Inter, sans-serif'
+        }}>
+            {/* Header */}
+            <div style={{
+                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                color: 'white',
+                padding: '2rem'
+            }}>
+                <button
+                    onClick={onBack}
+                    style={{
+                        background: 'rgba(255,255,255,0.2)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '12px',
+                        padding: '12px 20px',
+                        cursor: 'pointer',
+                        fontWeight: 500,
+                        marginBottom: '1rem'
+                    }}
+                >
+                    ← Back to Features
+                </button>
+
+                <h1 style={{fontSize: '2.5rem', marginBottom: '0.5rem', fontWeight: 700}}>
+                    📊 Student Information & Academic Records
+                </h1>
+                <p style={{fontSize: '1.1rem', opacity: 0.9}}>
+                    Centralized student profiles with AI-powered academic analysis
+                </p>
+            </div>
+
+            <div style={{maxWidth: '1400px', margin: '0 auto', padding: '2rem'}}>
+                <div style={{display: 'grid', gridTemplateColumns: '300px 1fr', gap: '2rem'}}>
+                    {/* Student List */}
+                    <div style={{
+                        backgroundColor: 'white',
+                        borderRadius: '16px',
+                        padding: '1.5rem',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                        height: 'fit-content'
+                    }}>
+                        <h3 style={{marginBottom: '1rem', color: '#1e293b'}}>Students</h3>
+
+                        {mockStudents.map((student) => (
+                            <div
+                                key={student.id}
+                                onClick={() => setSelectedStudent(student)}
+                                style={{
+                                    padding: '1rem',
+                                    borderRadius: '12px',
+                                    backgroundColor: selectedStudent?.id === student.id ? '#6366f1' : '#f8fafc',
+                                    color: selectedStudent?.id === student.id ? 'white' : '#1e293b',
+                                    cursor: 'pointer',
+                                    marginBottom: '0.5rem',
+                                    transition: 'all 0.2s'
+                                }}
+                            >
+                                <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
+                                    <div style={{
+                                        width: '40px',
+                                        height: '40px',
+                                        backgroundColor: selectedStudent?.id === student.id ? 'rgba(255,255,255,0.2)' : '#6366f1',
+                                        borderRadius: '50%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '1.2rem'
+                                    }}>
+                                        {student.avatar}
+                                    </div>
+                                    <div>
+                                        <div style={{fontWeight: 600, fontSize: '0.9rem'}}>
+                                            {student.name}
+                                        </div>
+                                        <div style={{fontSize: '0.8rem', opacity: 0.8}}>
+                                            {student.studentId}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style={{
+                                    marginTop: '0.5rem',
+                                    fontSize: '0.8rem',
+                                    display: 'flex',
+                                    justifyContent: 'space-between'
+                                }}>
+                                    <span>GPA: {student.gpa}</span>
+                                    <span style={{
+                                        backgroundColor: student.riskLevel === 'Low' ? '#10b981' :
+                                            student.riskLevel === 'Medium' ? '#f59e0b' : '#ef4444',
+                                        color: 'white',
+                                        padding: '0.1rem 0.5rem',
+                                        borderRadius: '10px',
+                                        fontSize: '0.7rem'
+                                    }}>
+                                        {student.riskLevel} Risk
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Student Details */}
+                    {selectedStudent ? (
+                        <div>
+                            {/* Student Header */}
+                            <div style={{
+                                backgroundColor: 'white',
+                                borderRadius: '16px',
+                                padding: '2rem',
+                                marginBottom: '2rem',
+                                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                            }}>
+                                <div style={{display: 'flex', alignItems: 'center', gap: '2rem'}}>
+                                    <div style={{
+                                        width: '100px',
+                                        height: '100px',
+                                        backgroundColor: '#6366f1',
+                                        borderRadius: '50%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '3rem'
+                                    }}>
+                                        {selectedStudent.avatar}
+                                    </div>
+                                    <div style={{flex: 1}}>
+                                        <h2 style={{fontSize: '2rem', fontWeight: 700, color: '#1e293b', margin: 0}}>
+                                            {selectedStudent.name}
+                                        </h2>
+                                        <p style={{color: '#64748b', margin: '0.5rem 0'}}>
+                                            {selectedStudent.year} • {selectedStudent.major}
+                                        </p>
+                                        <div style={{display: 'flex', gap: '2rem', marginTop: '1rem'}}>
+                                            <div>
+                                                <div style={{fontSize: '1.5rem', fontWeight: 700, color: '#6366f1'}}>
+                                                    {selectedStudent.gpa}
+                                                </div>
+                                                <div style={{fontSize: '0.9rem', color: '#64748b'}}>Current GPA</div>
+                                            </div>
+                                            <div>
+                                                <div style={{fontSize: '1.5rem', fontWeight: 700, color: '#10b981'}}>
+                                                    {selectedStudent.attendanceRate}%
+                                                </div>
+                                                <div style={{fontSize: '0.9rem', color: '#64748b'}}>Attendance</div>
+                                            </div>
+                                            <div>
+                                                <div style={{fontSize: '1.5rem', fontWeight: 700, color: '#f59e0b'}}>
+                                                    {selectedStudent.analytics.dropoutRisk}%
+                                                </div>
+                                                <div style={{fontSize: '0.9rem', color: '#64748b'}}>Dropout Risk</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div style={{
+                                        backgroundColor: '#6366f110',
+                                        color: '#6366f1',
+                                        padding: '0.5rem 1rem',
+                                        borderRadius: '20px',
+                                        fontWeight: 600
+                                    }}>
+                                        AI Profile
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Tabs */}
+                            <div style={{
+                                backgroundColor: 'white',
+                                borderRadius: '16px',
+                                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                                overflow: 'hidden'
+                            }}>
+                                <div style={{
+                                    display: 'flex',
+                                    backgroundColor: '#f8fafc',
+                                    borderBottom: '1px solid #e2e8f0'
+                                }}>
+                                    {[
+                                        {id: 'profile', label: 'Profile', icon: '👤'},
+                                        {id: 'analytics', label: 'AI Analytics', icon: '🧠'},
+                                        {id: 'courses', label: 'Courses', icon: '📚'},
+                                        {id: 'transcripts', label: 'Transcripts', icon: '📄'}
+                                    ].map((tab) => (
+                                        <button
+                                            key={tab.id}
+                                            onClick={() => setActiveTab(tab.id)}
+                                            style={{
+                                                flex: 1,
+                                                padding: '1rem',
+                                                backgroundColor: activeTab === tab.id ? 'white' : 'transparent',
+                                                color: activeTab === tab.id ? '#6366f1' : '#64748b',
+                                                border: 'none',
+                                                cursor: 'pointer',
+                                                fontWeight: activeTab === tab.id ? 600 : 400,
+                                                borderBottom: activeTab === tab.id ? '2px solid #6366f1' : 'none'
+                                            }}
+                                        >
+                                            <span style={{marginRight: '0.5rem'}}>{tab.icon}</span>
+                                            {tab.label}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                <div style={{padding: '2rem'}}>
+                                    {activeTab === 'profile' && (
+                                        <div>
+                                            <h3 style={{marginBottom: '1.5rem', color: '#1e293b'}}>Student Profile</h3>
+                                            <div style={{
+                                                display: 'grid',
+                                                gridTemplateColumns: 'repeat(2, 1fr)',
+                                                gap: '1.5rem'
+                                            }}>
+                                                <div>
+                                                    <div style={{fontWeight: 600, color: '#64748b'}}>Email</div>
+                                                    <div style={{color: '#1e293b'}}>{selectedStudent.email}</div>
+                                                </div>
+                                                <div>
+                                                    <div style={{fontWeight: 600, color: '#64748b'}}>Student ID</div>
+                                                    <div style={{color: '#1e293b'}}>{selectedStudent.studentId}</div>
+                                                </div>
+                                                <div>
+                                                    <div style={{fontWeight: 600, color: '#64748b'}}>Academic Year</div>
+                                                    <div style={{color: '#1e293b'}}>{selectedStudent.year}</div>
+                                                </div>
+                                                <div>
+                                                    <div style={{fontWeight: 600, color: '#64748b'}}>Major</div>
+                                                    <div style={{color: '#1e293b'}}>{selectedStudent.major}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {activeTab === 'analytics' && (
+                                        <div>
+                                            <h3 style={{marginBottom: '1.5rem', color: '#1e293b'}}>AI-Powered
+                                                Analytics</h3>
+                                            <div style={{
+                                                display: 'grid',
+                                                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                                                gap: '1.5rem'
+                                            }}>
+                                                <div style={{
+                                                    backgroundColor: '#10b98110',
+                                                    borderRadius: '12px',
+                                                    padding: '1.5rem',
+                                                    borderLeft: '4px solid #10b981'
+                                                }}>
+                                                    <h4 style={{
+                                                        color: '#10b981',
+                                                        marginBottom: '0.5rem'
+                                                    }}>Strengths</h4>
+                                                    <ul style={{listStyle: 'none', padding: 0, margin: 0}}>
+                                                        {selectedStudent.analytics.strengths.map((strength: string, idx: number) => (
+                                                            <li key={idx} style={{
+                                                                color: '#64748b',
+                                                                fontSize: '0.9rem',
+                                                                marginBottom: '0.25rem'
+                                                            }}>
+                                                                ✓ {strength}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                                <div style={{
+                                                    backgroundColor: '#f59e0b10',
+                                                    borderRadius: '12px',
+                                                    padding: '1.5rem',
+                                                    borderLeft: '4px solid #f59e0b'
+                                                }}>
+                                                    <h4 style={{color: '#f59e0b', marginBottom: '0.5rem'}}>Areas for
+                                                        Improvement</h4>
+                                                    <ul style={{listStyle: 'none', padding: 0, margin: 0}}>
+                                                        {selectedStudent.analytics.weaknesses.map((weakness: string, idx: number) => (
+                                                            <li key={idx} style={{
+                                                                color: '#64748b',
+                                                                fontSize: '0.9rem',
+                                                                marginBottom: '0.25rem'
+                                                            }}>
+                                                                ⚠ {weakness}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                                <div style={{
+                                                    backgroundColor: '#6366f110',
+                                                    borderRadius: '12px',
+                                                    padding: '1.5rem',
+                                                    borderLeft: '4px solid #6366f1'
+                                                }}>
+                                                    <h4 style={{color: '#6366f1', marginBottom: '0.5rem'}}>Performance
+                                                        Trend</h4>
+                                                    <div style={{color: '#64748b', fontSize: '0.9rem'}}>
+                                                        📈 {selectedStudent.analytics.performanceTrend}
+                                                    </div>
+                                                    <div style={{
+                                                        marginTop: '0.5rem',
+                                                        fontSize: '0.8rem',
+                                                        color: '#64748b'
+                                                    }}>
+                                                        AI predicts continued improvement based on current patterns
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {activeTab === 'courses' && (
+                                        <div>
+                                            <h3 style={{marginBottom: '1.5rem', color: '#1e293b'}}>Current Courses</h3>
+                                            <div style={{display: 'grid', gap: '1rem'}}>
+                                                {selectedStudent.courses.map((course: any, idx: number) => (
+                                                    <div key={idx} style={{
+                                                        backgroundColor: '#f8fafc',
+                                                        borderRadius: '12px',
+                                                        padding: '1.5rem',
+                                                        display: 'flex',
+                                                        justifyContent: 'space-between',
+                                                        alignItems: 'center'
+                                                    }}>
+                                                        <div>
+                                                            <h4 style={{
+                                                                color: '#1e293b',
+                                                                margin: 0,
+                                                                marginBottom: '0.25rem'
+                                                            }}>
+                                                                {course.code}: {course.name}
+                                                            </h4>
+                                                            <div style={{color: '#64748b', fontSize: '0.9rem'}}>
+                                                                Credits: {course.credits}
+                                                            </div>
+                                                        </div>
+                                                        <div style={{
+                                                            backgroundColor: '#6366f1',
+                                                            color: 'white',
+                                                            padding: '0.5rem 1rem',
+                                                            borderRadius: '20px',
+                                                            fontWeight: 600
+                                                        }}>
+                                                            {course.grade}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {activeTab === 'transcripts' && (
+                                        <div>
+                                            <h3 style={{marginBottom: '1.5rem', color: '#1e293b'}}>Automated
+                                                Transcripts</h3>
+                                            <div style={{
+                                                backgroundColor: '#6366f110',
+                                                borderRadius: '12px',
+                                                padding: '2rem',
+                                                textAlign: 'center'
+                                            }}>
+                                                <div style={{fontSize: '3rem', marginBottom: '1rem'}}>📄</div>
+                                                <h4 style={{color: '#6366f1', marginBottom: '1rem'}}>AI-Generated
+                                                    Transcript</h4>
+                                                <p style={{color: '#64748b', marginBottom: '1.5rem'}}>
+                                                    Official transcript automatically generated and updated in real-time
+                                                </p>
+                                                <button
+                                                    onClick={() => toast.success('Generating official transcript...')}
+                                                    style={{
+                                                        padding: '12px 24px',
+                                                        backgroundColor: '#6366f1',
+                                                        color: 'white',
+                                                        border: 'none',
+                                                        borderRadius: '12px',
+                                                        cursor: 'pointer',
+                                                        fontWeight: 600
+                                                    }}
+                                                >
+                                                    Download Transcript
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div style={{
+                            backgroundColor: 'white',
+                            borderRadius: '16px',
+                            padding: '4rem',
+                            textAlign: 'center',
+                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                        }}>
+                            <div style={{fontSize: '4rem', marginBottom: '1rem'}}>👥</div>
+                            <h3 style={{color: '#64748b', fontSize: '1.2rem'}}>
+                                Select a student to view their comprehensive AI-powered profile
+                            </h3>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// --- Personalized & Adaptive Learning Page ---
+const AdaptiveLearningPage = ({onBack}: { onBack: () => void }) => {
+    const [activeTab, setActiveTab] = React.useState('paths')
+    const [selectedPath, setSelectedPath] = React.useState<any>(null)
+
+    const mockLearningPaths = [
+        {
+            id: 1,
+            title: 'Computer Science Fundamentals',
+            student: 'Sarah Johnson',
+            progress: 78,
+            difficulty: 'Adaptive',
+            estimatedCompletion: '6 weeks',
+            modules: [
+                {name: 'Variables & Data Types', status: 'completed', score: 95},
+                {name: 'Control Structures', status: 'completed', score: 87},
+                {name: 'Functions & Methods', status: 'current', score: null},
+                {name: 'Object-Oriented Programming', status: 'locked', score: null},
+                {name: 'Data Structures', status: 'locked', score: null}
+            ],
+            aiInsights: 'Student excels in logical thinking. Recommend more visual programming exercises.',
+            gamification: {
+                badges: ['First Code', 'Logic Master', 'Problem Solver'],
+                points: 2340,
+                level: 'Intermediate Coder'
+            }
+        }
+    ]
+
+    return (
+        <div style={{
+            minHeight: '100vh',
+            backgroundColor: '#f8fafc',
+            fontFamily: 'Inter, sans-serif'
+        }}>
+            {/* Header */}
+            <div style={{
+                background: 'linear-gradient(135deg, #8b5cf6, #6366f1)',
+                color: 'white',
+                padding: '2rem'
+            }}>
+                <button
+                    onClick={onBack}
+                    style={{
+                        background: 'rgba(255,255,255,0.2)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '12px',
+                        padding: '12px 20px',
+                        cursor: 'pointer',
+                        fontWeight: 500,
+                        marginBottom: '1rem'
+                    }}
+                >
+                    ← Back to Features
+                </button>
+
+                <h1 style={{fontSize: '2.5rem', marginBottom: '0.5rem', fontWeight: 700}}>
+                    🧠 Personalized & Adaptive Learning
+                </h1>
+                <p style={{fontSize: '1.1rem', opacity: 0.9}}>
+                    AI-powered customized learning paths for every student
+                </p>
+            </div>
+
+            <div style={{maxWidth: '1400px', margin: '0 auto', padding: '2rem'}}>
+                <div style={{
+                    backgroundColor: 'white',
+                    borderRadius: '16px',
+                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
+                    padding: '1rem',
+                    marginBottom: '2rem',
+                    display: 'flex',
+                    gap: '1rem'
+                }}>
+                    {[
+                        {id: 'paths', label: 'Learning Paths', icon: '🛤️'},
+                        {id: 'gamification', label: 'Gamification', icon: '🎮'},
+                        {id: 'assessments', label: 'AI Assessments', icon: '📝'}
+                    ].map((tab) => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            style={{
+                                flex: 1,
+                                padding: '1rem',
+                                backgroundColor: activeTab === tab.id ? '#8b5cf6' : 'transparent',
+                                color: activeTab === tab.id ? 'white' : '#64748b',
+                                border: 'none',
+                                borderRadius: '12px',
+                                cursor: 'pointer',
+                                fontWeight: activeTab === tab.id ? 600 : 400,
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            <span style={{marginRight: '0.5rem'}}>{tab.icon}</span>
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
+
+                {activeTab === 'paths' && (
+                    <div style={{display: 'grid', gridTemplateColumns: '400px 1fr', gap: '2rem'}}>
+                        {/* Learning Paths List */}
+                        <div style={{
+                            backgroundColor: 'white',
+                            borderRadius: '16px',
+                            padding: '1.5rem',
+                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                            height: 'fit-content'
+                        }}>
+                            <h3 style={{marginBottom: '1rem', color: '#1e293b'}}>Active Learning Paths</h3>
+
+                            {mockLearningPaths.map((path) => (
+                                <div
+                                    key={path.id}
+                                    onClick={() => setSelectedPath(path)}
+                                    style={{
+                                        padding: '1.5rem',
+                                        borderRadius: '12px',
+                                        backgroundColor: selectedPath?.id === path.id ? '#8b5cf6' : '#f8fafc',
+                                        color: selectedPath?.id === path.id ? 'white' : '#1e293b',
+                                        cursor: 'pointer',
+                                        marginBottom: '1rem',
+                                        transition: 'all 0.2s'
+                                    }}
+                                >
+                                    <h4 style={{margin: 0, marginBottom: '0.5rem', fontWeight: 600}}>
+                                        {path.title}
+                                    </h4>
+                                    <div style={{fontSize: '0.9rem', opacity: 0.8, marginBottom: '0.5rem'}}>
+                                        Student: {path.student}
+                                    </div>
+                                    <div style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center'
+                                    }}>
+                                        <span style={{fontSize: '0.8rem'}}>Progress: {path.progress}%</span>
+                                        <div style={{
+                                            backgroundColor: selectedPath?.id === path.id ? 'rgba(255,255,255,0.2)' : '#8b5cf6',
+                                            color: 'white',
+                                            padding: '0.2rem 0.6rem',
+                                            borderRadius: '10px',
+                                            fontSize: '0.7rem',
+                                            fontWeight: 500
+                                        }}>
+                                            AI-Adaptive
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Path Details */}
+                        {selectedPath ? (
+                            <div style={{
+                                backgroundColor: 'white',
+                                borderRadius: '16px',
+                                padding: '2rem',
+                                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                            }}>
+                                <div style={{marginBottom: '2rem'}}>
+                                    <h2 style={{
+                                        fontSize: '1.8rem',
+                                        fontWeight: 700,
+                                        color: '#1e293b',
+                                        margin: 0,
+                                        marginBottom: '0.5rem'
+                                    }}>
+                                        {selectedPath.title}
+                                    </h2>
+                                    <div style={{display: 'flex', gap: '2rem', marginBottom: '1rem'}}>
+                                        <div>
+                                            <div style={{fontSize: '1.2rem', fontWeight: 600, color: '#8b5cf6'}}>
+                                                {selectedPath.progress}%
+                                            </div>
+                                            <div style={{fontSize: '0.9rem', color: '#64748b'}}>Progress</div>
+                                        </div>
+                                        <div>
+                                            <div style={{fontSize: '1.2rem', fontWeight: 600, color: '#10b981'}}>
+                                                {selectedPath.estimatedCompletion}
+                                            </div>
+                                            <div style={{fontSize: '0.9rem', color: '#64748b'}}>Est. Completion</div>
+                                        </div>
+                                        <div>
+                                            <div style={{fontSize: '1.2rem', fontWeight: 600, color: '#f59e0b'}}>
+                                                {selectedPath.difficulty}
+                                            </div>
+                                            <div style={{fontSize: '0.9rem', color: '#64748b'}}>Difficulty</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <h3 style={{marginBottom: '1rem', color: '#1e293b'}}>Learning Modules</h3>
+                                <div style={{display: 'grid', gap: '1rem', marginBottom: '2rem'}}>
+                                    {selectedPath.modules.map((module: any, idx: number) => (
+                                        <div key={idx} style={{
+                                            backgroundColor: '#f8fafc',
+                                            borderRadius: '12px',
+                                            padding: '1.5rem',
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'center',
+                                            opacity: module.status === 'locked' ? 0.5 : 1
+                                        }}>
+                                            <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
+                                                <div style={{
+                                                    width: '40px',
+                                                    height: '40px',
+                                                    borderRadius: '50%',
+                                                    backgroundColor:
+                                                        module.status === 'completed' ? '#10b981' :
+                                                            module.status === 'current' ? '#f59e0b' : '#e2e8f0',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    color: 'white',
+                                                    fontSize: '1.2rem'
+                                                }}>
+                                                    {module.status === 'completed' ? '✓' :
+                                                        module.status === 'current' ? '⏳' : '🔒'}
+                                                </div>
+                                                <div>
+                                                    <h4 style={{color: '#1e293b', margin: 0, marginBottom: '0.25rem'}}>
+                                                        {module.name}
+                                                    </h4>
+                                                    <div style={{
+                                                        color: '#64748b',
+                                                        fontSize: '0.9rem',
+                                                        textTransform: 'capitalize'
+                                                    }}>
+                                                        {module.status}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {module.score && (
+                                                <div style={{
+                                                    backgroundColor: '#8b5cf6',
+                                                    color: 'white',
+                                                    padding: '0.5rem 1rem',
+                                                    borderRadius: '20px',
+                                                    fontWeight: 600
+                                                }}>
+                                                    {module.score}%
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div style={{
+                                    backgroundColor: '#8b5cf610',
+                                    borderRadius: '12px',
+                                    padding: '1.5rem'
+                                }}>
+                                    <h4 style={{color: '#8b5cf6', marginBottom: '0.5rem'}}>AI Insights</h4>
+                                    <p style={{color: '#64748b', fontSize: '0.9rem', margin: 0}}>
+                                        {selectedPath.aiInsights}
+                                    </p>
+                                </div>
+                            </div>
+                        ) : (
+                            <div style={{
+                                backgroundColor: 'white',
+                                borderRadius: '16px',
+                                padding: '4rem',
+                                textAlign: 'center',
+                                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                            }}>
+                                <div style={{fontSize: '4rem', marginBottom: '1rem'}}>🛤️</div>
+                                <h3 style={{color: '#64748b', fontSize: '1.2rem'}}>
+                                    Select a learning path to view AI-powered customization
+                                </h3>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {activeTab === 'gamification' && selectedPath && (
+                    <div style={{
+                        backgroundColor: 'white',
+                        borderRadius: '16px',
+                        padding: '2rem',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                    }}>
+                        <h3 style={{marginBottom: '1.5rem', color: '#1e293b'}}>Gamification Engine</h3>
+
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                            gap: '1.5rem',
+                            marginBottom: '2rem'
+                        }}>
+                            <div style={{
+                                backgroundColor: '#8b5cf610',
+                                borderRadius: '12px',
+                                padding: '1.5rem',
+                                textAlign: 'center'
+                            }}>
+                                <div style={{fontSize: '2rem', marginBottom: '0.5rem'}}>🏆</div>
+                                <h4 style={{color: '#8b5cf6', marginBottom: '0.5rem'}}>Level</h4>
+                                <div style={{fontSize: '1.2rem', fontWeight: 600, color: '#1e293b'}}>
+                                    {selectedPath.gamification.level}
+                                </div>
+                            </div>
+                            <div style={{
+                                backgroundColor: '#f59e0b10',
+                                borderRadius: '12px',
+                                padding: '1.5rem',
+                                textAlign: 'center'
+                            }}>
+                                <div style={{fontSize: '2rem', marginBottom: '0.5rem'}}>⭐</div>
+                                <h4 style={{color: '#f59e0b', marginBottom: '0.5rem'}}>Points</h4>
+                                <div style={{fontSize: '1.2rem', fontWeight: 600, color: '#1e293b'}}>
+                                    {selectedPath.gamification.points.toLocaleString()}
+                                </div>
+                            </div>
+                        </div>
+
+                        <h4 style={{marginBottom: '1rem', color: '#1e293b'}}>Achievement Badges</h4>
+                        <div style={{display: 'flex', gap: '1rem', flexWrap: 'wrap'}}>
+                            {selectedPath.gamification.badges.map((badge: string, idx: number) => (
+                                <div key={idx} style={{
+                                    backgroundColor: '#10b98110',
+                                    color: '#10b981',
+                                    padding: '0.5rem 1rem',
+                                    borderRadius: '20px',
+                                    fontWeight: 600,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem'
+                                }}>
+                                    🏅 {badge}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'assessments' && (
+                    <div style={{
+                        backgroundColor: 'white',
+                        borderRadius: '16px',
+                        padding: '2rem',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                    }}>
+                        <h3 style={{marginBottom: '1.5rem', color: '#1e293b'}}>AI-Generated Assessments</h3>
+
+                        <div style={{
+                            backgroundColor: '#8b5cf610',
+                            borderRadius: '12px',
+                            padding: '2rem',
+                            textAlign: 'center',
+                            marginBottom: '2rem'
+                        }}>
+                            <div style={{fontSize: '3rem', marginBottom: '1rem'}}>📝</div>
+                            <h4 style={{color: '#8b5cf6', marginBottom: '1rem'}}>Dynamic Quiz Generation</h4>
+                            <p style={{color: '#64748b', marginBottom: '1.5rem'}}>
+                                AI creates personalized quizzes based on your learning progress and difficulty
+                                preferences
+                            </p>
+                            <button
+                                onClick={() => toast.success('Generating personalized quiz...')}
+                                style={{
+                                    padding: '12px 24px',
+                                    backgroundColor: '#8b5cf6',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '12px',
+                                    cursor: 'pointer',
+                                    fontWeight: 600
+                                }}
+                            >
+                                Generate Quiz
+                            </button>
+                        </div>
+
+                        <div style={{
+                            backgroundColor: '#f8fafc',
+                            borderRadius: '12px',
+                            padding: '1.5rem'
+                        }}>
+                            <h4 style={{color: '#1e293b', marginBottom: '0.5rem'}}>AI Assessment Features</h4>
+                            <ul style={{color: '#64748b', fontSize: '0.9rem'}}>
+                                <li>Adaptive difficulty based on performance</li>
+                                <li>Instant feedback with explanations</li>
+                                <li>Progress tracking and weak area identification</li>
+                                <li>Personalized challenge recommendations</li>
+                            </ul>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+}
+
+// --- Career Guidance & Employability Page ---
+const CareerGuidancePage = ({onBack}: { onBack: () => void }) => {
+    const [activeTab, setActiveTab] = React.useState('resume')
+    const [mockResume] = React.useState({
+        name: 'Sarah Johnson',
+        email: 'sarah.johnson@student.edu',
+        skills: ['JavaScript', 'Python', 'React', 'Node.js', 'SQL'],
+        experience: [
+            {title: 'Intern Developer', company: 'Tech Corp', duration: '3 months'},
+            {title: 'Project Assistant', company: 'University Lab', duration: '6 months'}
+        ],
+        aiScore: 87,
+        suggestions: [
+            'Add more quantifiable achievements',
+            'Include relevant coursework section',
+            'Highlight leadership experiences'
+        ]
+    })
+
+    const mockJobs = [
+        {
+            id: 1,
+            title: 'Frontend Developer',
+            company: 'Tech Innovations',
+            location: 'San Francisco, CA',
+            salary: '$75,000 - $95,000',
+            match: 94,
+            skills: ['React', 'JavaScript', 'CSS'],
+            type: 'Full-time'
+        },
+        {
+            id: 2,
+            title: 'Software Engineer Intern',
+            company: 'StartupXYZ',
+            location: 'Remote',
+            salary: '$25/hour',
+            match: 87,
+            skills: ['Python', 'JavaScript', 'Git'],
+            type: 'Internship'
+        }
+    ]
+
+    return (
+        <div style={{
+            minHeight: '100vh',
+            backgroundColor: '#f8fafc',
+            fontFamily: 'Inter, sans-serif'
+        }}>
+            {/* Header */}
+            <div style={{
+                background: 'linear-gradient(135deg, #10b981, #6366f1)',
+                color: 'white',
+                padding: '2rem'
+            }}>
+                <button
+                    onClick={onBack}
+                    style={{
+                        background: 'rgba(255,255,255,0.2)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '12px',
+                        padding: '12px 20px',
+                        cursor: 'pointer',
+                        fontWeight: 500,
+                        marginBottom: '1rem'
+                    }}
+                >
+                    ← Back to Features
+                </button>
+
+                <h1 style={{fontSize: '2.5rem', marginBottom: '0.5rem', fontWeight: 700}}>
+                    💼 Career Guidance & Employability
+                </h1>
+                <p style={{fontSize: '1.1rem', opacity: 0.9}}>
+                    AI-driven career matching and skill development
+                </p>
+            </div>
+
+            <div style={{maxWidth: '1400px', margin: '0 auto', padding: '2rem'}}>
+                <div style={{
+                    backgroundColor: 'white',
+                    borderRadius: '16px',
+                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
+                    padding: '1rem',
+                    marginBottom: '2rem',
+                    display: 'flex',
+                    gap: '1rem'
+                }}>
+                    {[
+                        {id: 'resume', label: 'Resume Analysis', icon: '📄'},
+                        {id: 'jobs', label: 'Job Matching', icon: '🎯'},
+                        {id: 'chatbot', label: 'Career Advisor', icon: '🤖'}
+                    ].map((tab) => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            style={{
+                                flex: 1,
+                                padding: '1rem',
+                                backgroundColor: activeTab === tab.id ? '#10b981' : 'transparent',
+                                color: activeTab === tab.id ? 'white' : '#64748b',
+                                border: 'none',
+                                borderRadius: '12px',
+                                cursor: 'pointer',
+                                fontWeight: activeTab === tab.id ? 600 : 400,
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            <span style={{marginRight: '0.5rem'}}>{tab.icon}</span>
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
+
+                {activeTab === 'resume' && (
+                    <div style={{display: 'grid', gridTemplateColumns: '1fr 400px', gap: '2rem'}}>
+                        <div style={{
+                            backgroundColor: 'white',
+                            borderRadius: '16px',
+                            padding: '2rem',
+                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                        }}>
+                            <h3 style={{marginBottom: '1.5rem', color: '#1e293b'}}>Resume Analysis</h3>
+
+                            <div style={{marginBottom: '2rem'}}>
+                                <div style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    marginBottom: '1rem'
+                                }}>
+                                    <h4 style={{color: '#1e293b', margin: 0}}>AI Optimization Score</h4>
+                                    <div style={{
+                                        backgroundColor: '#10b981',
+                                        color: 'white',
+                                        padding: '0.5rem 1rem',
+                                        borderRadius: '20px',
+                                        fontWeight: 600,
+                                        fontSize: '1.1rem'
+                                    }}>
+                                        {mockResume.aiScore}/100
+                                    </div>
+                                </div>
+                                <div style={{
+                                    backgroundColor: '#e2e8f0',
+                                    borderRadius: '10px',
+                                    height: '10px',
+                                    overflow: 'hidden'
+                                }}>
+                                    <div style={{
+                                        backgroundColor: '#10b981',
+                                        height: '100%',
+                                        width: `${mockResume.aiScore}%`,
+                                        transition: 'width 0.3s'
+                                    }}/>
+                                </div>
+                            </div>
+
+                            <div style={{marginBottom: '2rem'}}>
+                                <h4 style={{color: '#1e293b', marginBottom: '1rem'}}>Skills Analysis</h4>
+                                <div style={{display: 'flex', flexWrap: 'wrap', gap: '0.5rem'}}>
+                                    {mockResume.skills.map((skill: string, idx: number) => (
+                                        <div key={idx} style={{
+                                            backgroundColor: '#10b98110',
+                                            color: '#10b981',
+                                            padding: '0.5rem 1rem',
+                                            borderRadius: '20px',
+                                            fontWeight: 500,
+                                            fontSize: '0.9rem'
+                                        }}>
+                                            {skill}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div style={{
+                                border: '2px dashed #e2e8f0',
+                                borderRadius: '12px',
+                                padding: '2rem',
+                                textAlign: 'center',
+                                backgroundColor: '#f8fafc'
+                            }}>
+                                <div style={{fontSize: '2rem', marginBottom: '1rem'}}>📄</div>
+                                <p style={{color: '#64748b', marginBottom: '1rem'}}>
+                                    Upload your resume for AI-powered analysis and optimization
+                                </p>
+                                <button
+                                    onClick={() => toast.success('Analyzing resume with AI...')}
+                                    style={{
+                                        padding: '12px 24px',
+                                        backgroundColor: '#10b981',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '12px',
+                                        cursor: 'pointer',
+                                        fontWeight: 600
+                                    }}
+                                >
+                                    Upload Resume
+                                </button>
+                            </div>
+                        </div>
+
+                        <div style={{
+                            backgroundColor: 'white',
+                            borderRadius: '16px',
+                            padding: '2rem',
+                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                            height: 'fit-content'
+                        }}>
+                            <h3 style={{marginBottom: '1.5rem', color: '#1e293b'}}>AI Suggestions</h3>
+                            <div style={{display: 'grid', gap: '1rem'}}>
+                                {mockResume.suggestions.map((suggestion: string, idx: number) => (
+                                    <div key={idx} style={{
+                                        backgroundColor: '#f59e0b10',
+                                        borderRadius: '8px',
+                                        padding: '1rem',
+                                        borderLeft: '4px solid #f59e0b'
+                                    }}>
+                                        <div style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '0.5rem',
+                                            marginBottom: '0.5rem'
+                                        }}>
+                                            <span style={{color: '#f59e0b'}}>💡</span>
+                                            <span style={{fontWeight: 600, color: '#1e293b', fontSize: '0.9rem'}}>
+                                                Improvement Tip
+                                            </span>
+                                        </div>
+                                        <p style={{color: '#64748b', fontSize: '0.9rem', margin: 0}}>
+                                            {suggestion}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'jobs' && (
+                    <div>
+                        <div style={{
+                            backgroundColor: 'white',
+                            borderRadius: '16px',
+                            padding: '2rem',
+                            marginBottom: '2rem',
+                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                        }}>
+                            <h3 style={{marginBottom: '1.5rem', color: '#1e293b'}}>AI Job Matching Engine</h3>
+                            <p style={{color: '#64748b', marginBottom: '1rem'}}>
+                                Our NLP-powered system matches your skills with the best job opportunities
+                            </p>
+                        </div>
+
+                        <div style={{display: 'grid', gap: '1.5rem'}}>
+                            {mockJobs.map((job) => (
+                                <div key={job.id} style={{
+                                    backgroundColor: 'white',
+                                    borderRadius: '16px',
+                                    padding: '2rem',
+                                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                                    transition: 'transform 0.2s'
+                                }}>
+                                    <div style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'start',
+                                        marginBottom: '1rem'
+                                    }}>
+                                        <div>
+                                            <h4 style={{
+                                                color: '#1e293b',
+                                                margin: 0,
+                                                marginBottom: '0.25rem',
+                                                fontSize: '1.3rem'
+                                            }}>
+                                                {job.title}
+                                            </h4>
+                                            <p style={{color: '#64748b', margin: 0, fontSize: '1rem'}}>
+                                                {job.company} • {job.location}
+                                            </p>
+                                        </div>
+                                        <div style={{
+                                            backgroundColor: '#10b981',
+                                            color: 'white',
+                                            padding: '0.5rem 1rem',
+                                            borderRadius: '20px',
+                                            fontWeight: 600,
+                                            fontSize: '0.9rem'
+                                        }}>
+                                            {job.match}% Match
+                                        </div>
+                                    </div>
+
+                                    <div style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        marginBottom: '1rem'
+                                    }}>
+                                        <div style={{color: '#10b981', fontWeight: 600, fontSize: '1.1rem'}}>
+                                            {job.salary}
+                                        </div>
+                                        <div style={{
+                                            backgroundColor: '#6366f110',
+                                            color: '#6366f1',
+                                            padding: '0.25rem 0.75rem',
+                                            borderRadius: '15px',
+                                            fontSize: '0.8rem',
+                                            fontWeight: 500
+                                        }}>
+                                            {job.type}
+                                        </div>
+                                    </div>
+
+                                    <div style={{marginBottom: '1rem'}}>
+                                        <h5 style={{
+                                            color: '#1e293b',
+                                            marginBottom: '0.5rem',
+                                            fontSize: '0.9rem'
+                                        }}>Required Skills:</h5>
+                                        <div style={{display: 'flex', gap: '0.5rem', flexWrap: 'wrap'}}>
+                                            {job.skills.map((skill: string, idx: number) => (
+                                                <span key={idx} style={{
+                                                    backgroundColor: '#8b5cf610',
+                                                    color: '#8b5cf6',
+                                                    padding: '0.25rem 0.75rem',
+                                                    borderRadius: '15px',
+                                                    fontSize: '0.8rem',
+                                                    fontWeight: 500
+                                                }}>
+                                                    {skill}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        onClick={() => toast.success(`Applied to ${job.title} position!`)}
+                                        style={{
+                                            padding: '10px 20px',
+                                            backgroundColor: '#10b981',
+                                            color: 'white',
+                                            border: 'none',
+                                            borderRadius: '8px',
+                                            cursor: 'pointer',
+                                            fontWeight: 600,
+                                            fontSize: '0.9rem'
+                                        }}
+                                    >
+                                        Apply Now
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'chatbot' && (
+                    <div style={{
+                        backgroundColor: 'white',
+                        borderRadius: '16px',
+                        padding: '2rem',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                    }}>
+                        <h3 style={{marginBottom: '1.5rem', color: '#1e293b'}}>Career Chatbot Advisor</h3>
+
+                        <div style={{
+                            backgroundColor: '#10b98110',
+                            borderRadius: '12px',
+                            padding: '2rem',
+                            textAlign: 'center',
+                            marginBottom: '2rem'
+                        }}>
+                            <div style={{fontSize: '3rem', marginBottom: '1rem'}}>🤖</div>
+                            <h4 style={{color: '#10b981', marginBottom: '1rem'}}>AI-Powered Career Guidance</h4>
+                            <p style={{color: '#64748b', marginBottom: '1.5rem'}}>
+                                Get instant, personalized advice on courses, admissions, scholarships, and career paths
+                            </p>
+                            <button
+                                onClick={() => toast.success('Starting chat with career advisor...')}
+                                style={{
+                                    padding: '12px 24px',
+                                    backgroundColor: '#10b981',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '12px',
+                                    cursor: 'pointer',
+                                    fontWeight: 600
+                                }}
+                            >
+                                Start Conversation
+                            </button>
+                        </div>
+
+                        <div style={{
+                            backgroundColor: '#f8fafc',
+                            borderRadius: '12px',
+                            padding: '1.5rem'
+                        }}>
+                            <h4 style={{color: '#1e293b', marginBottom: '0.5rem'}}>24/7 Guidance Topics</h4>
+                            <ul style={{color: '#64748b', fontSize: '0.9rem'}}>
+                                <li>Course recommendations based on career goals</li>
+                                <li>Scholarship opportunities and application tips</li>
+                                <li>Admission requirements for target programs</li>
+                                <li>Industry insights and job market trends</li>
+                                <li>Skill development recommendations</li>
+                            </ul>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
     )
 }
 
