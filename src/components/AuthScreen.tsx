@@ -5,115 +5,154 @@ import {useAuth, RegisterData} from '../contexts/AuthContext'
 
 const AuthScreen: React.FC = () => {
     const [isLogin, setIsLogin] = useState(true)
-    const [userType, setUserType] = useState<'student' | 'teacher'>('student')
+    const [userType, setUserType] = useState<'student' | 'teacher' | 'admin'>('student')
     const [isLoading, setIsLoading] = useState(false)
     const {login, register} = useAuth()
 
     // Login form state
     const [loginForm, setLoginForm] = useState({
-        email: '',
+        username: '',
         password: ''
     })
 
     // Registration form state
     const [registerForm, setRegisterForm] = useState({
-        firstName: '',
-        lastName: '',
+        username: '',
+        first_name: '',
+        last_name: '',
         email: '',
         password: '',
         confirmPassword: '',
-        // Student specific
-        studentId: '',
-        major: '',
-        year: '',
-        // Teacher specific
-        teacherId: '',
-        department: '',
-        expertise: [] as string[]
+        phone_number: '',
+        address: ''
     })
+
+    // Form validation errors
+    const [errors, setErrors] = useState<Record<string, string>>({})
+
+    const validateRegistration = (): boolean => {
+        const newErrors: Record<string, string> = {}
+
+        // Required field validation
+        if (!registerForm.username.trim()) {
+            newErrors.username = 'Username is required'
+        } else if (registerForm.username.length < 3) {
+            newErrors.username = 'Username must be at least 3 characters'
+        } else if (!/^[a-zA-Z0-9_]+$/.test(registerForm.username)) {
+            newErrors.username = 'Username can only contain letters, numbers, and underscores'
+        }
+
+        if (!registerForm.first_name.trim()) {
+            newErrors.first_name = 'First name is required'
+        }
+
+        if (!registerForm.last_name.trim()) {
+            newErrors.last_name = 'Last name is required'
+        }
+
+        if (!registerForm.email.trim()) {
+            newErrors.email = 'Email is required'
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(registerForm.email)) {
+            newErrors.email = 'Please enter a valid email address'
+        }
+
+        if (!registerForm.password) {
+            newErrors.password = 'Password is required'
+        } else if (registerForm.password.length < 6) {
+            newErrors.password = 'Password must be at least 6 characters'
+        }
+
+        if (!registerForm.confirmPassword) {
+            newErrors.confirmPassword = 'Please confirm your password'
+        } else if (registerForm.password !== registerForm.confirmPassword) {
+            newErrors.confirmPassword = 'Passwords do not match'
+        }
+
+        setErrors(newErrors)
+        return Object.keys(newErrors).length === 0
+    }
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!loginForm.email || !loginForm.password) {
+
+        if (!loginForm.username || !loginForm.password) {
             toast.error('Please fill in all fields')
             return
         }
 
         setIsLoading(true)
-        const success = await login(loginForm.email, loginForm.password, userType)
-        setIsLoading(false)
-
-        if (!success) {
-            // Show demo credentials hint
-            toast.info(`Demo ${userType} credentials: ${userType}@demo.com / any password`)
+        try {
+            const success = await login(loginForm.username, loginForm.password, userType)
+            if (!success) {
+                // Show demo credentials hint
+                toast.info(`💡 Try demo accounts: ${userType}@demo.com with any password`)
+            }
+        } catch (error) {
+            toast.error('Login failed. Please try again.')
+        } finally {
+            setIsLoading(false)
         }
     }
 
     const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault()
 
-        // Validation
-        if (!registerForm.firstName || !registerForm.lastName || !registerForm.email || !registerForm.password) {
-            toast.error('Please fill in all required fields')
-            return
-        }
+        // Clear previous errors
+        setErrors({})
 
-        if (registerForm.password !== registerForm.confirmPassword) {
-            toast.error('Passwords do not match')
-            return
-        }
-
-        if (registerForm.password.length < 6) {
-            toast.error('Password must be at least 6 characters')
+        // Validate form
+        if (!validateRegistration()) {
+            toast.error('Please fix the validation errors')
             return
         }
 
         const userData: RegisterData = {
-            firstName: registerForm.firstName,
-            lastName: registerForm.lastName,
-            email: registerForm.email,
+            username: registerForm.username.trim(),
+            first_name: registerForm.first_name.trim(),
+            last_name: registerForm.last_name.trim(),
+            email: registerForm.email.trim().toLowerCase(),
             password: registerForm.password,
-            userType,
-            ...(userType === 'student' ? {
-                studentId: registerForm.studentId,
-                major: registerForm.major,
-                year: registerForm.year
-            } : {
-                teacherId: registerForm.teacherId,
-                department: registerForm.department,
-                expertise: registerForm.expertise
-            })
+            user_type: userType,
+            phone_number: registerForm.phone_number.trim(),
+            address: registerForm.address.trim()
         }
 
         setIsLoading(true)
-        const success = await register(userData)
-        setIsLoading(false)
+        try {
+            const success = await register(userData)
+            if (success) {
+                // Clear form on success
+                setRegisterForm({
+                    username: '',
+                    first_name: '',
+                    last_name: '',
+                    email: '',
+                    password: '',
+                    confirmPassword: '',
+                    phone_number: '',
+                    address: ''
+                })
+            }
+        } catch (error) {
+            toast.error('Registration failed. Please try again.')
+        } finally {
+            setIsLoading(false)
+        }
     }
 
     const loadDemoCredentials = () => {
         setLoginForm({
-            email: userType === 'student' ? 'student@demo.com' : 'teacher@demo.com',
+            username: `${userType}@demo.com`,
             password: 'demo123'
         })
-        toast.info('Demo credentials loaded!')
+        toast.info('✨ Demo credentials loaded! Click Sign In to continue.')
     }
 
-    const majors = [
-        'Computer Science', 'Business Administration', 'Engineering', 'Mathematics',
-        'Physics', 'Biology', 'Psychology', 'Art & Design', 'Literature', 'Medicine'
-    ]
-
-    const years = ['Freshman', 'Sophomore', 'Junior', 'Senior', 'Graduate']
-
-    const departments = [
-        'Computer Science', 'Mathematics', 'Physics', 'Business', 'Engineering',
-        'Biology', 'Psychology', 'Art & Design', 'Literature', 'Medicine'
-    ]
-
-    const expertiseOptions = [
-        'Machine Learning', 'AI', 'Statistics', 'Web Development', 'Mobile Development',
-        'Data Science', 'Cybersecurity', 'Cloud Computing', 'Teaching Methodology', 'Research'
-    ]
+    const clearErrors = (field: string) => {
+        if (errors[field]) {
+            setErrors({...errors, [field]: ''})
+        }
+    }
 
     return (
         <div style={{
@@ -165,7 +204,10 @@ const AuthScreen: React.FC = () => {
                     marginBottom: '2rem'
                 }}>
                     <button
-                        onClick={() => setIsLogin(true)}
+                        onClick={() => {
+                            setIsLogin(true)
+                            setErrors({})
+                        }}
                         style={{
                             flex: 1,
                             padding: '12px',
@@ -181,7 +223,10 @@ const AuthScreen: React.FC = () => {
                         Sign In
                     </button>
                     <button
-                        onClick={() => setIsLogin(false)}
+                        onClick={() => {
+                            setIsLogin(false)
+                            setErrors({})
+                        }}
                         style={{
                             flex: 1,
                             padding: '12px',
@@ -200,17 +245,18 @@ const AuthScreen: React.FC = () => {
 
                 {/* User Type Selection */}
                 <div style={{
-                    display: 'flex',
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr 1fr',
                     backgroundColor: '#f8fafc',
                     borderRadius: '12px',
                     padding: '4px',
-                    marginBottom: '2rem'
+                    marginBottom: '2rem',
+                    gap: '4px'
                 }}>
                     <button
                         onClick={() => setUserType('student')}
                         style={{
-                            flex: 1,
-                            padding: '12px',
+                            padding: '12px 8px',
                             backgroundColor: userType === 'student' ? '#10b981' : 'transparent',
                             color: userType === 'student' ? 'white' : '#64748b',
                             border: 'none',
@@ -221,7 +267,8 @@ const AuthScreen: React.FC = () => {
                             alignItems: 'center',
                             justifyContent: 'center',
                             gap: '0.5rem',
-                            transition: 'all 0.2s'
+                            transition: 'all 0.2s',
+                            fontSize: '0.9rem'
                         }}
                     >
                         🎓 Student
@@ -229,8 +276,7 @@ const AuthScreen: React.FC = () => {
                     <button
                         onClick={() => setUserType('teacher')}
                         style={{
-                            flex: 1,
-                            padding: '12px',
+                            padding: '12px 8px',
                             backgroundColor: userType === 'teacher' ? '#ec4899' : 'transparent',
                             color: userType === 'teacher' ? 'white' : '#64748b',
                             border: 'none',
@@ -241,10 +287,31 @@ const AuthScreen: React.FC = () => {
                             alignItems: 'center',
                             justifyContent: 'center',
                             gap: '0.5rem',
-                            transition: 'all 0.2s'
+                            transition: 'all 0.2s',
+                            fontSize: '0.9rem'
                         }}
                     >
                         👨‍🏫 Teacher
+                    </button>
+                    <button
+                        onClick={() => setUserType('admin')}
+                        style={{
+                            padding: '12px 8px',
+                            backgroundColor: userType === 'admin' ? '#dc2626' : 'transparent',
+                            color: userType === 'admin' ? 'white' : '#64748b',
+                            border: 'none',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            fontWeight: 500,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.5rem',
+                            transition: 'all 0.2s',
+                            fontSize: '0.9rem'
+                        }}
+                    >
+                        👑 Admin
                     </button>
                 </div>
 
@@ -260,10 +327,10 @@ const AuthScreen: React.FC = () => {
                             style={{display: 'grid', gap: '1rem'}}
                         >
                             <input
-                                type="email"
-                                placeholder="Email address"
-                                value={loginForm.email}
-                                onChange={(e) => setLoginForm({...loginForm, email: e.target.value})}
+                                type="text"
+                                placeholder="Username or Email"
+                                value={loginForm.username}
+                                onChange={(e) => setLoginForm({...loginForm, username: e.target.value})}
                                 style={{
                                     width: '100%',
                                     padding: '16px',
@@ -309,9 +376,14 @@ const AuthScreen: React.FC = () => {
                                     fontWeight: 600,
                                     cursor: isLoading ? 'not-allowed' : 'pointer',
                                     transition: 'all 0.2s',
-                                    marginTop: '0.5rem'
+                                    marginTop: '0.5rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '0.5rem'
                                 }}
                             >
+                                {isLoading && <span>⏳</span>}
                                 {isLoading ? 'Signing In...' : 'Sign In'}
                             </button>
 
@@ -330,6 +402,14 @@ const AuthScreen: React.FC = () => {
                                     cursor: 'pointer',
                                     transition: 'all 0.2s'
                                 }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.backgroundColor = '#6366f1'
+                                    e.currentTarget.style.color = 'white'
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.backgroundColor = 'transparent'
+                                    e.currentTarget.style.color = '#6366f1'
+                                }}
                             >
                                 🚀 Load Demo Credentials
                             </button>
@@ -344,39 +424,116 @@ const AuthScreen: React.FC = () => {
                             onSubmit={handleRegister}
                             style={{display: 'grid', gap: '1rem'}}
                         >
-                            {/* Basic Info */}
-                            <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem'}}>
+                            {/* Username */}
+                            <div>
                                 <input
                                     type="text"
-                                    placeholder="First Name"
-                                    value={registerForm.firstName}
-                                    onChange={(e) => setRegisterForm({...registerForm, firstName: e.target.value})}
+                                    placeholder="Username"
+                                    value={registerForm.username}
+                                    onChange={(e) => {
+                                        setRegisterForm({...registerForm, username: e.target.value})
+                                        clearErrors('username')
+                                    }}
                                     style={{
+                                        width: '100%',
                                         padding: '16px',
-                                        border: '2px solid #e2e8f0',
+                                        border: `2px solid ${errors.username ? '#ef4444' : '#e2e8f0'}`,
                                         borderRadius: '12px',
-                                        fontSize: '16px'
+                                        fontSize: '16px',
+                                        boxSizing: 'border-box'
                                     }}
                                 />
-                                <input
-                                    type="text"
-                                    placeholder="Last Name"
-                                    value={registerForm.lastName}
-                                    onChange={(e) => setRegisterForm({...registerForm, lastName: e.target.value})}
-                                    style={{
-                                        padding: '16px',
-                                        border: '2px solid #e2e8f0',
-                                        borderRadius: '12px',
-                                        fontSize: '16px'
-                                    }}
-                                />
+                                {errors.username && (
+                                    <p style={{color: '#ef4444', fontSize: '0.8rem', margin: '0.25rem 0 0 0'}}>
+                                        {errors.username}
+                                    </p>
+                                )}
                             </div>
 
+                            {/* Name Fields */}
+                            <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem'}}>
+                                <div>
+                                    <input
+                                        type="text"
+                                        placeholder="First Name"
+                                        value={registerForm.first_name}
+                                        onChange={(e) => {
+                                            setRegisterForm({...registerForm, first_name: e.target.value})
+                                            clearErrors('first_name')
+                                        }}
+                                        style={{
+                                            padding: '16px',
+                                            border: `2px solid ${errors.first_name ? '#ef4444' : '#e2e8f0'}`,
+                                            borderRadius: '12px',
+                                            fontSize: '16px',
+                                            width: '100%',
+                                            boxSizing: 'border-box'
+                                        }}
+                                    />
+                                    {errors.first_name && (
+                                        <p style={{color: '#ef4444', fontSize: '0.8rem', margin: '0.25rem 0 0 0'}}>
+                                            {errors.first_name}
+                                        </p>
+                                    )}
+                                </div>
+                                <div>
+                                    <input
+                                        type="text"
+                                        placeholder="Last Name"
+                                        value={registerForm.last_name}
+                                        onChange={(e) => {
+                                            setRegisterForm({...registerForm, last_name: e.target.value})
+                                            clearErrors('last_name')
+                                        }}
+                                        style={{
+                                            padding: '16px',
+                                            border: `2px solid ${errors.last_name ? '#ef4444' : '#e2e8f0'}`,
+                                            borderRadius: '12px',
+                                            fontSize: '16px',
+                                            width: '100%',
+                                            boxSizing: 'border-box'
+                                        }}
+                                    />
+                                    {errors.last_name && (
+                                        <p style={{color: '#ef4444', fontSize: '0.8rem', margin: '0.25rem 0 0 0'}}>
+                                            {errors.last_name}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Email */}
+                            <div>
+                                <input
+                                    type="email"
+                                    placeholder="Email address"
+                                    value={registerForm.email}
+                                    onChange={(e) => {
+                                        setRegisterForm({...registerForm, email: e.target.value})
+                                        clearErrors('email')
+                                    }}
+                                    style={{
+                                        width: '100%',
+                                        padding: '16px',
+                                        border: `2px solid ${errors.email ? '#ef4444' : '#e2e8f0'}`,
+                                        borderRadius: '12px',
+                                        fontSize: '16px',
+                                        boxSizing: 'border-box'
+                                    }}
+                                />
+                                {errors.email && (
+                                    <p style={{color: '#ef4444', fontSize: '0.8rem', margin: '0.25rem 0 0 0'}}>
+                                        {errors.email}
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Phone and Address */}
                             <input
-                                type="email"
-                                placeholder="Email address"
-                                value={registerForm.email}
-                                onChange={(e) => setRegisterForm({...registerForm, email: e.target.value})}
+                                type="tel"
+                                placeholder="Phone Number (optional)"
+                                value={registerForm.phone_number}
+                                onChange={(e) => setRegisterForm({...registerForm, phone_number: e.target.value})}
                                 style={{
                                     width: '100%',
                                     padding: '16px',
@@ -387,121 +544,72 @@ const AuthScreen: React.FC = () => {
                                 }}
                             />
 
-                            <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem'}}>
-                                <input
-                                    type="password"
-                                    placeholder="Password"
-                                    value={registerForm.password}
-                                    onChange={(e) => setRegisterForm({...registerForm, password: e.target.value})}
-                                    style={{
-                                        padding: '16px',
-                                        border: '2px solid #e2e8f0',
-                                        borderRadius: '12px',
-                                        fontSize: '16px'
-                                    }}
-                                />
-                                <input
-                                    type="password"
-                                    placeholder="Confirm Password"
-                                    value={registerForm.confirmPassword}
-                                    onChange={(e) => setRegisterForm({
-                                        ...registerForm,
-                                        confirmPassword: e.target.value
-                                    })}
-                                    style={{
-                                        padding: '16px',
-                                        border: '2px solid #e2e8f0',
-                                        borderRadius: '12px',
-                                        fontSize: '16px'
-                                    }}
-                                />
-                            </div>
+                            <input
+                                type="text"
+                                placeholder="Address (optional)"
+                                value={registerForm.address}
+                                onChange={(e) => setRegisterForm({...registerForm, address: e.target.value})}
+                                style={{
+                                    width: '100%',
+                                    padding: '16px',
+                                    border: '2px solid #e2e8f0',
+                                    borderRadius: '12px',
+                                    fontSize: '16px',
+                                    boxSizing: 'border-box'
+                                }}
+                            />
 
-                            {/* User Type Specific Fields */}
-                            {userType === 'student' ? (
-                                <>
+                            {/* Password Fields */}
+                            <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem'}}>
+                                <div>
                                     <input
-                                        type="text"
-                                        placeholder="Student ID (optional)"
-                                        value={registerForm.studentId}
-                                        onChange={(e) => setRegisterForm({...registerForm, studentId: e.target.value})}
+                                        type="password"
+                                        placeholder="Password"
+                                        value={registerForm.password}
+                                        onChange={(e) => {
+                                            setRegisterForm({...registerForm, password: e.target.value})
+                                            clearErrors('password')
+                                        }}
                                         style={{
-                                            width: '100%',
                                             padding: '16px',
-                                            border: '2px solid #e2e8f0',
+                                            border: `2px solid ${errors.password ? '#ef4444' : '#e2e8f0'}`,
                                             borderRadius: '12px',
                                             fontSize: '16px',
+                                            width: '100%',
                                             boxSizing: 'border-box'
                                         }}
                                     />
-                                    <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem'}}>
-                                        <select
-                                            value={registerForm.major}
-                                            onChange={(e) => setRegisterForm({...registerForm, major: e.target.value})}
-                                            style={{
-                                                padding: '16px',
-                                                border: '2px solid #e2e8f0',
-                                                borderRadius: '12px',
-                                                fontSize: '16px'
-                                            }}
-                                        >
-                                            <option value="">Select Major</option>
-                                            {majors.map(major => (
-                                                <option key={major} value={major}>{major}</option>
-                                            ))}
-                                        </select>
-                                        <select
-                                            value={registerForm.year}
-                                            onChange={(e) => setRegisterForm({...registerForm, year: e.target.value})}
-                                            style={{
-                                                padding: '16px',
-                                                border: '2px solid #e2e8f0',
-                                                borderRadius: '12px',
-                                                fontSize: '16px'
-                                            }}
-                                        >
-                                            <option value="">Select Year</option>
-                                            {years.map(year => (
-                                                <option key={year} value={year}>{year}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                </>
-                            ) : (
-                                <>
+                                    {errors.password && (
+                                        <p style={{color: '#ef4444', fontSize: '0.8rem', margin: '0.25rem 0 0 0'}}>
+                                            {errors.password}
+                                        </p>
+                                    )}
+                                </div>
+                                <div>
                                     <input
-                                        type="text"
-                                        placeholder="Teacher ID (optional)"
-                                        value={registerForm.teacherId}
-                                        onChange={(e) => setRegisterForm({...registerForm, teacherId: e.target.value})}
+                                        type="password"
+                                        placeholder="Confirm Password"
+                                        value={registerForm.confirmPassword}
+                                        onChange={(e) => {
+                                            setRegisterForm({...registerForm, confirmPassword: e.target.value})
+                                            clearErrors('confirmPassword')
+                                        }}
                                         style={{
-                                            width: '100%',
                                             padding: '16px',
-                                            border: '2px solid #e2e8f0',
+                                            border: `2px solid ${errors.confirmPassword ? '#ef4444' : '#e2e8f0'}`,
                                             borderRadius: '12px',
                                             fontSize: '16px',
+                                            width: '100%',
                                             boxSizing: 'border-box'
                                         }}
                                     />
-                                    <select
-                                        value={registerForm.department}
-                                        onChange={(e) => setRegisterForm({...registerForm, department: e.target.value})}
-                                        style={{
-                                            width: '100%',
-                                            padding: '16px',
-                                            border: '2px solid #e2e8f0',
-                                            borderRadius: '12px',
-                                            fontSize: '16px',
-                                            boxSizing: 'border-box'
-                                        }}
-                                    >
-                                        <option value="">Select Department</option>
-                                        {departments.map(dept => (
-                                            <option key={dept} value={dept}>{dept}</option>
-                                        ))}
-                                    </select>
-                                </>
-                            )}
+                                    {errors.confirmPassword && (
+                                        <p style={{color: '#ef4444', fontSize: '0.8rem', margin: '0.25rem 0 0 0'}}>
+                                            {errors.confirmPassword}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
 
                             <button
                                 type="submit"
@@ -517,10 +625,15 @@ const AuthScreen: React.FC = () => {
                                     fontWeight: 600,
                                     cursor: isLoading ? 'not-allowed' : 'pointer',
                                     transition: 'all 0.2s',
-                                    marginTop: '0.5rem'
+                                    marginTop: '0.5rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '0.5rem'
                                 }}
                             >
-                                {isLoading ? 'Creating Account...' : 'Create Account'}
+                                {isLoading && <span>⏳</span>}
+                                {isLoading ? 'Creating Account...' : '✨ Create Account'}
                             </button>
                         </motion.form>
                     )}
@@ -534,9 +647,17 @@ const AuthScreen: React.FC = () => {
                     backgroundColor: '#f8fafc',
                     borderRadius: '12px'
                 }}>
-                    <p style={{color: '#64748b', fontSize: '0.9rem', margin: 0}}>
-                        🚀 Demo Mode: Any credentials work for existing accounts
+                    <p style={{color: '#64748b', fontSize: '0.9rem', margin: '0 0 0.5rem 0'}}>
+                        🚀 <strong>Demo Accounts Available:</strong>
                     </p>
+                    <div style={{display: 'grid', gap: '0.25rem', fontSize: '0.8rem', color: '#64748b'}}>
+                        <div>👤 <strong>Student:</strong> student@demo.com</div>
+                        <div>👨‍🏫 <strong>Teacher:</strong> teacher@demo.com</div>
+                        <div>👑 <strong>Admin:</strong> admin@demo.com</div>
+                        <div style={{marginTop: '0.5rem', fontSize: '0.75rem', fontStyle: 'italic'}}>
+                            Password: Any password works in demo mode
+                        </div>
+                    </div>
                 </div>
             </motion.div>
         </div>

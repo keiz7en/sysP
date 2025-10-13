@@ -1,6 +1,7 @@
 import React from 'react'
 import {motion, AnimatePresence} from 'framer-motion'
 import {useNavigate, useLocation} from 'react-router-dom'
+import {useAuth} from '../../contexts/AuthContext'
 
 interface User {
     name: string
@@ -28,14 +29,35 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({isOpen, onToggle, menuItems, userType, user}) => {
     const navigate = useNavigate()
     const location = useLocation()
+    const {logout} = useAuth()
 
     const handleNavigate = (path: string) => {
         navigate(path)
     }
 
-    const handleLogout = () => {
-        // This would typically clear auth state
-        navigate('/auth')
+    const handleLogout = async () => {
+        try {
+            await logout()
+            navigate('/auth')
+        } catch (error) {
+            console.error('Logout error:', error)
+            // Force navigation even if logout fails
+            navigate('/auth')
+        }
+    }
+
+    const handleSettings = () => {
+        navigate('/settings')
+    }
+
+    const isActiveRoute = (itemPath: string) => {
+        const currentPath = location.pathname
+
+        if (itemPath === '/student' || itemPath === '/teacher' || itemPath === '/admin') {
+            return currentPath === itemPath || currentPath === '/'
+        }
+
+        return currentPath === itemPath || currentPath.startsWith(itemPath)
     }
 
     return (
@@ -156,10 +178,7 @@ const Sidebar: React.FC<SidebarProps> = ({isOpen, onToggle, menuItems, userType,
 
                         <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
                             {menuItems.map((item) => {
-                                const isActive = location.pathname === item.path ||
-                                    (item.path === '/' && location.pathname === '/student') ||
-                                    (item.path === '/' && location.pathname === '/teacher') ||
-                                    (item.path === '/' && location.pathname === '/admin')
+                                const isActive = isActiveRoute(item.path)
 
                                 return (
                                     <motion.button
@@ -231,6 +250,21 @@ const Sidebar: React.FC<SidebarProps> = ({isOpen, onToggle, menuItems, userType,
                                                 </motion.div>
                                             )}
                                         </AnimatePresence>
+
+                                        {isActive && (
+                                            <motion.div
+                                                initial={{scale: 0}}
+                                                animate={{scale: 1}}
+                                                style={{
+                                                    position: 'absolute',
+                                                    right: '0.5rem',
+                                                    width: '4px',
+                                                    height: '20px',
+                                                    backgroundColor: 'rgba(255,255,255,0.8)',
+                                                    borderRadius: '2px'
+                                                }}
+                                            />
+                                        )}
                                     </motion.button>
                                 )
                             })}
@@ -244,7 +278,7 @@ const Sidebar: React.FC<SidebarProps> = ({isOpen, onToggle, menuItems, userType,
                     padding: '1rem'
                 }}>
                     <AnimatePresence>
-                        {isOpen && (
+                        {isOpen && user && (
                             <motion.div
                                 initial={{opacity: 0, y: 20}}
                                 animate={{opacity: 1, y: 0}}
@@ -300,6 +334,7 @@ const Sidebar: React.FC<SidebarProps> = ({isOpen, onToggle, menuItems, userType,
                     {/* Settings & Logout */}
                     <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
                         <button
+                            onClick={handleSettings}
                             style={{
                                 display: 'flex',
                                 alignItems: 'center',
@@ -308,14 +343,26 @@ const Sidebar: React.FC<SidebarProps> = ({isOpen, onToggle, menuItems, userType,
                                 padding: '0.75rem 1rem',
                                 borderRadius: '8px',
                                 border: 'none',
-                                background: 'transparent',
-                                color: '#9ca3af',
+                                background: location.pathname === '/settings'
+                                    ? 'rgba(99, 102, 241, 0.2)'
+                                    : 'transparent',
+                                color: location.pathname === '/settings' ? '#6366f1' : '#9ca3af',
                                 cursor: 'pointer',
                                 fontSize: '0.9rem',
-                                transition: 'color 0.2s'
+                                transition: 'all 0.2s'
                             }}
-                            onMouseEnter={(e) => e.currentTarget.style.color = 'white'}
-                            onMouseLeave={(e) => e.currentTarget.style.color = '#9ca3af'}
+                            onMouseEnter={(e) => {
+                                if (location.pathname !== '/settings') {
+                                    e.currentTarget.style.color = 'white'
+                                    e.currentTarget.style.backgroundColor = '#374151'
+                                }
+                            }}
+                            onMouseLeave={(e) => {
+                                if (location.pathname !== '/settings') {
+                                    e.currentTarget.style.color = '#9ca3af'
+                                    e.currentTarget.style.backgroundColor = 'transparent'
+                                }
+                            }}
                         >
                             <span style={{fontSize: '1.1rem'}}>⚙️</span>
                             {isOpen && <span>Settings</span>}

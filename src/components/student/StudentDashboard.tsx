@@ -27,63 +27,63 @@ const StudentDashboard: React.FC = () => {
             id: 'home',
             label: 'Dashboard',
             icon: '🏠',
-            path: '/',
+            path: '/student',
             description: 'Overview and quick access'
         },
         {
             id: 'records',
             label: 'Academic Records',
             icon: '📊',
-            path: '/records',
+            path: '/student/records',
             description: 'Grades, transcripts, and AI analysis'
         },
         {
             id: 'learning',
             label: 'Adaptive Learning',
             icon: '🧠',
-            path: '/learning',
+            path: '/student/learning',
             description: 'Personalized learning paths'
         },
         {
             id: 'career',
             label: 'Career Guidance',
             icon: '💼',
-            path: '/career',
+            path: '/student/career',
             description: 'Job matching and resume analysis'
         },
         {
             id: 'assessments',
             label: 'AI Assessments',
             icon: '⚡',
-            path: '/assessments',
+            path: '/student/assessments',
             description: 'Automated testing and grading'
         },
         {
             id: 'insights',
             label: 'Learning Insights',
             icon: '🔬',
-            path: '/insights',
+            path: '/student/insights',
             description: 'Performance analytics and trends'
         },
         {
             id: 'accessibility',
             label: 'Accessibility',
             icon: '♿',
-            path: '/accessibility',
+            path: '/student/accessibility',
             description: 'Voice recognition and adaptive tools'
         },
         {
             id: 'chat',
             label: 'AI Assistant',
             icon: '🤖',
-            path: '/chat',
+            path: '/student/chat',
             description: '24/7 AI-powered help'
         },
         {
             id: 'profile',
             label: 'Profile',
             icon: '👤',
-            path: '/profile',
+            path: '/student/profile',
             description: 'Account settings and preferences'
         }
     ]
