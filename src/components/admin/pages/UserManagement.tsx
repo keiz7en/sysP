@@ -45,6 +45,10 @@ const UserManagement: React.FC = () => {
                         <div style={{fontSize: '1.2rem', fontWeight: '600', color: '#d97706'}}>Manage Roles</div>
                         <div style={{fontSize: '0.9rem', color: '#64748b'}}>Assign user permissions</div>
                     </div>
+                    <div style={{padding: '1rem', backgroundColor: '#f3f4f6', borderRadius: '8px'}}>
+                        <div style={{fontSize: '1.2rem', fontWeight: '600', color: '#1f2937'}}>Student Approvals</div>
+                        <div style={{fontSize: '0.9rem', color: '#64748b'}}>Approve pending student registrations</div>
+                    </div>
                 </div>
             </motion.div>
         </div>

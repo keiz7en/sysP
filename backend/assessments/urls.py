@@ -1,17 +1,14 @@
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
+from django.urls import path
 from . import views
 
 app_name = 'assessments'
 
-router = DefaultRouter()
-router.register(r'assessments', views.AssessmentViewSet)
-router.register(r'questions', views.QuestionViewSet)
-router.register(r'attempts', views.StudentAssessmentAttemptViewSet)
-
 urlpatterns = [
-    path('', include(router.urls)),
-    path('ai-grading/', views.AIGradingView.as_view(), name='ai-grading'),
-    path('analytics/', views.AssessmentAnalyticsView.as_view(), name='analytics'),
-    path('auto-generate/', views.AutoGenerateQuestionsView.as_view(), name='auto-generate'),
+    path('', views.AssessmentViewSet.as_view({'get': 'list', 'post': 'create'}), name='assessment-list'),
+    path('<int:pk>/', views.AssessmentViewSet.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'}), name='assessment-detail'),
+    path('questions/', views.QuestionViewSet.as_view({'get': 'list', 'post': 'create'}), name='question-list'),
+    path('questions/<int:pk>/', views.QuestionViewSet.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'}), name='question-detail'),
+    path('attempts/', views.StudentAssessmentAttemptViewSet.as_view({'get': 'list', 'post': 'create'}), name='attempt-list'),
+    path('attempts/<int:pk>/', views.StudentAssessmentAttemptViewSet.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'}), name='attempt-detail'),
+    path('statistics/', views.assessment_statistics, name='assessment-statistics'),
 ]

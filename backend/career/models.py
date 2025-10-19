@@ -136,16 +136,11 @@ class Resume(models.Model):
     """Student resume management"""
     student = models.ForeignKey('students.StudentProfile', on_delete=models.CASCADE, related_name='resumes')
     title = models.CharField(max_length=200)
-
-    # Personal Information
-    objective = models.TextField(blank=True)
-    summary = models.TextField(blank=True)
-
-    # Experience & Education stored as JSON for flexibility
-    experience = models.JSONField(default=list)
-    education = models.JSONField(default=list)
-    projects = models.JSONField(default=list)
-    certifications = models.JSONField(default=list)
+    content = models.JSONField(default=dict)
+    generated_at = models.DateTimeField(null=True, blank=True)
+    ai_score = models.IntegerField(default=0)
+    suggestions = models.JSONField(default=list)
+    version = models.FloatField(default=1.0)
 
     # AI Enhancement
     ai_optimized = models.BooleanField(default=False)
@@ -158,6 +153,39 @@ class Resume(models.Model):
 
     class Meta:
         db_table = 'resumes'
+
+
+class ResumeProfile(models.Model):
+    """Resume profile for students - compatible with test data"""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='resume_profiles')
+    skills = models.JSONField(default=list)
+    experience_years = models.IntegerField(default=0)
+    education_level = models.CharField(max_length=50, default='Bachelor')
+    preferred_job_types = models.JSONField(default=list)
+    location_preference = models.CharField(max_length=100, default='')
+    salary_expectation = models.IntegerField(default=0)
+    work_experience = models.JSONField(default=list)
+    achievements = models.JSONField(default=list)
+    certifications = models.JSONField(default=list)
+    last_updated = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'resume_profiles'
+
+
+class SkillAssessment(models.Model):
+    """Skill assessment for students"""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='skill_assessments')
+    technical_skills = models.JSONField(default=dict)
+    soft_skills = models.JSONField(default=dict)
+    overall_score = models.IntegerField(default=0)
+    assessment_date = models.DateTimeField(null=True, blank=True)
+    strengths = models.JSONField(default=list)
+    areas_for_improvement = models.JSONField(default=list)
+    career_recommendations = models.JSONField(default=list)
+
+    class Meta:
+        db_table = 'skill_assessments'
 
 
 class JobRecommendation(models.Model):
@@ -196,6 +224,24 @@ class JobRecommendation(models.Model):
     class Meta:
         db_table = 'job_recommendations'
         unique_together = ['student', 'job_data']
+
+
+class JobMatching(models.Model):
+    """Job matching for students"""
+    student = models.ForeignKey('students.StudentProfile', on_delete=models.CASCADE, related_name='job_matches')
+    job_title = models.CharField(max_length=200)
+    company = models.CharField(max_length=200)
+    match_score = models.IntegerField()
+    requirements_met = models.JSONField(default=list)
+    missing_skills = models.JSONField(default=list)
+    salary_range = models.JSONField(default=dict)
+    location = models.CharField(max_length=100)
+    job_description = models.TextField()
+    application_deadline = models.DateTimeField()
+    matched_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'job_matchings'
 
 
 class TrainingProgram(models.Model):

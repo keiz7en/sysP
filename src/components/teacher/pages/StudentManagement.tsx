@@ -1,6 +1,8 @@
 import React, {useState, useEffect} from 'react'
 import {motion, AnimatePresence} from 'framer-motion'
 import toast from 'react-hot-toast'
+import {useAuth} from '../../../contexts/AuthContext'
+import {teacherAPI} from '../../../services/api'
 
 interface Student {
     id: number
@@ -52,30 +54,22 @@ const StudentManagement: React.FC = () => {
     const [bulkStudentData, setBulkStudentData] = useState('')
 
     useEffect(() => {
-        fetchStudents()
-        fetchCourses()
-    }, [])
+        if (user && token) {
+            fetchStudents()
+            fetchCourses()
+        }
+    }, [user, token])
 
     const fetchStudents = async () => {
         try {
             setLoading(true)
-            const token = localStorage.getItem('auth_token')
-            const response = await fetch('http://localhost:8000/api/teachers/students/', {
-                headers: {
-                    'Authorization': `Token ${token}`,
-                    'Content-Type': 'application/json',
-                }
-            })
+            if (!token) return
 
-            if (response.ok) {
-                const data = await response.json()
-                setStudents(data.students || [])
-            } else {
-                toast.error('Failed to fetch students')
-            }
-        } catch (error) {
+            const data = await teacherAPI.getStudents(token)
+            setStudents(data.students || [])
+        } catch (error: any) {
             console.error('Error fetching students:', error)
-            toast.error('Error fetching students')
+            toast.error(error.message || 'Error fetching students')
         } finally {
             setLoading(false)
         }
@@ -83,20 +77,13 @@ const StudentManagement: React.FC = () => {
 
     const fetchCourses = async () => {
         try {
-            const token = localStorage.getItem('auth_token')
-            const response = await fetch('http://localhost:8000/api/teachers/courses/', {
-                headers: {
-                    'Authorization': `Token ${token}`,
-                    'Content-Type': 'application/json',
-                }
-            })
+            if (!token) return
 
-            if (response.ok) {
-                const data = await response.json()
-                setCourses(data.courses || [])
-            }
-        } catch (error) {
+            const data = await teacherAPI.getCourses(token)
+            setCourses(data.courses || [])
+        } catch (error: any) {
             console.error('Error fetching courses:', error)
+            // Don't show error toast for courses as it's not critical
         }
     }
 
@@ -109,46 +96,34 @@ const StudentManagement: React.FC = () => {
         }
 
         try {
-            const token = localStorage.getItem('auth_token')
-            const response = await fetch('http://localhost:8000/api/teachers/students/add/', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Token ${token}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(addStudentForm)
+            const data = await teacherAPI.addStudent(token!, addStudentForm)
+
+            toast.success(`Student added successfully! 
+                Username: ${data.student.username}
+                Temporary Password: ${data.student.temporary_password}
+                Student ID: ${data.student.student_id}`, {
+                duration: 10000
             })
 
-            if (response.ok) {
-                const data = await response.json()
-                toast.success(`Student added successfully! 
-                    Username: ${data.student.username}
-                    Temporary Password: ${data.student.temporary_password}
-                    Student ID: ${data.student.student_id}`)
-
-                setShowAddModal(false)
-                setAddStudentForm({
-                    first_name: '',
-                    last_name: '',
-                    email: '',
-                    phone_number: '',
-                    grade_level: '',
-                    course_id: '',
-                    guardian_name: '',
-                    guardian_phone: '',
-                    guardian_email: '',
-                    emergency_contact: '',
-                    emergency_phone: '',
-                    learning_style: 'adaptive'
-                })
-                fetchStudents()
-            } else {
-                const errorData = await response.json()
-                toast.error(errorData.error || 'Failed to add student')
-            }
-        } catch (error) {
+            setShowAddModal(false)
+            setAddStudentForm({
+                first_name: '',
+                last_name: '',
+                email: '',
+                phone_number: '',
+                grade_level: '',
+                course_id: '',
+                guardian_name: '',
+                guardian_phone: '',
+                guardian_email: '',
+                emergency_contact: '',
+                emergency_phone: '',
+                learning_style: 'adaptive'
+            })
+            fetchStudents()
+        } catch (error: any) {
             console.error('Error adding student:', error)
-            toast.error('Error adding student')
+            toast.error(error.message || 'Failed to add student')
         }
     }
 
@@ -158,25 +133,12 @@ const StudentManagement: React.FC = () => {
         }
 
         try {
-            const token = localStorage.getItem('auth_token')
-            const response = await fetch(`http://localhost:8000/api/teachers/students/remove/${studentId}/`, {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Token ${token}`,
-                    'Content-Type': 'application/json',
-                }
-            })
-
-            if (response.ok) {
-                toast.success('Student removed successfully')
-                fetchStudents()
-            } else {
-                const errorData = await response.json()
-                toast.error(errorData.error || 'Failed to remove student')
-            }
-        } catch (error) {
+            await teacherAPI.removeStudent(token!, studentId)
+            toast.success('Student removed successfully')
+            fetchStudents()
+        } catch (error: any) {
             console.error('Error removing student:', error)
-            toast.error('Error removing student')
+            toast.error(error.message || 'Failed to remove student')
         }
     }
 
@@ -210,45 +172,31 @@ const StudentManagement: React.FC = () => {
                 }
             }
 
-            const token = localStorage.getItem('auth_token')
-            const response = await fetch('http://localhost:8000/api/teachers/students/bulk-upload/', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Token ${token}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    course_id: selectedCourse,
-                    students: students
-                })
+            const data = await teacherAPI.bulkUploadStudents(token!, {
+                course_id: selectedCourse,
+                students: students
             })
 
-            if (response.ok) {
-                const data = await response.json()
-                toast.success(data.message)
+            toast.success(data.message)
 
-                // Show successful additions
-                if (data.successful_additions.length > 0) {
-                    console.log('Successfully added students:', data.successful_additions)
-                }
-
-                // Show failed additions
-                if (data.failed_additions.length > 0) {
-                    console.log('Failed additions:', data.failed_additions)
-                    toast.error(`${data.failed_additions.length} students failed to add. Check console for details.`)
-                }
-
-                setShowBulkModal(false)
-                setBulkStudentData('')
-                setSelectedCourse('')
-                fetchStudents()
-            } else {
-                const errorData = await response.json()
-                toast.error(errorData.error || 'Failed to bulk upload students')
+            // Show successful additions
+            if (data.successful_additions.length > 0) {
+                console.log('Successfully added students:', data.successful_additions)
             }
-        } catch (error) {
+
+            // Show failed additions
+            if (data.failed_additions.length > 0) {
+                console.log('Failed additions:', data.failed_additions)
+                toast.error(`${data.failed_additions.length} students failed to add. Check console for details.`)
+            }
+
+            setShowBulkModal(false)
+            setBulkStudentData('')
+            setSelectedCourse('')
+            fetchStudents()
+        } catch (error: any) {
             console.error('Error bulk uploading students:', error)
-            toast.error('Error processing bulk upload')
+            toast.error(error.message || 'Error processing bulk upload')
         }
     }
 
@@ -471,7 +419,26 @@ const StudentManagement: React.FC = () => {
                         textAlign: 'center',
                         color: '#6b7280'
                     }}>
-                        No students found. Add your first student!
+                        <div style={{fontSize: '3rem', marginBottom: '1rem'}}>👥</div>
+                        <p style={{fontSize: '1.1rem', marginBottom: '0.5rem'}}>No students enrolled yet</p>
+                        <p style={{fontSize: '0.9rem', marginBottom: '2rem'}}>
+                            Add your first student to get started with teaching!
+                        </p>
+                        <button
+                            onClick={() => setShowAddModal(true)}
+                            style={{
+                                padding: '0.75rem 1.5rem',
+                                backgroundColor: '#3b82f6',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                fontSize: '0.9rem',
+                                fontWeight: '600'
+                            }}
+                        >
+                            ➕ Add First Student
+                        </button>
                     </div>
                 ) : (
                     <div style={{overflowX: 'auto'}}>

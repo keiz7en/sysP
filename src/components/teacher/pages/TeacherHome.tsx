@@ -1,6 +1,8 @@
 import React, {useState, useEffect} from 'react'
 import {motion} from 'framer-motion'
 import toast from 'react-hot-toast'
+import {useAuth} from '../../../contexts/AuthContext'
+import {teacherAPI} from '../../../services/api'
 
 interface DashboardData {
     teacher_info: {
@@ -26,33 +28,40 @@ interface DashboardData {
 }
 
 const TeacherHome: React.FC = () => {
+    const {user, token} = useAuth()
     const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
     const [loading, setLoading] = useState(true)
+    const [error, setError] = useState<string | null>(null)
 
     useEffect(() => {
-        fetchDashboardData()
-    }, [])
+        if (user && token) {
+            fetchDashboardData()
+        }
+    }, [user, token])
 
     const fetchDashboardData = async () => {
         try {
             setLoading(true)
-            const token = localStorage.getItem('auth_token')
-            const response = await fetch('http://localhost:8000/api/teachers/dashboard/', {
-                headers: {
-                    'Authorization': `Token ${token}`,
-                    'Content-Type': 'application/json',
-                }
-            })
+            setError(null)
 
-            if (response.ok) {
-                const data = await response.json()
-                setDashboardData(data)
-            } else {
-                toast.error('Failed to fetch dashboard data')
+            if (!token) {
+                setError('Authentication required')
+                return
             }
-        } catch (error) {
+
+            const data = await teacherAPI.getDashboard(token)
+            setDashboardData(data)
+        } catch (error: any) {
             console.error('Error fetching dashboard data:', error)
-            toast.error('Error loading dashboard')
+            const errorMessage = error.message || 'Error loading dashboard'
+
+            if (errorMessage.includes('Access denied') || errorMessage.includes('403')) {
+                setError('Access denied. Your teacher account may be pending approval or not activated.')
+            } else if (errorMessage.includes('404')) {
+                setError('Teacher profile not found. Please contact administrator.')
+            } else {
+                setError(errorMessage)
+            }
         } finally {
             setLoading(false)
         }
@@ -69,6 +78,56 @@ const TeacherHome: React.FC = () => {
                 <div style={{fontSize: '1.2rem', color: '#6b7280'}}>
                     Loading dashboard...
                 </div>
+            </div>
+        )
+    }
+
+    if (error) {
+        return (
+            <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center',
+                height: '500px',
+                textAlign: 'center',
+                padding: '2rem'
+            }}>
+                <div style={{fontSize: '3rem', marginBottom: '1rem', color: '#ef4444'}}>⚠️</div>
+                <p style={{fontSize: '1.2rem', color: '#ef4444', marginBottom: '2rem', maxWidth: '600px'}}>{error}</p>
+
+                {error.includes('pending approval') && (
+                    <div style={{
+                        background: '#fef3c7',
+                        color: '#92400e',
+                        padding: '1.5rem',
+                        borderRadius: '12px',
+                        marginBottom: '2rem',
+                        maxWidth: '500px'
+                    }}>
+                        <div style={{fontWeight: '600', marginBottom: '0.5rem'}}>⏳ Teacher Account Pending Approval
+                        </div>
+                        <p style={{margin: 0, fontSize: '0.9rem'}}>
+                            Your teacher application is being reviewed by administrators. You will be notified once
+                            approved and can access the teaching dashboard.
+                        </p>
+                    </div>
+                )}
+
+                <button
+                    onClick={fetchDashboardData}
+                    style={{
+                        padding: '0.75rem 1.5rem',
+                        backgroundColor: '#3b82f6',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontSize: '1rem'
+                    }}
+                >
+                    Try Again
+                </button>
             </div>
         )
     }
@@ -307,7 +366,11 @@ const TeacherHome: React.FC = () => {
                         textAlign: 'center',
                         color: '#6b7280'
                     }}>
-                        No recent enrollments
+                        <div style={{fontSize: '2rem', marginBottom: '1rem'}}>📚</div>
+                        <p>No recent enrollments</p>
+                        <p style={{fontSize: '0.9rem', marginTop: '0.5rem'}}>
+                            Students will appear here when they enroll in your courses
+                        </p>
                     </div>
                 ) : (
                     <div style={{padding: '1rem'}}>
@@ -418,7 +481,7 @@ const TeacherHome: React.FC = () => {
                     >
                         <div style={{fontSize: '1.5rem', marginBottom: '0.5rem'}}>👥</div>
                         <div style={{fontWeight: '600', marginBottom: '0.25rem'}}>Manage Students</div>
-                        <div style={{fontSize: '0.8rem', opacity: 0.9}}>Add, view, and remove students</div>
+                        <div style={{fontSize: '0.8rem', opacity: 0.9}}>Add, view, and manage students</div>
                     </button>
 
                     <button

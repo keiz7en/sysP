@@ -1,16 +1,11 @@
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
+from django.urls import path
 from . import views
 
 app_name = 'chatbot'
 
-router = DefaultRouter()
-router.register(r'sessions', views.ChatSessionViewSet)
-router.register(r'knowledge-base', views.KnowledgeBaseViewSet)
-
 urlpatterns = [
-    path('', include(router.urls)),
-    path('chat/', views.ChatView.as_view(), name='chat'),
-    path('intents/', views.ChatbotIntentView.as_view(), name='intents'),
-    path('analytics/', views.ChatbotAnalyticsView.as_view(), name='analytics'),
+    path('sessions/', views.ChatSessionView.as_view(), name='chat-sessions'),
+    path('sessions/<str:session_id>/messages/', views.get_chat_messages, name='chat-messages'),
+    path('sessions/<str:session_id>/send/', views.send_message, name='send-message'),
+    path('quick-help/', views.quick_help, name='quick-help'),
 ]

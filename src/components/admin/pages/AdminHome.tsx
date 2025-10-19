@@ -1,30 +1,136 @@
-import React from 'react'
+import React, {useState, useEffect} from 'react'
 import {motion} from 'framer-motion'
 import {useAuth} from '../../../contexts/AuthContext'
+import {adminAPI} from '../../../services/api'
+import toast from 'react-hot-toast'
+
+interface DashboardData {
+    user: any;
+    stats: {
+        total_users: number;
+        pending_teachers: number;
+        pending_students: number;
+        students: number;
+        teachers: number;
+    };
+    recent_activity: Array<{
+        time: string;
+        activity: string;
+        score: string;
+    }>;
+}
 
 const AdminHome: React.FC = () => {
-    const {user} = useAuth()
+    const {user, token} = useAuth()
+    const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
+    const [loading, setLoading] = useState(true)
+    const [error, setError] = useState<string | null>(null)
 
-    // Demo statistics
+    useEffect(() => {
+        if (user && token) {
+            fetchDashboardData()
+        }
+    }, [user, token])
+
+    const fetchDashboardData = async () => {
+        try {
+            setLoading(true)
+            setError(null)
+
+            if (!token) {
+                setError('Authentication required')
+                return
+            }
+
+            const data = await adminAPI.getDashboard(token)
+            setDashboardData(data)
+        } catch (error: any) {
+            console.error('Error fetching dashboard data:', error)
+            const errorMessage = error.message || 'Error loading dashboard'
+
+            if (errorMessage.includes('Access denied') || errorMessage.includes('403')) {
+                setError('Access denied. Admin privileges required.')
+            } else {
+                setError(errorMessage)
+            }
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    if (loading) {
+        return (
+            <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                height: '400px'
+            }}>
+                <div style={{fontSize: '1.2rem', color: '#6b7280'}}>
+                    Loading admin dashboard...
+                </div>
+            </div>
+        )
+    }
+
+    if (error) {
+        return (
+            <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center',
+                height: '500px',
+                textAlign: 'center',
+                padding: '2rem'
+            }}>
+                <div style={{fontSize: '3rem', marginBottom: '1rem', color: '#ef4444'}}>⚠️</div>
+                <p style={{fontSize: '1.2rem', color: '#ef4444', marginBottom: '2rem', maxWidth: '600px'}}>{error}</p>
+
+                <button
+                    onClick={fetchDashboardData}
+                    style={{
+                        padding: '0.75rem 1.5rem',
+                        backgroundColor: '#3b82f6',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontSize: '1rem'
+                    }}
+                >
+                    Try Again
+                </button>
+            </div>
+        )
+    }
+
+    if (!dashboardData) {
+        return (
+            <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                height: '400px'
+            }}>
+                <div style={{fontSize: '1.2rem', color: '#6b7280'}}>
+                    No dashboard data available
+                </div>
+            </div>
+        )
+    }
+
+    // Real system statistics
     const systemStats = [
-        {label: 'Total Users', value: '1,247', color: '#3b82f6', icon: '👥'},
-        {label: 'Active Students', value: '956', color: '#10b981', icon: '🎓'},
-        {label: 'Teachers', value: '87', color: '#f59e0b', icon: '👨‍🏫'},
-        {label: 'Pending Approvals', value: '12', color: '#ef4444', icon: '⏳'}
-    ]
-
-    const recentActivity = [
-        {action: 'New student registered', user: 'John Smith', time: '2 minutes ago', type: 'registration'},
-        {action: 'Teacher approved', user: 'Dr. Lisa Wilson', time: '15 minutes ago', type: 'approval'},
-        {action: 'Course completed', user: 'Sarah Johnson', time: '1 hour ago', type: 'completion'},
-        {action: 'New teacher application', user: 'Michael Brown', time: '2 hours ago', type: 'application'}
-    ]
-
-    const systemHealth = [
-        {metric: 'Server Uptime', value: '99.9%', status: 'excellent'},
-        {metric: 'Database Performance', value: '98.5%', status: 'good'},
-        {metric: 'API Response Time', value: '145ms', status: 'excellent'},
-        {metric: 'Active Sessions', value: '234', status: 'normal'}
+        {label: 'Total Users', value: dashboardData.stats.total_users.toString(), color: '#3b82f6', icon: '👥'},
+        {label: 'Active Students', value: dashboardData.stats.students.toString(), color: '#10b981', icon: '🎓'},
+        {label: 'Teachers', value: dashboardData.stats.teachers.toString(), color: '#f59e0b', icon: '👨‍🏫'},
+        {
+            label: 'Pending Approvals',
+            value: (dashboardData.stats.pending_teachers + dashboardData.stats.pending_students).toString(),
+            color: '#ef4444',
+            icon: '⏳'
+        }
     ]
 
     const getStatusColor = (status: string) => {
@@ -158,44 +264,56 @@ const AdminHome: React.FC = () => {
                     </div>
 
                     <div style={{padding: '1rem'}}>
-                        {recentActivity.map((activity, index) => (
-                            <motion.div
-                                key={index}
-                                initial={{opacity: 0, x: -10}}
-                                animate={{opacity: 1, x: 0}}
-                                transition={{delay: 0.3 + (index * 0.1)}}
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '1rem',
-                                    padding: '1rem',
-                                    marginBottom: '0.5rem',
-                                    backgroundColor: '#f9fafb',
-                                    borderRadius: '8px',
-                                    border: '1px solid #e5e7eb'
-                                }}
-                            >
-                                <div style={{fontSize: '1.5rem'}}>
-                                    {getActivityIcon(activity.type)}
-                                </div>
-                                <div style={{flex: 1}}>
-                                    <div style={{
-                                        fontSize: '0.9rem',
-                                        fontWeight: '600',
-                                        color: '#1f2937',
-                                        marginBottom: '0.2rem'
-                                    }}>
-                                        {activity.action}
+                        {dashboardData.recent_activity && dashboardData.recent_activity.length > 0 ? (
+                            dashboardData.recent_activity.map((activity, index) => (
+                                <motion.div
+                                    key={index}
+                                    initial={{opacity: 0, x: -10}}
+                                    animate={{opacity: 1, x: 0}}
+                                    transition={{delay: 0.3 + (index * 0.1)}}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '1rem',
+                                        padding: '1rem',
+                                        marginBottom: '0.5rem',
+                                        backgroundColor: '#f9fafb',
+                                        borderRadius: '8px',
+                                        border: '1px solid #e5e7eb'
+                                    }}
+                                >
+                                    <div style={{fontSize: '1.5rem'}}>
+                                        {getActivityIcon('approval')}
                                     </div>
-                                    <div style={{
-                                        fontSize: '0.8rem',
-                                        color: '#6b7280'
-                                    }}>
-                                        {activity.user} • {activity.time}
+                                    <div style={{flex: 1}}>
+                                        <div style={{
+                                            fontSize: '0.9rem',
+                                            fontWeight: '600',
+                                            color: '#1f2937',
+                                            marginBottom: '0.2rem'
+                                        }}>
+                                            {activity.activity}
+                                        </div>
+                                        <div style={{
+                                            fontSize: '0.8rem',
+                                            color: '#6b7280'
+                                        }}>
+                                            {activity.time}
+                                        </div>
                                     </div>
-                                </div>
-                            </motion.div>
-                        ))}
+                                </motion.div>
+                            ))
+                        ) : (
+                            <div style={{
+                                padding: '3rem 2rem',
+                                textAlign: 'center',
+                                color: '#6b7280'
+                            }}>
+                                <div style={{fontSize: '2.5rem', marginBottom: '1rem'}}>📊</div>
+                                <p>No recent activity to display</p>
+                                <p style={{fontSize: '0.9rem'}}>System activities will appear here</p>
+                            </div>
+                        )}
                     </div>
                 </motion.div>
 
@@ -218,31 +336,82 @@ const AdminHome: React.FC = () => {
                         background: '#f9fafb'
                     }}>
                         <h3 style={{margin: 0, fontSize: '1.25rem', fontWeight: '600', color: '#1f2937'}}>
-                            🔧 System Health
+                            🔧 System Status
                         </h3>
                     </div>
 
                     <div style={{padding: '1rem'}}>
-                        {systemHealth.map((health, index) => (
-                            <div key={index} style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                padding: '0.75rem 0',
-                                borderBottom: index < systemHealth.length - 1 ? '1px solid #f3f4f6' : 'none'
-                            }}>
-                                <div style={{fontSize: '0.9rem', color: '#374151', fontWeight: '500'}}>
-                                    {health.metric}
-                                </div>
-                                <div style={{
-                                    fontSize: '0.9rem',
-                                    fontWeight: '600',
-                                    color: getStatusColor(health.status)
-                                }}>
-                                    {health.value}
-                                </div>
+                        <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '0.75rem 0',
+                            borderBottom: '1px solid #f3f4f6'
+                        }}>
+                            <div style={{fontSize: '0.9rem', color: '#374151', fontWeight: '500'}}>
+                                Backend Status
                             </div>
-                        ))}
+                            <div style={{
+                                fontSize: '0.9rem',
+                                fontWeight: '600',
+                                color: '#10b981'
+                            }}>
+                                Online
+                            </div>
+                        </div>
+                        <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '0.75rem 0',
+                            borderBottom: '1px solid #f3f4f6'
+                        }}>
+                            <div style={{fontSize: '0.9rem', color: '#374151', fontWeight: '500'}}>
+                                Database
+                            </div>
+                            <div style={{
+                                fontSize: '0.9rem',
+                                fontWeight: '600',
+                                color: '#10b981'
+                            }}>
+                                Connected
+                            </div>
+                        </div>
+                        <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '0.75rem 0',
+                            borderBottom: '1px solid #f3f4f6'
+                        }}>
+                            <div style={{fontSize: '0.9rem', color: '#374151', fontWeight: '500'}}>
+                                Active Users
+                            </div>
+                            <div style={{
+                                fontSize: '0.9rem',
+                                fontWeight: '600',
+                                color: '#3b82f6'
+                            }}>
+                                {dashboardData.stats.students + dashboardData.stats.teachers}
+                            </div>
+                        </div>
+                        <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '0.75rem 0'
+                        }}>
+                            <div style={{fontSize: '0.9rem', color: '#374151', fontWeight: '500'}}>
+                                Pending Reviews
+                            </div>
+                            <div style={{
+                                fontSize: '0.9rem',
+                                fontWeight: '600',
+                                color: dashboardData.stats.pending_teachers + dashboardData.stats.pending_students > 0 ? '#f59e0b' : '#10b981'
+                            }}>
+                                {dashboardData.stats.pending_teachers + dashboardData.stats.pending_students}
+                            </div>
+                        </div>
                     </div>
                 </motion.div>
             </div>
@@ -288,8 +457,29 @@ const AdminHome: React.FC = () => {
                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'}
                     >
                         <div style={{fontSize: '1.5rem', marginBottom: '0.5rem'}}>✅</div>
-                        <div><strong>Approve Teachers:</strong> Review pending teacher applications and manage
+                        <div><strong>Approve Teachers ({dashboardData.stats.pending_teachers}):</strong> Review pending
+                            teacher applications and manage
                             approvals.
+                        </div>
+                    </button>
+                    <button
+                        onClick={() => window.location.href = '/admin/students'}
+                        style={{
+                            background: 'rgba(255,255,255,0.1)',
+                            padding: '1rem',
+                            borderRadius: '8px',
+                            border: 'none',
+                            color: 'white',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.2)'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'}
+                    >
+                        <div style={{fontSize: '1.5rem', marginBottom: '0.5rem'}}>🎓</div>
+                        <div><strong>Approve Students ({dashboardData.stats.pending_students}):</strong> Review and
+                            approve student registrations.
                         </div>
                     </button>
                     <button

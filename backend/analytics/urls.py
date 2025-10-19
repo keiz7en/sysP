@@ -4,10 +4,8 @@ from . import views
 app_name = 'analytics'
 
 urlpatterns = [
-    path('learning-analytics/', views.LearningAnalyticsView.as_view(), name='learning-analytics'),
-    path('dropout-prediction/', views.DropoutPredictionView.as_view(), name='dropout-prediction'),
-    path('performance-trends/', views.PerformanceTrendsView.as_view(), name='performance-trends'),
-    path('institutional/', views.InstitutionalAnalyticsView.as_view(), name='institutional'),
-    path('effectiveness/', views.LearningEffectivenessView.as_view(), name='effectiveness'),
-    path('admission-analysis/', views.AdmissionOutcomeAnalysisView.as_view(), name='admission-analysis'),
+    path('system/', views.system_analytics, name='system-analytics'),
+    path('student-performance/', views.student_performance_analytics, name='student-performance'),
+    path('usage-metrics/', views.usage_metrics, name='usage-metrics'),
+    path('dashboard/', views.DashboardAnalyticsView.as_view(), name='dashboard-analytics'),
 ]

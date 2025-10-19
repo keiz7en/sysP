@@ -10,7 +10,12 @@ class TeacherProfile(models.Model):
     specialization = models.JSONField(default=list)  # List of subjects/skills
     qualifications = models.JSONField(default=list)  # Educational qualifications
     experience_years = models.IntegerField(default=0)
-    hire_date = models.DateField()
+    hire_date = models.DateField(auto_now_add=True)
+
+    # Approval system
+    is_approved = models.BooleanField(default=False)
+    approved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_teachers')
+    approved_at = models.DateTimeField(null=True, blank=True)
 
     # Performance Metrics
     teaching_rating = models.DecimalField(max_digits=3, decimal_places=2, default=0.00)

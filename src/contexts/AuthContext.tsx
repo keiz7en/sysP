@@ -1,5 +1,6 @@
 import React, {createContext, useContext, useState, useEffect, ReactNode} from 'react'
 import toast from 'react-hot-toast'
+import {userAPI} from '../services/api'
 
 // User types and interfaces
 export interface User {
@@ -13,6 +14,7 @@ export interface User {
     address?: string
     is_verified: boolean
     created_at: string
+    approval_status: 'pending' | 'approved' | 'rejected'
     // Student specific fields
     student_id?: string
     current_gpa?: number
@@ -30,6 +32,7 @@ export interface User {
 
 export interface AuthContextType {
     user: User | null
+    token: string | null
     isLoading: boolean
     login: (username: string, password: string, userType: 'student' | 'teacher' | 'admin') => Promise<boolean>
     register: (userData: RegisterData) => Promise<boolean>
@@ -46,6 +49,18 @@ export interface RegisterData {
     user_type: 'student' | 'teacher' | 'admin'
     phone_number?: string
     address?: string
+    // Student specific
+    grade_level?: string
+    guardian_name?: string
+    guardian_phone?: string
+    guardian_email?: string
+    learning_style?: string
+    // Teacher specific
+    department?: string
+    specialization?: string[]
+    experience_years?: number
+    qualifications?: string[]
+    reason_for_joining?: string
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
@@ -60,85 +75,8 @@ export const useAuth = () => {
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({children}) => {
     const [user, setUser] = useState<User | null>(null)
+    const [token, setToken] = useState<string | null>(null)
     const [isLoading, setIsLoading] = useState(true)
-
-    // Demo accounts for testing
-    const getDemoUsers = (): User[] => {
-        return [
-            {
-                id: 1,
-                username: 'student_demo',
-                email: 'student@demo.com',
-                first_name: 'Sarah',
-                last_name: 'Johnson',
-                user_type: 'student',
-                phone_number: '+1-555-0101',
-                address: '123 Student St, College City',
-                is_verified: true,
-                created_at: '2023-01-15T10:00:00Z',
-                student_id: '12345',
-                current_gpa: 3.85,
-                grade_level: 'Sophomore',
-                academic_status: 'active',
-                name: 'Sarah Johnson',
-                role: 'student'
-            },
-            {
-                id: 2,
-                username: 'teacher_demo',
-                email: 'teacher@demo.com',
-                first_name: 'Dr. Emily',
-                last_name: 'Carter',
-                user_type: 'teacher',
-                phone_number: '+1-555-0102',
-                address: '456 Faculty Ave, University Town',
-                is_verified: true,
-                created_at: '2023-01-10T10:00:00Z',
-                employee_id: 'EMP1001',
-                department: 'Computer Science',
-                teaching_rating: 4.8,
-                experience_years: 8,
-                name: 'Dr. Emily Carter',
-                role: 'teacher'
-            },
-            {
-                id: 3,
-                username: 'admin_demo',
-                email: 'admin@demo.com',
-                first_name: 'John',
-                last_name: 'Administrator',
-                user_type: 'admin',
-                phone_number: '+1-555-0103',
-                address: '789 Admin Blvd, Campus Center',
-                is_verified: true,
-                created_at: '2023-01-01T10:00:00Z',
-                name: 'John Administrator',
-                role: 'admin'
-            }
-        ]
-    }
-
-    // Check for demo mode or backend
-    const isDemo = () => {
-        return localStorage.getItem('eduai_demo_mode') === 'true' ||
-            !process.env.REACT_APP_API_URL ||
-            process.env.NODE_ENV === 'development'
-    }
-
-    // Get existing demo users from localStorage
-    const getExistingDemoUsers = (): User[] => {
-        try {
-            const existing = localStorage.getItem('eduai_demo_users')
-            return existing ? JSON.parse(existing) : getDemoUsers()
-        } catch {
-            return getDemoUsers()
-        }
-    }
-
-    // Save demo users to localStorage
-    const saveDemoUsers = (users: User[]) => {
-        localStorage.setItem('eduai_demo_users', JSON.stringify(users))
-    }
 
     useEffect(() => {
         checkAuthStatus()
@@ -147,56 +85,35 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({children}) => {
     const checkAuthStatus = async () => {
         try {
             setIsLoading(true)
+            const storedToken = localStorage.getItem('auth_token')
 
-            // Check for demo mode first
-            if (isDemo()) {
-                const savedUser = localStorage.getItem('eduai_current_user')
-                if (savedUser) {
-                    try {
-                        const userData = JSON.parse(savedUser)
-                        setUser(userData)
-                    } catch {
-                        localStorage.removeItem('eduai_current_user')
-                    }
-                }
-                return
-            }
-
-            // Check backend authentication
-            const token = localStorage.getItem('auth_token')
-            if (token) {
+            if (storedToken) {
                 try {
-                    const response = await fetch('http://localhost:8000/api/users/verify-token/', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({token})
-                    })
-
-                    if (response.ok) {
-                        const data = await response.json()
-                        if (data.valid) {
-                            const processedUser = {
-                                ...data.user,
-                                name: `${data.user.first_name} ${data.user.last_name}`,
-                                role: data.user.user_type
-                            }
-                            setUser(processedUser)
-                        } else {
-                            localStorage.removeItem('auth_token')
+                    const response = await userAPI.verifyToken(storedToken)
+                    if (response.valid) {
+                        const processedUser = {
+                            ...response.user,
+                            name: `${response.user.first_name} ${response.user.last_name}`,
+                            role: response.user.user_type
                         }
+                        setUser(processedUser)
+                        setToken(storedToken)
                     } else {
                         localStorage.removeItem('auth_token')
+                        setToken(null)
                     }
                 } catch (error) {
-                    console.log('Backend not available, switching to demo mode')
-                    localStorage.setItem('eduai_demo_mode', 'true')
+                    console.error('Token verification failed:', error)
+                    localStorage.removeItem('auth_token')
+                    setToken(null)
+                    // Show demo mode fallback for development
+                    if (process.env.NODE_ENV === 'development') {
+                        console.log('Backend not available, demo mode available')
+                    }
                 }
             }
         } catch (error) {
             console.error('Auth check failed:', error)
-            localStorage.removeItem('auth_token')
         } finally {
             setIsLoading(false)
         }
@@ -206,66 +123,40 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({children}) => {
         try {
             setIsLoading(true)
 
-            // Always try demo mode first if backend is not available or in development
-            const demoUsers = getExistingDemoUsers()
-            const foundUser = demoUsers.find(u =>
-                (u.username === username || u.email === username) &&
-                u.user_type === userType
-            )
+            const response = await userAPI.login(username, password, userType)
 
-            if (foundUser) {
-                setUser(foundUser)
-                localStorage.setItem('eduai_current_user', JSON.stringify(foundUser))
-                localStorage.setItem('eduai_demo_mode', 'true')
-                toast.success(`Welcome back, ${foundUser.first_name}!`)
-                return true
+            const processedUser = {
+                ...response.user,
+                name: `${response.user.first_name} ${response.user.last_name}`,
+                role: response.user.user_type
             }
 
-            // If not found in demo and not in demo mode, try backend
-            if (!isDemo()) {
-                try {
-                    const response = await fetch('http://localhost:8000/api/users/login/', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            username,
-                            password,
-                            user_type: userType
-                        })
-                    })
+            setUser(processedUser)
+            setToken(response.token)
+            localStorage.setItem('auth_token', response.token)
 
-                    if (response.ok) {
-                        const data = await response.json()
-                        const processedUser = {
-                            ...data.user,
-                            name: `${data.user.first_name} ${data.user.last_name}`,
-                            role: data.user.user_type
-                        }
+            toast.success(response.message || `Welcome back, ${processedUser.first_name}!`)
+            return true
 
-                        setUser(processedUser)
-                        localStorage.setItem('auth_token', data.token)
-                        localStorage.removeItem('eduai_demo_mode')
-                        toast.success(data.message)
-                        return true
-                    } else {
-                        const errorData = await response.json()
-                        toast.error(errorData.error || 'Login failed')
-                        return false
-                    }
-                } catch (error) {
-                    console.log('Backend login failed, switching to demo mode')
-                    localStorage.setItem('eduai_demo_mode', 'true')
-                }
+        } catch (error: any) {
+            const errorMessage = error.message || 'Login failed. Please try again.'
+
+            // Handle specific approval status errors
+            if (errorMessage.includes('pending approval')) {
+                toast.error('Your account is pending approval. You will be notified when approved.', {
+                    duration: 6000
+                })
+            } else if (errorMessage.includes('rejected')) {
+                toast.error('Your account has been rejected. Please contact administrator.', {
+                    duration: 6000
+                })
+            } else if (errorMessage.includes('not registered as a')) {
+                toast.error('Please select the correct account type for your registered account.')
+            } else {
+                toast.error(errorMessage)
             }
 
-            toast.error('Invalid credentials. Try demo accounts: student@demo.com, teacher@demo.com, or admin@demo.com')
-            return false
-
-        } catch (error) {
             console.error('Login error:', error)
-            toast.error('Login failed. Please try again.')
             return false
         } finally {
             setIsLoading(false)
@@ -287,71 +178,46 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({children}) => {
                 return false
             }
 
-            // Check if username or email already exists in demo users
-            const existingUsers = getExistingDemoUsers()
-            const usernameExists = existingUsers.some(u =>
-                u.username.toLowerCase() === userData.username.toLowerCase()
-            )
-            const emailExists = existingUsers.some(u =>
-                u.email.toLowerCase() === userData.email.toLowerCase()
-            )
+            const response = await userAPI.register(userData)
 
-            if (usernameExists) {
-                toast.error('Username already exists. Please choose a different username.')
-                return false
+            // Handle registration response based on approval status
+            if (response.approval_status === 'pending') {
+                if (userData.user_type === 'student') {
+                    toast.success(
+                        'Registration successful! Your student account is pending approval from teachers/administrators. You will receive notification when approved.',
+                        {duration: 8000}
+                    )
+                } else if (userData.user_type === 'teacher') {
+                    toast.success(
+                        'Registration successful! Your teacher application is being reviewed by administrators. You will be notified once approved.',
+                        {duration: 8000}
+                    )
+                }
+
+                // Don't auto-login for pending users
+                return true
+            } else if (response.approval_status === 'approved') {
+                // Auto-login for approved users (like admins)
+                const processedUser = {
+                    ...response.user,
+                    name: `${response.user.first_name} ${response.user.last_name}`,
+                    role: response.user.user_type
+                }
+
+                setUser(processedUser)
+                setToken(response.token)
+                localStorage.setItem('auth_token', response.token)
+
+                toast.success(`Account created successfully! Welcome to EduAI, ${processedUser.first_name}!`)
+                return true
             }
 
-            if (emailExists) {
-                toast.error('Email already registered. Please use a different email address.')
-                return false
-            }
-
-            // Demo mode registration (always works)
-            await new Promise(resolve => setTimeout(resolve, 1000))
-
-            const newUser: User = {
-                id: Date.now(),
-                username: userData.username,
-                email: userData.email,
-                first_name: userData.first_name,
-                last_name: userData.last_name,
-                user_type: userData.user_type,
-                phone_number: userData.phone_number || '',
-                address: userData.address || '',
-                is_verified: true,
-                created_at: new Date().toISOString(),
-                name: `${userData.first_name} ${userData.last_name}`,
-                role: userData.user_type
-            }
-
-            // Add type-specific fields
-            if (userData.user_type === 'student') {
-                newUser.student_id = Math.floor(Math.random() * 90000 + 10000).toString()
-                newUser.current_gpa = 0.0
-                newUser.grade_level = 'Freshman'
-                newUser.academic_status = 'active'
-            } else if (userData.user_type === 'teacher') {
-                newUser.employee_id = `EMP${Math.floor(Math.random() * 9000 + 1000)}`
-                newUser.department = 'General'
-                newUser.teaching_rating = 0.0
-                newUser.experience_years = 0
-            }
-
-            // Add new user to existing demo users
-            const updatedDemoUsers = [...existingUsers, newUser]
-            saveDemoUsers(updatedDemoUsers)
-
-            // Set as current user
-            setUser(newUser)
-            localStorage.setItem('eduai_current_user', JSON.stringify(newUser))
-            localStorage.setItem('eduai_demo_mode', 'true')
-
-            toast.success(`Account created successfully! Welcome to EduAI, ${newUser.first_name}!`)
             return true
 
-        } catch (error) {
+        } catch (error: any) {
+            const errorMessage = error.message || 'Registration failed. Please try again.'
+            toast.error(errorMessage)
             console.error('Registration error:', error)
-            toast.error('Registration failed. Please try again.')
             return false
         } finally {
             setIsLoading(false)
@@ -360,37 +226,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({children}) => {
 
     const logout = async () => {
         try {
-            // Demo mode logout
-            if (isDemo()) {
-                setUser(null)
-                localStorage.removeItem('eduai_current_user')
-                localStorage.removeItem('eduai_demo_mode')
-                toast.success('Logged out successfully')
-                return
-            }
-
-            // Backend logout
-            const token = localStorage.getItem('auth_token')
             if (token) {
                 try {
-                    await fetch('http://localhost:8000/api/users/logout/', {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Token ${token}`,
-                            'Content-Type': 'application/json',
-                        }
-                    })
+                    await userAPI.logout(token)
                 } catch (error) {
                     console.log('Backend logout failed, clearing local data')
                 }
             }
 
             setUser(null)
+            setToken(null)
             localStorage.removeItem('auth_token')
             toast.success('Logged out successfully')
         } catch (error) {
             console.error('Logout error:', error)
+            // Force clear even if backend fails
             setUser(null)
+            setToken(null)
             localStorage.removeItem('auth_token')
             toast.success('Logged out successfully')
         }
@@ -398,55 +250,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({children}) => {
 
     const updateProfile = async (data: Partial<User>): Promise<boolean> => {
         try {
-            if (!user) return false
+            if (!user || !token) return false
             setIsLoading(true)
 
-            // Demo mode update
-            if (isDemo()) {
-                await new Promise(resolve => setTimeout(resolve, 500))
-                const updatedUser = {
-                    ...user,
-                    ...data,
-                    name: `${data.first_name || user.first_name} ${data.last_name || user.last_name}`
-                }
+            await userAPI.updateProfile(token, data)
 
-                // Update in demo users list
-                const existingUsers = getExistingDemoUsers()
-                const updatedUsers = existingUsers.map(u =>
-                    u.id === user.id ? updatedUser : u
-                )
-                saveDemoUsers(updatedUsers)
-
-                setUser(updatedUser)
-                localStorage.setItem('eduai_current_user', JSON.stringify(updatedUser))
-                toast.success('Profile updated successfully')
-                return true
+            const updatedUser = {
+                ...user,
+                ...data,
+                name: `${data.first_name || user.first_name} ${data.last_name || user.last_name}`
             }
 
-            // Backend update
-            const token = localStorage.getItem('auth_token')
-            const response = await fetch('http://localhost:8000/api/users/profile/', {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `Token ${token}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(data)
-            })
-
-            if (response.ok) {
-                const updatedUser = {...user, ...data}
-                setUser(updatedUser)
-                toast.success('Profile updated successfully')
-                return true
-            } else {
-                const errorData = await response.json()
-                toast.error(errorData.error || 'Failed to update profile')
-                return false
-            }
-        } catch (error) {
+            setUser(updatedUser)
+            toast.success('Profile updated successfully')
+            return true
+        } catch (error: any) {
+            const errorMessage = error.message || 'Failed to update profile'
+            toast.error(errorMessage)
             console.error('Update profile error:', error)
-            toast.error('Failed to update profile')
             return false
         } finally {
             setIsLoading(false)
@@ -455,6 +276,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({children}) => {
 
     const value: AuthContextType = {
         user,
+        token,
         isLoading,
         login,
         register,
