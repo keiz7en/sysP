@@ -602,7 +602,7 @@ const TeacherHome: React.FC = () => {
                     </button>
 
                     <button
-                        onClick={() => toast.info('Assessment tools coming soon!')}
+                        onClick={() => toast.success('Assessment tools coming soon!')}
                         style={{
                             padding: '1rem',
                             backgroundColor: '#f59e0b',
@@ -622,7 +622,7 @@ const TeacherHome: React.FC = () => {
                     </button>
 
                     <button
-                        onClick={() => toast.info('Analytics coming soon!')}
+                        onClick={() => toast.success('Analytics coming soon!')}
                         style={{
                             padding: '1rem',
                             backgroundColor: '#8b5cf6',

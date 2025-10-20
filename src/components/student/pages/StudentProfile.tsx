@@ -25,6 +25,7 @@ interface StudentProfileData {
     };
     accessibility_needs?: string[];
     languages?: string[];
+    date_of_birth?: string;
 }
 
 const StudentProfile: React.FC = () => {
@@ -368,6 +369,26 @@ const StudentProfile: React.FC = () => {
                                 onChange={(e) => handleInputChange('phone', e.target.value)}
                                 disabled={!editing}
                                 placeholder="(555) 123-4567"
+                                style={{
+                                    width: '100%',
+                                    padding: '0.75rem',
+                                    borderRadius: '8px',
+                                    border: '1px solid #d1d5db',
+                                    fontSize: '1rem',
+                                    backgroundColor: editing ? 'white' : '#f9fafb'
+                                }}
+                            />
+                        </div>
+                        <div>
+                            <label
+                                style={{display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#374151'}}>
+                                Date of Birth
+                            </label>
+                            <input
+                                type="date"
+                                value={profile.date_of_birth || ''}
+                                onChange={(e) => handleInputChange('date_of_birth', e.target.value)}
+                                disabled={!editing}
                                 style={{
                                     width: '100%',
                                     padding: '0.75rem',

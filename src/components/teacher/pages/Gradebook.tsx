@@ -46,6 +46,9 @@ const Gradebook: React.FC = () => {
     const [loading, setLoading] = useState(true)
     const [sortBy, setSortBy] = useState('name')
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+    const [selectedStudent, setSelectedStudent] = useState<string | null>(null)
+    const [selectedAssignment, setSelectedAssignment] = useState<string | null>(null)
+    const [gradeFilter, setGradeFilter] = useState<'all' | 'pending' | 'graded'>('all')
 
     useEffect(() => {
         if (user && token) {
@@ -100,33 +103,6 @@ const Gradebook: React.FC = () => {
             }
         } catch (error) {
             console.error('Error fetching courses:', error)
-        }
-    }
-
-    const updateGrade = async (studentId: string, assignmentId: string, newScore: number) => {
-        try {
-            const response = await fetch('http://localhost:8000/api/teachers/update-grade/', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Token ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    student_id: studentId,
-                    assignment_id: assignmentId,
-                    score: newScore
-                })
-            })
-
-            if (response.ok) {
-                toast.success('Grade updated successfully')
-                fetchGradebook()
-            } else {
-                toast.error('Failed to update grade')
-            }
-        } catch (error) {
-            console.error('Error updating grade:', error)
-            toast.error('Error updating grade')
         }
     }
 
@@ -559,7 +535,7 @@ const Gradebook: React.FC = () => {
                             </tr>
                             </thead>
                             <tbody>
-                            {sortedStudents.map((student, index) => (
+                            {sortedStudents.map((student) => (
                                 <tr key={student.student_id} style={{borderBottom: '1px solid #e5e7eb'}}>
                                     <td style={{
                                         padding: '1rem',

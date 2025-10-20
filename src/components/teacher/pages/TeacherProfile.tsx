@@ -6,12 +6,15 @@ import toast from 'react-hot-toast'
 const TeacherProfile: React.FC = () => {
     const {user} = useAuth()
     const [profileData, setProfileData] = useState({
-        first_name: '',
-        last_name: '',
-        email: '',
-        phone_number: '',
-        address: '',
-        bio: ''
+        first_name: user?.first_name || '',
+        last_name: user?.last_name || '',
+        email: user?.email || '',
+        phone_number: user?.phone_number || '',
+        address: user?.address || '',
+        bio: user?.bio || '',
+        department: user?.department || '',
+        specialization: user?.specialization || [],
+        experience_years: user?.experience_years || 0
     })
     const [loading, setLoading] = useState(false)
 
@@ -23,7 +26,10 @@ const TeacherProfile: React.FC = () => {
                 email: user.email || '',
                 phone_number: user.phone_number || '',
                 address: user.address || '',
-                bio: user.bio || ''
+                bio: user.bio || '',
+                department: user.department || '',
+                specialization: user.specialization || [],
+                experience_years: user.experience_years || 0
             })
         }
     }, [user])

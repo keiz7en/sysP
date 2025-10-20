@@ -24,17 +24,18 @@ interface AssessmentStats {
 }
 
 const AcademicAutomation: React.FC = () => {
-    const {user, token} = useAuth()
+    const {token} = useAuth()
     const [assessments, setAssessments] = useState<Assessment[]>([])
+    const [loading, setLoading] = useState(true)
+    const [selectedAssessment, setSelectedAssessment] = useState<Assessment | null>(null)
+    const [showSubmissionModal, setShowSubmissionModal] = useState(false)
     const [stats, setStats] = useState<AssessmentStats>({
         completed: 0,
         pending: 0,
         averageScore: 0,
         totalAssessments: 0
     })
-    const [loading, setLoading] = useState(true)
     const [selectedType, setSelectedType] = useState<'all' | 'Quiz' | 'Exam' | 'Assignment'>('all')
-    const [showCreateModal, setShowCreateModal] = useState(false)
 
     useEffect(() => {
         fetchAssessments()

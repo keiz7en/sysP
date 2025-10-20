@@ -1,6 +1,7 @@
 import React, {useState, useEffect} from 'react'
 import {motion} from 'framer-motion'
 import {useAuth} from '../../../contexts/AuthContext'
+import {getAccessibilityFeatures, processVoiceInput} from '../../../services/api'
 import toast from 'react-hot-toast'
 
 interface AccessibilitySettings {
@@ -23,7 +24,7 @@ interface VoiceCommand {
 }
 
 const EngagementAccessibility: React.FC = () => {
-    const {user} = useAuth()
+    const {token} = useAuth()
     const [settings, setSettings] = useState<AccessibilitySettings>({
         voiceRecognition: false,
         textToSpeech: false,
@@ -38,7 +39,6 @@ const EngagementAccessibility: React.FC = () => {
     })
     const [isListening, setIsListening] = useState(false)
     const [voiceCommand, setVoiceCommand] = useState('')
-    const [loading, setLoading] = useState(false)
     const [activeTab, setActiveTab] = useState<'visual' | 'audio' | 'motor' | 'cognitive'>('visual')
 
     const voiceCommands: VoiceCommand[] = [
@@ -151,7 +151,7 @@ const EngagementAccessibility: React.FC = () => {
         } else if (lowerCommand.includes('help')) {
             toast.success('Opening AI assistant...')
         } else {
-            toast.info(`Voice command received: "${command}". Feature coming soon!`)
+            toast.success(`Voice command received: "${command}". Feature coming soon!`)
         }
     }
 

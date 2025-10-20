@@ -1,17 +1,7 @@
-import React, { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
-import { useAuth } from '../../../contexts/AuthContext'
-import {
-    getStudentDashboard,
-    getAcademicTranscript,
-    getAIProgressAnalysis,
-    getPersonalizedLearningPath,
-    getEngagementAnalytics,
-    getAcademicRecords,
-    getCareerGuidance,
-    getAssessments
-} from '../../../services/api'
-import toast from 'react-hot-toast'
+import React, {useState, useEffect} from 'react'
+import {motion} from 'framer-motion'
+import {useAuth} from '../../../contexts/AuthContext'
+import {studentAPI} from '../../../services/api'
 
 interface DashboardStats {
     gpa: number;
@@ -58,7 +48,6 @@ const StudentHome: React.FC = () => {
     const [academicRecords, setAcademicRecords] = useState<AcademicRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState('overview');
 
     useEffect(() => {
         const fetchAllData = async () => {
@@ -72,13 +61,13 @@ const StudentHome: React.FC = () => {
                 }
 
                 // Fetch student dashboard data
-                const dashboardRes = await getStudentDashboard(token);
+                const dashboardRes = await studentAPI.getStudentDashboard(token);
                 setDashboardData(dashboardRes);
 
                 // Only fetch additional data if student has courses
                 if (dashboardRes.has_courses) {
                     try {
-                        const recordsRes = await getAcademicRecords(token);
+                        const recordsRes = await studentAPI.getAcademicRecords(token);
                         setAcademicRecords(recordsRes.academic_records || []);
                     } catch (recordsError) {
                         console.log('No academic records yet');

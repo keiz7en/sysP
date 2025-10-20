@@ -142,6 +142,26 @@ const TeacherDashboard: React.FC = () => {
                         <Route path="profile" element={<TeacherProfile/>}/>
                         <Route path="*" element={<Navigate to="/teacher" replace/>}/>
                     </Routes>
+                    {/* Check if teacher profile exists and show setup message if needed */}
+                    {user && !user.teacher_profile && (
+                        <motion.div
+                            initial={{opacity: 0, y: 20}}
+                            animate={{opacity: 1, y: 0}}
+                            transition={{duration: 0.3}}
+                            style={{
+                                padding: '2rem',
+                                backgroundColor: '#f8fafc',
+                                border: '1px solid #ddd',
+                                borderRadius: '10px',
+                                boxShadow: '0 0 10px rgba(0, 0, 0, 0.1)',
+                                marginBottom: '2rem'
+                            }}
+                        >
+                            <h2>Setup Your Teacher Profile</h2>
+                            <p>Please complete your teacher profile to access all features.</p>
+                            <button onClick={() => console.log('Setup profile')}>Setup Profile</button>
+                        </motion.div>
+                    )}
                 </motion.main>
             </div>
         </div>

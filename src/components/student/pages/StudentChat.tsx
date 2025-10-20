@@ -1,7 +1,6 @@
 import React, {useState, useEffect, useRef} from 'react'
 import {motion, AnimatePresence} from 'framer-motion'
 import {useAuth} from '../../../contexts/AuthContext'
-import toast from 'react-hot-toast'
 
 interface ChatMessage {
     id: string;
@@ -40,7 +39,7 @@ What would you like to explore today?`,
     const [isTyping, setIsTyping] = useState(false)
     const [selectedQuickAction, setSelectedQuickAction] = useState<string | null>(null)
     const messagesEndRef = useRef<HTMLDivElement>(null)
-    const inputRef = useRef<HTMLInputElement>(null)
+    const inputRef = useRef<HTMLTextAreaElement>(null)
 
     const quickActions: QuickAction[] = [
         {id: '1', label: 'Help with homework', icon: '📚', message: 'I need help with my homework assignments'},

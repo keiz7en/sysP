@@ -94,12 +94,12 @@ const SystemSettings: React.FC = () => {
 
     const handleSettingChange = (key: string, value: any) => {
         if (key.includes('.')) {
-            const [parent, child] = key.split('.')
+            const [section, keyInSection] = key.split('.')
             setSettings(prev => ({
                 ...prev,
-                [parent]: {
-                    ...prev[parent as keyof SystemSettings],
-                    [child]: value
+                [section]: {
+                    ...(prev[section] || {}),
+                    [keyInSection]: value
                 }
             }))
         } else {

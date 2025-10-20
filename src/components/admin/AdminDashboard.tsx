@@ -1,6 +1,5 @@
 import React, {useState} from 'react'
 import {Routes, Route, Navigate} from 'react-router-dom'
-import {motion} from 'framer-motion'
 import Navbar from '../shared/Navbar'
 import Sidebar from '../shared/Sidebar'
 import AdminHome from './pages/AdminHome'

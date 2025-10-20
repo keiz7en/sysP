@@ -35,7 +35,6 @@ const StudentRecords: React.FC = () => {
     const {user, token} = useAuth()
     const [transcriptData, setTranscriptData] = useState<TranscriptData | null>(null)
     const [loading, setLoading] = useState(true)
-    const [activeTab, setActiveTab] = useState('current')
     const [selectedSemester, setSelectedSemester] = useState('all')
 
     useEffect(() => {

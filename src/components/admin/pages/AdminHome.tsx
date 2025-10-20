@@ -2,7 +2,6 @@ import React, {useState, useEffect} from 'react'
 import {motion} from 'framer-motion'
 import {useAuth} from '../../../contexts/AuthContext'
 import {adminAPI} from '../../../services/api'
-import toast from 'react-hot-toast'
 
 interface DashboardData {
     user: any;
@@ -132,21 +131,6 @@ const AdminHome: React.FC = () => {
             icon: '⏳'
         }
     ]
-
-    const getStatusColor = (status: string) => {
-        switch (status) {
-            case 'excellent':
-                return '#10b981'
-            case 'good':
-                return '#3b82f6'
-            case 'warning':
-                return '#f59e0b'
-            case 'error':
-                return '#ef4444'
-            default:
-                return '#6b7280'
-        }
-    }
 
     const getActivityIcon = (type: string) => {
         switch (type) {

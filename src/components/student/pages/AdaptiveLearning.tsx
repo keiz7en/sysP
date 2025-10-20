@@ -2,7 +2,6 @@ import React, {useState, useEffect} from 'react'
 import {motion} from 'framer-motion'
 import {useAuth} from '../../../contexts/AuthContext'
 import {getPersonalizedLearningPath} from '../../../services/api'
-import toast from 'react-hot-toast'
 
 interface LearningPath {
     id: number

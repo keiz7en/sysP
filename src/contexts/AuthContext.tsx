@@ -26,7 +26,7 @@ export interface User {
     teaching_rating?: number
     experience_years?: number
     // Computed fields
-    name?: string
+    name: string
     role?: string
 }
 
@@ -112,7 +112,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({children}) => {
                     localStorage.removeItem('auth_token')
                     setToken(null)
                     // Show demo mode fallback for development
-                    if (process.env.NODE_ENV === 'development') {
+                    if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
                         console.log('Backend not available, demo mode available')
                     }
                 }

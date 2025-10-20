@@ -107,13 +107,20 @@ const AssignmentManagement: React.FC = () => {
         }
 
         try {
+            const formData = new FormData()
+            formData.append('title', assignmentForm.title)
+            formData.append('description', assignmentForm.description)
+            formData.append('course_id', assignmentForm.course_id)
+            formData.append('due_date', assignmentForm.due_date)
+            formData.append('max_points', assignmentForm.max_points.toString())
+            formData.append('assignment_type', assignmentForm.assignment_type)
+
             const response = await fetch('http://localhost:8000/api/teachers/assignments/', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Token ${token}`,
-                    'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(assignmentForm)
+                body: formData
             })
 
             if (response.ok) {

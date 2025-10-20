@@ -1,7 +1,6 @@
 import React, {useState, useEffect} from 'react'
 import {motion} from 'framer-motion'
 import {useAuth} from '../../../contexts/AuthContext'
-import toast from 'react-hot-toast'
 
 interface AnalyticsData {
     overview: {
@@ -40,7 +39,6 @@ const TeachingAnalytics: React.FC = () => {
     const [loading, setLoading] = useState(true)
     const [selectedTimeRange, setSelectedTimeRange] = useState('week')
     const [error, setError] = useState<string | null>(null)
-    const [debugInfo, setDebugInfo] = useState<any>(null)
 
     useEffect(() => {
         if (user && token) {
@@ -85,13 +83,11 @@ const TeachingAnalytics: React.FC = () => {
                 } else {
                     console.warn('⚠️ Unexpected data structure:', data)
                     setError('Unexpected data format received from server')
-                    setDebugInfo(data)
                 }
             } else {
                 const errorData = await response.json().catch(() => ({}))
                 console.error('❌ API Error:', response.status, errorData)
                 setError(`API Error ${response.status}: ${errorData.error || 'Unknown error'}`)
-                setDebugInfo(errorData)
             }
         } catch (error) {
             console.error('❌ Network error:', error)
@@ -585,7 +581,7 @@ const TeachingAnalytics: React.FC = () => {
                                     </tr>
                                     </thead>
                                     <tbody>
-                                    {analytics.student_performance.map((student, index) => (
+                                    {analytics.student_performance.map((student) => (
                                         <tr key={student.student_id} style={{borderBottom: '1px solid #e5e7eb'}}>
                                             <td style={{padding: '1rem'}}>
                                                 <div>

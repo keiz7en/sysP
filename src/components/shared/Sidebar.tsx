@@ -1,14 +1,7 @@
 import React from 'react'
 import {motion, AnimatePresence} from 'framer-motion'
 import {useNavigate, useLocation} from 'react-router-dom'
-import {useAuth} from '../../contexts/AuthContext'
-
-interface User {
-    name: string
-    email: string
-    avatar?: string
-    role: string
-}
+import {useAuth, User} from '../../contexts/AuthContext'
 
 interface MenuItem {
     id: string
