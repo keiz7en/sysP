@@ -1,4 +1,5 @@
 const API_BASE_URL = 'http://localhost:8000/api'
+const API_BASE = API_BASE_URL // Add this for compatibility
 
 const getAuthHeaders = (token: string | null) => ({
     'Authorization': `Token ${token}`,
@@ -8,6 +9,16 @@ const getAuthHeaders = (token: string | null) => ({
 export const studentAPI = {
     getDashboard: async (token: string) => {
         const response = await fetch(`${API_BASE_URL}/students/dashboard/`, {
+            headers: getAuthHeaders(token)
+        })
+        if (!response.ok) {
+            throw new Error('Failed to fetch student dashboard')
+        }
+        return response.json()
+    },
+
+    getStudentDashboard: async (token: string) => {
+        const response = await fetch(`${API_BASE_URL}/users/dashboard/`, {
             headers: getAuthHeaders(token)
         })
         if (!response.ok) {
@@ -70,6 +81,16 @@ export const studentAPI = {
 export const teacherAPI = {
     getDashboard: async (token: string) => {
         const response = await fetch(`${API_BASE_URL}/teachers/dashboard/`, {
+            headers: getAuthHeaders(token)
+        })
+        if (!response.ok) {
+            throw new Error('Failed to fetch teacher dashboard')
+        }
+        return response.json()
+    },
+
+    getTeacherDashboard: async (token: string) => {
+        const response = await fetch(`${API_BASE_URL}/users/dashboard/`, {
             headers: getAuthHeaders(token)
         })
         if (!response.ok) {
@@ -174,6 +195,16 @@ export const teacherAPI = {
 
 export const adminAPI = {
     getDashboard: async (token: string) => {
+        const response = await fetch(`${API_BASE_URL}/users/dashboard/`, {
+            headers: getAuthHeaders(token)
+        })
+        if (!response.ok) {
+            throw new Error('Failed to fetch admin dashboard')
+        }
+        return response.json()
+    },
+
+    getAdminDashboard: async (token: string) => {
         const response = await fetch(`${API_BASE_URL}/users/dashboard/`, {
             headers: getAuthHeaders(token)
         })
@@ -369,7 +400,42 @@ export const userAPI = {
             throw new Error(error.error || 'Failed to change password')
         }
         return response.json()
-    }
+    },
+
+    deleteAccount: async (token: string, confirmation: string) => {
+        const response = await fetch(`${API_BASE_URL}/users/delete-account/`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(token),
+            body: JSON.stringify({confirmation})
+        })
+        if (!response.ok) {
+            const error = await response.json()
+            throw new Error(error.error || 'Failed to delete account')
+        }
+        return response.json()
+    },
+
+    deleteUserAccount: async (token: string, userId: number, confirmation: string, reason?: string) => {
+        const response = await fetch(`${API_BASE}/users/delete-user/${userId}/`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Token ${token}`
+            },
+            body: JSON.stringify({
+                confirmation: confirmation,
+                reason: reason || 'Account deleted by administrator'
+            })
+        })
+
+        if (!response.ok) {
+            const errorData = await response.json()
+            throw new Error(errorData.error || 'Failed to delete user account')
+        }
+
+        return response.json()
+    },
+
 }
 
 // ===========================

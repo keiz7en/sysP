@@ -2,13 +2,15 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    path('register/', views.RegisterView.as_view(), name='register'),
+    path('register/', views.register, name='register'),
     path('login/', views.LoginView.as_view(), name='login'),
     path('logout/', views.LogoutView.as_view(), name='logout'),
     path('verify-token/', views.verify_token, name='verify_token'),
     path('profile/', views.UserProfileView.as_view(), name='profile'),
     path('dashboard/', views.dashboard_data, name='dashboard'),
     path('change-password/', views.change_password, name='change-password'),
+    path('delete-account/', views.delete_account, name='delete-account'),
+    path('delete-user/<int:user_id>/', views.delete_user_account, name='delete-user-account'),
 
     # Admin endpoints
     path('admin/pending-teachers/', views.pending_teachers, name='pending_teachers'),

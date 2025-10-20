@@ -16,8 +16,8 @@ import { AuthProvider, useAuth } from './contexts/AuthContext'
 
 // Settings page component
 const SettingsPage: React.FC = () => {
-    const {user, updateProfile, changePassword} = useAuth()
-    const [activeTab, setActiveTab] = useState<'profile' | 'password' | 'preferences'>('profile')
+    const {user, updateProfile, changePassword, deleteAccount} = useAuth()
+    const [activeTab, setActiveTab] = useState<'profile' | 'password' | 'preferences' | 'danger'>('profile')
     const [profileFormData, setProfileFormData] = useState({
         first_name: user?.first_name || '',
         last_name: user?.last_name || '',
@@ -30,8 +30,13 @@ const SettingsPage: React.FC = () => {
         new_password: '',
         confirm_password: ''
     })
+    const [deleteFormData, setDeleteFormData] = useState({
+        confirmation: '',
+        reason: ''
+    })
     const [loading, setLoading] = useState(false)
     const [errors, setErrors] = useState<{ [key: string]: string }>({})
+    const [showDeleteModal, setShowDeleteModal] = useState(false)
 
     useEffect(() => {
         if (user) {
@@ -111,6 +116,36 @@ const SettingsPage: React.FC = () => {
             }
         } catch (error) {
             console.error('Password change error:', error)
+        }
+
+        setLoading(false)
+    }
+
+    const handleDeleteAccount = async (e: React.FormEvent) => {
+        e.preventDefault()
+        setErrors({})
+
+        if (!deleteFormData.confirmation) {
+            setErrors({confirmation: 'Password is required to delete account'})
+            return
+        }
+
+        // Show confirmation modal
+        setShowDeleteModal(true)
+    }
+
+    const confirmDeleteAccount = async () => {
+        setLoading(true)
+
+        try {
+            const confirmation = `delete ${user?.username}`
+            const success = await deleteAccount(confirmation)
+            if (success) {
+                // User will be automatically logged out and redirected
+                setShowDeleteModal(false)
+            }
+        } catch (error) {
+            console.error('Delete account error:', error)
         }
 
         setLoading(false)
@@ -199,7 +234,8 @@ const SettingsPage: React.FC = () => {
                         {[
                             {key: 'profile', label: '👤 Profile', description: 'Personal information'},
                             {key: 'password', label: '🔒 Password', description: 'Change password'},
-                            {key: 'preferences', label: '🎨 Preferences', description: 'App preferences'}
+                            {key: 'preferences', label: '🎨 Preferences', description: 'App preferences'},
+                            {key: 'danger', label: '⚠️ Account', description: 'Delete account'}
                         ].map((tab) => (
                             <button
                                 key={tab.key}
@@ -605,8 +641,235 @@ const SettingsPage: React.FC = () => {
                             </div>
                         </div>
                     )}
+
+                    {/* Danger Zone Tab */}
+                    {activeTab === 'danger' && (
+                        <div>
+                            <div style={{marginBottom: '2rem'}}>
+                                <h3 style={{
+                                    fontSize: '1.25rem',
+                                    fontWeight: '600',
+                                    color: '#1f2937',
+                                    marginBottom: '1rem'
+                                }}>
+                                    Danger Zone
+                                </h3>
+                                <p style={{
+                                    color: '#6b7280',
+                                    fontSize: '0.875rem',
+                                    marginBottom: '1.5rem'
+                                }}>
+                                    Be careful when making changes in this section.
+                                </p>
+                            </div>
+
+                            <div style={{
+                                backgroundColor: '#f9fafb',
+                                border: '1px solid #e5e7eb',
+                                borderRadius: '8px',
+                                padding: '2rem',
+                                textAlign: 'center'
+                            }}>
+                                <div style={{fontSize: '3rem', marginBottom: '1rem'}}>⚠️</div>
+                                <h4 style={{
+                                    fontSize: '1.1rem',
+                                    fontWeight: '600',
+                                    color: '#1f2937',
+                                    marginBottom: '0.5rem'
+                                }}>
+                                    Delete Account
+                                </h4>
+                                <p style={{
+                                    color: '#6b7280',
+                                    fontSize: '0.875rem',
+                                    margin: 0
+                                }}>
+                                    Deleting your account will remove all associated data. Please enter your password
+                                    to confirm.
+                                </p>
+
+                                <form onSubmit={handleDeleteAccount}>
+                                    <div style={{display: 'grid', gap: '1.5rem', marginBottom: '2rem'}}>
+                                        <div>
+                                            <label style={{
+                                                display: 'block',
+                                                marginBottom: '0.5rem',
+                                                fontWeight: '600',
+                                                color: '#374151'
+                                            }}>
+                                                Password *
+                                            </label>
+                                            <input
+                                                type="password"
+                                                value={deleteFormData.confirmation}
+                                                onChange={(e) => setDeleteFormData({
+                                                    ...deleteFormData,
+                                                    confirmation: e.target.value
+                                                })}
+                                                style={inputStyle}
+                                                required
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label style={{
+                                                display: 'block',
+                                                marginBottom: '0.5rem',
+                                                fontWeight: '600',
+                                                color: '#374151'
+                                            }}>
+                                                Reason for deletion (optional)
+                                            </label>
+                                            <textarea
+                                                value={deleteFormData.reason}
+                                                onChange={(e) => setDeleteFormData({
+                                                    ...deleteFormData,
+                                                    reason: e.target.value
+                                                })}
+                                                rows={3}
+                                                style={{
+                                                    ...inputStyle,
+                                                    resize: 'vertical'
+                                                }}
+                                                placeholder="Enter reason for deletion"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        type="submit"
+                                        style={{
+                                            backgroundColor: '#dc2626',
+                                            color: 'white',
+                                            padding: '0.75rem 1.5rem',
+                                            borderRadius: '6px',
+                                            border: 'none',
+                                            fontWeight: '600',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        Delete Account
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
+
+            {/* Delete Account Confirmation Modal */}
+            {showDeleteModal && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000,
+                    padding: '1rem'
+                }}>
+                    <div style={{
+                        background: 'white',
+                        borderRadius: '12px',
+                        padding: '2rem',
+                        width: '100%',
+                        maxWidth: '500px'
+                    }}>
+                        <div style={{textAlign: 'center', marginBottom: '2rem'}}>
+                            <div style={{fontSize: '4rem', marginBottom: '1rem'}}>⚠️</div>
+                            <h3 style={{
+                                fontSize: '1.5rem',
+                                fontWeight: '700',
+                                color: '#dc2626',
+                                marginBottom: '1rem'
+                            }}>
+                                Delete Account Permanently?
+                            </h3>
+                            <p style={{
+                                color: '#6b7280',
+                                fontSize: '1rem',
+                                marginBottom: '1.5rem'
+                            }}>
+                                This action cannot be undone. All your data will be permanently deleted.
+                            </p>
+                        </div>
+
+                        <div style={{
+                            backgroundColor: '#fef2f2',
+                            border: '1px solid #fecaca',
+                            borderRadius: '8px',
+                            padding: '1rem',
+                            marginBottom: '2rem'
+                        }}>
+                            <h4 style={{
+                                fontSize: '1rem',
+                                fontWeight: '600',
+                                color: '#dc2626',
+                                marginBottom: '0.5rem'
+                            }}>
+                                What will be deleted:
+                            </h4>
+                            <ul style={{
+                                margin: 0,
+                                paddingLeft: '1.5rem',
+                                color: '#dc2626',
+                                fontSize: '0.875rem'
+                            }}>
+                                <li>Your account and profile information</li>
+                                <li>All course enrollments and progress</li>
+                                <li>Assessment attempts and grades</li>
+                                <li>Learning analytics and history</li>
+                                <li>Settings and preferences</li>
+                            </ul>
+                        </div>
+
+                        <div style={{
+                            display: 'flex',
+                            gap: '1rem',
+                            justifyContent: 'flex-end'
+                        }}>
+                            <button
+                                onClick={() => setShowDeleteModal(false)}
+                                disabled={loading}
+                                style={{
+                                    padding: '0.75rem 1.5rem',
+                                    backgroundColor: '#f3f4f6',
+                                    color: '#374151',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    cursor: loading ? 'not-allowed' : 'pointer',
+                                    fontWeight: '600'
+                                }}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmDeleteAccount}
+                                disabled={loading}
+                                style={{
+                                    padding: '0.75rem 1.5rem',
+                                    backgroundColor: loading ? '#9ca3af' : '#dc2626',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    cursor: loading ? 'not-allowed' : 'pointer',
+                                    fontWeight: '600',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem'
+                                }}
+                            >
+                                {loading && <span>⏳</span>}
+                                {loading ? 'Deleting...' : '🗑️ Delete Account'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

@@ -35,7 +35,16 @@ export interface AuthContextType {
     token: string | null
     isLoading: boolean
     login: (username: string, password: string, userType: 'student' | 'teacher' | 'admin') => Promise<boolean>
-    register: (userData: RegisterData) => Promise<boolean>
+    register: (userData: {
+        username: string
+        first_name: string
+        last_name: string
+        email: string
+        password: string
+        user_type: 'student' | 'teacher' | 'admin'
+        phone_number?: string
+        address?: string
+    }) => Promise<boolean>
     logout: () => void
     updateProfile: (data: Partial<User>) => Promise<boolean>
     changePassword: (passwordData: {
@@ -43,6 +52,7 @@ export interface AuthContextType {
         new_password: string
         confirm_password: string
     }) => Promise<boolean>
+    deleteAccount: (confirmation: string) => Promise<boolean>
 }
 
 export interface RegisterData {
@@ -127,7 +137,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({children}) => {
     const login = async (username: string, password: string, userType: 'student' | 'teacher' | 'admin'): Promise<boolean> => {
         try {
             setIsLoading(true)
-
+            // Accepts all three user types: student, teacher, admin
             const response = await userAPI.login(username, password, userType)
 
             const processedUser = {
@@ -168,7 +178,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({children}) => {
         }
     }
 
-    const register = async (userData: RegisterData): Promise<boolean> => {
+    const register = async (userData: {
+        username: string
+        first_name: string
+        last_name: string
+        email: string
+        password: string
+        user_type: 'student' | 'teacher' | 'admin'
+        phone_number?: string
+        address?: string
+    }): Promise<boolean> => {
         try {
             setIsLoading(true)
 
@@ -312,6 +331,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({children}) => {
         }
     }
 
+    const deleteAccount = async (confirmation: string): Promise<boolean> => {
+        try {
+            if (!user || !token) return false
+            setIsLoading(true)
+
+            await userAPI.deleteAccount(token, confirmation)
+
+            setUser(null)
+            setToken(null)
+            localStorage.removeItem('auth_token')
+            toast.success('Account deleted successfully')
+            return true
+        } catch (error: any) {
+            const errorMessage = error.message || 'Failed to delete account'
+            toast.error(errorMessage)
+            console.error('Delete account error:', error)
+            return false
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
     const value: AuthContextType = {
         user,
         token,
@@ -320,7 +361,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({children}) => {
         register,
         logout,
         updateProfile,
-        changePassword
+        changePassword,
+        deleteAccount,
     }
 
     return (

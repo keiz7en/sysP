@@ -28,6 +28,7 @@ class User(AbstractUser):
     date_of_birth = models.DateField(blank=True, null=True)
     address = models.TextField(blank=True)
     is_verified = models.BooleanField(default=False)
+    google_id = models.CharField(max_length=255, blank=True, null=True, unique=True)
 
     # Approval system
     approval_status = models.CharField(max_length=10, choices=APPROVAL_STATUS, default='approved')

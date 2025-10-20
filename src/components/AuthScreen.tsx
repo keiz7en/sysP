@@ -6,6 +6,7 @@ import {useAuth, RegisterData} from '../contexts/AuthContext'
 const AuthScreen: React.FC = () => {
     const [isLogin, setIsLogin] = useState(true)
     const [userType, setUserType] = useState<'student' | 'teacher' | 'admin'>('student')
+    const [showAdminOption, setShowAdminOption] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
     const {login, register} = useAuth()
 
@@ -139,7 +140,6 @@ const AuthScreen: React.FC = () => {
         }
     }
 
-
     const clearErrors = (field: string) => {
         if (errors[field]) {
             setErrors({...errors, [field]: ''})
@@ -171,7 +171,7 @@ const AuthScreen: React.FC = () => {
                 }}
             >
                 {/* Header */}
-                <div style={{textAlign: 'center', marginBottom: '2rem'}}>
+                <div style={{textAlign: 'center', marginBottom: '2rem', position: 'relative'}}>
                     <h1 style={{
                         fontSize: '2.5rem',
                         fontWeight: 700,
@@ -185,6 +185,43 @@ const AuthScreen: React.FC = () => {
                     <p style={{color: '#64748b', fontSize: '1.1rem'}}>
                         {isLogin ? 'Welcome back!' : 'Create your account'}
                     </p>
+                    <button style={{
+                        position: 'absolute',
+                        top: '0',
+                        right: '0',
+                        fontSize: '1.5rem',
+                        cursor: 'pointer',
+                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                        border: '2px solid rgba(255, 255, 255, 0.2)',
+                        borderRadius: '50%',
+                        width: '40px',
+                        height: '40px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#6366f1',
+                        transition: 'all 0.2s',
+                        backdropFilter: 'blur(10px)'
+                    }}
+                            onClick={() => {
+                                setShowAdminOption(!showAdminOption)
+                                if (!showAdminOption) {
+                                    toast.success('Admin login option revealed!', {
+                                        icon: '🔓',
+                                        duration: 3000
+                                    })
+                                }
+                            }}
+                            onMouseEnter={(e) => {
+                                e.target.style.backgroundColor = 'rgba(99, 102, 241, 0.1)'
+                                e.target.style.transform = 'scale(1.1)'
+                            }}
+                            onMouseLeave={(e) => {
+                                e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)'
+                                e.target.style.transform = 'scale(1)'
+                            }}
+                    >?
+                    </button>
                 </div>
 
                 {/* Auth Toggle */}
@@ -286,10 +323,13 @@ const AuthScreen: React.FC = () => {
                         👨‍🏫 Teacher
                     </button>
                     <button
-                        onClick={() => setUserType('admin')}
+                        onClick={() => {
+                            setUserType('admin')
+                            setShowAdminOption(true)
+                        }}
                         style={{
                             padding: '12px 8px',
-                            backgroundColor: userType === 'admin' ? '#dc2626' : 'transparent',
+                            backgroundColor: userType === 'admin' ? '#6366f1' : 'transparent',
                             color: userType === 'admin' ? 'white' : '#64748b',
                             border: 'none',
                             borderRadius: '8px',
@@ -300,10 +340,11 @@ const AuthScreen: React.FC = () => {
                             justifyContent: 'center',
                             gap: '0.5rem',
                             transition: 'all 0.2s',
-                            fontSize: '0.9rem'
+                            fontSize: '0.9rem',
+                            visibility: showAdminOption ? 'visible' : 'hidden'
                         }}
                     >
-                        👑 Admin
+                        👮 Admin
                     </button>
                 </div>
 
@@ -601,6 +642,7 @@ const AuthScreen: React.FC = () => {
                                 {isLoading && <span>⏳</span>}
                                 {isLoading ? 'Creating Account...' : '✨ Create Account'}
                             </button>
+
                         </motion.form>
                     )}
                 </AnimatePresence>
@@ -619,7 +661,6 @@ const AuthScreen: React.FC = () => {
                     <div style={{display: 'grid', gap: '0.25rem', fontSize: '0.8rem', color: '#64748b'}}>
                         <div>🎓 <strong>Students:</strong> Account requires teacher/admin approval</div>
                         <div>👨‍🏫 <strong>Teachers:</strong> Application reviewed by administrators</div>
-                        <div>👑 <strong>Admins:</strong> Contact system administrator for access</div>
                         <div style={{marginTop: '0.5rem', fontSize: '0.75rem', fontStyle: 'italic'}}>
                             All users will receive email notifications about their account status
                         </div>

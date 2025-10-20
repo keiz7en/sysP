@@ -56,14 +56,41 @@ User = get_user_model()
 
 
 def generate_student_id():
-    """Generate a 4-7 digit student ID"""
-    length = random.randint(4, 7)
-    return ''.join(random.choices(string.digits[1:], k=1)) + ''.join(random.choices(string.digits, k=length - 1))
+    """Generate a unique student ID"""
+    import time
+    while True:
+        timestamp = str(int(time.time() * 1000))  # Use milliseconds for more uniqueness
+        student_id = f"S{timestamp[-6:]}"
+
+        # Check if this ID already exists
+        try:
+            from students.models import StudentProfile
+            if not StudentProfile.objects.filter(student_id=student_id).exists():
+                return student_id
+        except ImportError:
+            return student_id
+
+        # If ID exists, wait a moment and try again
+        time.sleep(0.001)
 
 
 def generate_employee_id():
-    """Generate an employee ID for teachers"""
-    return 'EMP' + ''.join(random.choices(string.digits, k=4))
+    """Generate a unique employee ID for teachers"""
+    import time
+    while True:
+        timestamp = str(int(time.time() * 1000))  # Use milliseconds for more uniqueness
+        employee_id = f"EMP{timestamp[-4:]}"
+
+        # Check if this ID already exists
+        try:
+            from teachers.models import TeacherProfile
+            if not TeacherProfile.objects.filter(employee_id=employee_id).exists():
+                return employee_id
+        except ImportError:
+            return employee_id
+
+        # If ID exists, wait a moment and try again
+        time.sleep(0.001)
 
 
 def generate_username(first_name, last_name):
@@ -85,136 +112,110 @@ def generate_temp_password(length=8):
     return ''.join(random.choices(characters, k=length))
 
 
-class RegisterView(APIView):
-    """User registration with automatic profile creation and approval system"""
-    permission_classes = [AllowAny]
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def register(request):
+    """Register new user with role-based creation"""
+    try:
+        username = request.data.get('username')
+        first_name = request.data.get('first_name')
+        last_name = request.data.get('last_name')
+        email = request.data.get('email')
+        password = request.data.get('password')
+        user_type = request.data.get('user_type')
+        phone_number = request.data.get('phone_number', '')
+        address = request.data.get('address', '')
 
-    def post(self, request):
-        try:
-            data = request.data
-            user_type = data.get('user_type', 'student')
+        # Block admin registration via API
+        if user_type == 'admin':
+            return Response({
+                'error': 'Admin registration is not allowed through the API. Contact system administrator.'
+            }, status=status.HTTP_400_BAD_REQUEST)
 
-            # Validate required fields
-            required_fields = ['username', 'email', 'password', 'first_name', 'last_name']
-            for field in required_fields:
-                if not data.get(field):
-                    return Response(
-                        {'error': f'{field} is required'},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
+        # Validate required fields
+        if not all([username, first_name, last_name, email, password, user_type]):
+            return Response({
+                'error': 'All required fields must be provided'
+            }, status=status.HTTP_400_BAD_REQUEST)
 
-            # Check if username/email already exists
-            if User.objects.filter(username=data['username']).exists():
-                return Response(
-                    {'error': 'Username already exists'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+        # Validate user_type
+        if user_type not in ['student', 'teacher']:
+            return Response({
+                'error': 'Invalid user type. Must be student or teacher.'
+            }, status=status.HTTP_400_BAD_REQUEST)
 
-            if User.objects.filter(email=data['email']).exists():
-                return Response(
-                    {'error': 'Email already registered'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+        # Check if username already exists
+        if User.objects.filter(username=username).exists():
+            return Response({
+                'error': 'Username already exists'
+            }, status=status.HTTP_400_BAD_REQUEST)
 
-            with transaction.atomic():
-                # Set approval status based on user type
-                # Students need approval from teachers/admins
-                if user_type == 'student':
-                    approval_status = 'pending'
-                elif user_type == 'teacher':
-                    approval_status = 'pending'
-                else:  # admin
-                    approval_status = 'approved'
+        # Check if email already exists
+        if User.objects.filter(email=email).exists():
+            return Response({
+                'error': 'Email already exists'
+            }, status=status.HTTP_400_BAD_REQUEST)
 
-                # Create user
-                user = User.objects.create_user(
-                    username=data['username'],
-                    email=data['email'],
-                    password=data['password'],
-                    first_name=data['first_name'],
-                    last_name=data['last_name'],
-                    user_type=user_type,
-                    phone_number=data.get('phone_number', ''),
-                    date_of_birth=data.get('date_of_birth'),
-                    address=data.get('address', ''),
-                    approval_status=approval_status
-                )
+        # Create user
+        user = User.objects.create_user(
+            username=username,
+            first_name=first_name,
+            last_name=last_name,
+            email=email,
+            password=password,
+            user_type=user_type,
+            phone_number=phone_number,
+            address=address
+        )
 
-                # Create user profile (only if it doesn't exist)
-                user_profile, created = UserProfile.objects.get_or_create(
+        # Create profile based on user type
+        if user_type == 'student':
+            try:
+                from students.models import StudentProfile
+                StudentProfile.objects.create(
                     user=user,
-                    defaults={
-                        'bio': data.get('bio', ''),
-                        'preferred_language': data.get('preferred_language', 'en')
-                    }
+                    student_id=generate_student_id(),
+                    grade_level='Freshman',
+                    learning_style='adaptive',
+                    academic_status='pending'
                 )
+            except ImportError:
+                pass
+        elif user_type == 'teacher':
+            try:
+                from teachers.models import TeacherProfile
+                TeacherProfile.objects.create(
+                    user=user,
+                    employee_id=generate_employee_id(),
+                    department='General',
+                    specialization=['Teaching'],
+                    experience_years=0,
+                    is_approved=False
+                )
+            except ImportError:
+                pass
 
-                # Create specific profile based on user type
-                if user_type == 'student':
-                    student_id = generate_student_id()
-                    if StudentProfile:
-                        StudentProfile.objects.create(
-                            user=user,
-                            student_id=student_id,
-                            grade_level=data.get('grade_level', 'Freshman'),
-                            guardian_name=data.get('guardian_name', ''),
-                            guardian_phone=data.get('guardian_phone', ''),
-                            guardian_email=data.get('guardian_email', ''),
-                            emergency_contact=data.get('emergency_contact', ''),
-                            emergency_phone=data.get('emergency_phone', ''),
-                            learning_style=data.get('learning_style', 'adaptive'),
-                            current_gpa=0.0,
-                            academic_status='pending'  # Student needs approval
-                        )
+        # Generate token
+        token, created = Token.objects.get_or_create(user=user)
 
-                    message = 'Registration successful! Your student account is pending approval from teachers/administrators. You will receive an email notification once your account is approved and you can access the platform.'
+        return Response({
+            'message': f'{user_type.title()} registered successfully',
+            'token': token.key,
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'email': user.email,
+                'user_type': user.user_type,
+                'name': f"{user.first_name} {user.last_name}"
+            }
+        }, status=status.HTTP_201_CREATED)
 
-                elif user_type == 'teacher':
-                    # Teachers need approval
-                    if TeacherProfile:
-                        TeacherProfile.objects.create(
-                            user=user,
-                            employee_id=generate_employee_id(),
-                            department=data.get('department', 'General'),
-                            specialization=data.get('specialization', []),
-                            experience_years=data.get('experience_years', 0),
-                            is_approved=False,  # Requires admin approval
-                            teaching_rating=0.0
-                        )
-
-                    # Create teacher approval request
-                    if TeacherApproval:
-                        TeacherApproval.objects.create(
-                            teacher=user,
-                            qualifications=data.get('qualifications', []),
-                            department_preference=data.get('department', 'General'),
-                            specialization=data.get('specialization', []),
-                            reason_for_joining=data.get('reason_for_joining', '')
-                        )
-
-                    message = 'Registration successful! Your teacher account is pending approval from administrators. You will be notified once your application is reviewed.'
-
-                # Don't create auth token for pending users
-                token = None
-                if approval_status == 'approved':
-                    token, created = Token.objects.get_or_create(user=user)
-
-                response_data = {
-                    'message': message,
-                    'user': UserSerializer(user).data,
-                    'token': token.key if token else None,
-                    'user_type': user_type,
-                    'approval_status': approval_status,
-                    'requires_approval': approval_status == 'pending'
-                }
-
-                return Response(response_data, status=status.HTTP_201_CREATED)
-
-        except Exception as e:
-            return Response(
-                {'error': f'Registration failed: {str(e)}'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+    except Exception as e:
+        return Response({
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class LoginView(APIView):
@@ -250,13 +251,11 @@ class LoginView(APIView):
                     status=status.HTTP_401_UNAUTHORIZED
                 )
 
-            # Check if user type matches
+            # Check if user type matches - STRICT VALIDATION
             if user.user_type != user_type:
-                return Response(
-                    {
-                        'error': f'This account is not registered as a {user_type}. Please select the correct account type.'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+                return Response({
+                    'error': f'Access denied. This account is registered as a {user.user_type}, not as a {user_type}. Please select the correct account type or contact administrator.'
+                }, status=status.HTTP_403_FORBIDDEN)
 
             # Check approval status for all user types
             if user.approval_status == 'pending':
@@ -1008,4 +1007,213 @@ def change_password(request):
     except Exception as e:
         return Response({
             'error': f'Password change failed: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_account(request):
+    """Delete user's own account - Available to all user types"""
+    try:
+        user = request.user
+
+        # Get confirmation from request
+        confirmation = request.data.get('confirmation', '').lower()
+        expected_confirmation = f"delete {user.username}".lower()
+
+        if confirmation != expected_confirmation:
+            return Response({
+                'error': f'To confirm account deletion, please type: "delete {user.username}"'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Store user info for response
+        user_info = {
+            'username': user.username,
+            'email': user.email,
+            'user_type': user.user_type,
+            'name': f"{user.first_name} {user.last_name}"
+        }
+
+        # Delete related data based on user type
+        with transaction.atomic():
+            if user.user_type == 'student':
+                # Delete student-specific data
+                if hasattr(user, 'student_profile'):
+                    # Remove from course enrollments
+                    if CourseEnrollment:
+                        CourseEnrollment.objects.filter(student=user.student_profile).delete()
+
+                    # Delete assessment attempts
+                    if StudentAssessmentAttempt:
+                        StudentAssessmentAttempt.objects.filter(student=user.student_profile).delete()
+
+                    # Delete learning progress
+                    if LearningProgress:
+                        LearningProgress.objects.filter(student=user.student_profile).delete()
+
+                    # Delete analytics
+                    if LearningAnalytics:
+                        LearningAnalytics.objects.filter(student=user.student_profile).delete()
+
+                    # Delete student profile
+                    user.student_profile.delete()
+
+            elif user.user_type == 'teacher':
+                # Delete teacher-specific data
+                if hasattr(user, 'teacher_profile'):
+                    # Update courses to remove instructor (or delete if needed)
+                    if Course:
+                        courses = Course.objects.filter(instructor=user.teacher_profile)
+                        for course in courses:
+                            # You might want to reassign courses instead of deleting
+                            course.is_active = False
+                            course.save()
+
+                    # Delete teacher approval request if exists
+                    if hasattr(user, 'teacher_approval'):
+                        user.teacher_approval.delete()
+
+                    # Delete teacher profile
+                    user.teacher_profile.delete()
+
+            # Delete authentication tokens
+            Token.objects.filter(user=user).delete()
+
+            # Delete user profile
+            if hasattr(user, 'userprofile'):
+                user.userprofile.delete()
+
+            # Finally delete the user
+            user.delete()
+
+        return Response({
+            'message': f'Account deleted successfully',
+            'deleted_user': user_info,
+            'deleted_at': timezone.now().isoformat()
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return Response({
+            'error': f'Account deletion failed: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_user_account(request, user_id):
+    """Delete another user's account - Admin can delete any, Teacher can delete students"""
+    try:
+        current_user = request.user
+        target_user = User.objects.get(id=user_id)
+
+        # Permission checks
+        if current_user.user_type == 'admin':
+            # Admin can delete anyone except other admins
+            if target_user.user_type == 'admin' and target_user.id != current_user.id:
+                return Response({
+                    'error': 'Admins cannot delete other admin accounts'
+                }, status=status.HTTP_403_FORBIDDEN)
+        elif current_user.user_type == 'teacher':
+            # Teachers can only delete students
+            if target_user.user_type != 'student':
+                return Response({
+                    'error': 'Teachers can only delete student accounts'
+                }, status=status.HTTP_403_FORBIDDEN)
+        else:
+            # Students cannot delete other accounts
+            return Response({
+                'error': 'Students cannot delete other user accounts'
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        # Prevent self-deletion through this endpoint
+        if target_user.id == current_user.id:
+            return Response({
+                'error': 'Use the delete-account endpoint to delete your own account'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Get confirmation from request
+        confirmation = request.data.get('confirmation', '').lower()
+        expected_confirmation = f"delete {target_user.username}".lower()
+
+        if confirmation != expected_confirmation:
+            return Response({
+                'error': f'To confirm account deletion, please type: "delete {target_user.username}"'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Deletion reason (optional)
+        deletion_reason = request.data.get('reason', 'Account deleted by administrator')
+
+        # Store user info for response
+        user_info = {
+            'username': target_user.username,
+            'email': target_user.email,
+            'user_type': target_user.user_type,
+            'name': f"{target_user.first_name} {target_user.last_name}",
+            'deleted_by': f"{current_user.first_name} {current_user.last_name}",
+            'deleted_by_type': current_user.user_type,
+            'reason': deletion_reason
+        }
+
+        # Delete related data
+        with transaction.atomic():
+            if target_user.user_type == 'student':
+                if hasattr(target_user, 'student_profile'):
+                    # Remove from course enrollments
+                    if CourseEnrollment:
+                        CourseEnrollment.objects.filter(student=target_user.student_profile).delete()
+
+                    # Delete assessment attempts
+                    if StudentAssessmentAttempt:
+                        StudentAssessmentAttempt.objects.filter(student=target_user.student_profile).delete()
+
+                    # Delete learning progress
+                    if LearningProgress:
+                        LearningProgress.objects.filter(student=target_user.student_profile).delete()
+
+                    # Delete analytics
+                    if LearningAnalytics:
+                        LearningAnalytics.objects.filter(student=target_user.student_profile).delete()
+
+                    # Delete student profile
+                    target_user.student_profile.delete()
+
+            elif target_user.user_type == 'teacher':
+                if hasattr(target_user, 'teacher_profile'):
+                    # Handle courses - make them inactive instead of deleting
+                    if Course:
+                        courses = Course.objects.filter(instructor=target_user.teacher_profile)
+                        for course in courses:
+                            course.is_active = False
+                            course.save()
+
+                    # Delete teacher approval request
+                    if hasattr(target_user, 'teacher_approval'):
+                        target_user.teacher_approval.delete()
+
+                    # Delete teacher profile
+                    target_user.teacher_profile.delete()
+
+            # Delete authentication tokens
+            Token.objects.filter(user=target_user).delete()
+
+            # Delete user profile
+            if hasattr(target_user, 'userprofile'):
+                target_user.userprofile.delete()
+
+            # Finally delete the user
+            target_user.delete()
+
+        return Response({
+            'message': f'User account deleted successfully',
+            'deleted_user': user_info,
+            'deleted_at': timezone.now().isoformat()
+        }, status=status.HTTP_200_OK)
+
+    except User.DoesNotExist:
+        return Response({
+            'error': 'User not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({
+            'error': f'Account deletion failed: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
