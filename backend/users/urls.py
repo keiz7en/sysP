@@ -8,6 +8,7 @@ urlpatterns = [
     path('verify-token/', views.verify_token, name='verify_token'),
     path('profile/', views.UserProfileView.as_view(), name='profile'),
     path('dashboard/', views.dashboard_data, name='dashboard'),
+    path('change-password/', views.change_password, name='change-password'),
 
     # Admin endpoints
     path('admin/pending-teachers/', views.pending_teachers, name='pending_teachers'),

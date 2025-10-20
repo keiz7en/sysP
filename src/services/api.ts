@@ -352,6 +352,23 @@ export const userAPI = {
             throw new Error(error.error || 'Failed to update profile')
         }
         return response.json()
+    },
+
+    changePassword: async (token: string, passwordData: {
+        current_password: string
+        new_password: string
+        confirm_password: string
+    }) => {
+        const response = await fetch(`${API_BASE_URL}/users/change-password/`, {
+            method: 'POST',
+            headers: getAuthHeaders(token),
+            body: JSON.stringify(passwordData)
+        })
+        if (!response.ok) {
+            const error = await response.json()
+            throw new Error(error.error || 'Failed to change password')
+        }
+        return response.json()
     }
 }
 

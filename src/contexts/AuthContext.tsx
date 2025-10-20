@@ -38,6 +38,11 @@ export interface AuthContextType {
     register: (userData: RegisterData) => Promise<boolean>
     logout: () => void
     updateProfile: (data: Partial<User>) => Promise<boolean>
+    changePassword: (passwordData: {
+        current_password: string
+        new_password: string
+        confirm_password: string
+    }) => Promise<boolean>
 }
 
 export interface RegisterData {
@@ -274,6 +279,39 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({children}) => {
         }
     }
 
+    const changePassword = async (passwordData: {
+        current_password: string
+        new_password: string
+        confirm_password: string
+    }): Promise<boolean> => {
+        try {
+            if (!user || !token) return false
+            setIsLoading(true)
+
+            if (passwordData.new_password.length < 6) {
+                toast.error('New password must be at least 6 characters long')
+                return false
+            }
+
+            if (passwordData.new_password !== passwordData.confirm_password) {
+                toast.error('New password and confirm password do not match')
+                return false
+            }
+
+            await userAPI.changePassword(token, passwordData)
+
+            toast.success('Password changed successfully')
+            return true
+        } catch (error: any) {
+            const errorMessage = error.message || 'Failed to change password'
+            toast.error(errorMessage)
+            console.error('Change password error:', error)
+            return false
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
     const value: AuthContextType = {
         user,
         token,
@@ -281,7 +319,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({children}) => {
         login,
         register,
         logout,
-        updateProfile
+        updateProfile,
+        changePassword
     }
 
     return (

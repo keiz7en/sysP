@@ -1,6 +1,6 @@
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.tokens import default_token_generator
-from django.contrib.auth.hashers import make_password
+from django.contrib.auth.hashers import make_password, check_password
 from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
 from django.core.mail import send_mail
@@ -941,4 +941,71 @@ def toggle_user_status(request, user_id):
     except Exception as e:
         return Response({
             'error': f'Failed to update user status: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def change_password(request):
+    """Change user password - Available to all user types"""
+    try:
+        user = request.user
+        data = request.data
+
+        # Validate required fields
+        current_password = data.get('current_password')
+        new_password = data.get('new_password')
+        confirm_password = data.get('confirm_password')
+
+        if not all([current_password, new_password, confirm_password]):
+            return Response({
+                'error': 'All fields are required: current_password, new_password, confirm_password'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check if current password is correct
+        if not check_password(current_password, user.password):
+            return Response({
+                'error': 'Current password is incorrect'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check if new passwords match
+        if new_password != confirm_password:
+            return Response({
+                'error': 'New passwords do not match'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Validate new password strength
+        if len(new_password) < 6:
+            return Response({
+                'error': 'New password must be at least 6 characters long'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check if new password is different from current
+        if check_password(new_password, user.password):
+            return Response({
+                'error': 'New password must be different from current password'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Change the password
+        user.set_password(new_password)
+        user.save()
+
+        # Log the user out from all sessions (optional security measure)
+        # Delete all tokens for this user
+        from rest_framework.authtoken.models import Token
+        Token.objects.filter(user=user).delete()
+
+        # Create new token
+        new_token, created = Token.objects.get_or_create(user=user)
+
+        return Response({
+            'message': 'Password changed successfully',
+            'token': new_token.key,  # Return new token
+            'user_type': user.user_type,
+            'requires_relogin': True
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return Response({
+            'error': f'Password change failed: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
