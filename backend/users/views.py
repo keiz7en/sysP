@@ -22,11 +22,35 @@ import string
 
 from .models import User, UserProfile, TeacherApproval
 from .serializers import UserSerializer, UserProfileSerializer, LoginSerializer, UserUpdateSerializer
-from students.models import StudentProfile, LearningProgress
-from teachers.models import TeacherProfile
-from courses.models import CourseEnrollment, Course
-from assessments.models import Assessment, StudentAssessmentAttempt
-from analytics.models import LearningAnalytics
+
+# Import other models properly
+try:
+    from students.models import StudentProfile, LearningProgress
+except ImportError:
+    StudentProfile = None
+    LearningProgress = None
+
+try:
+    from teachers.models import TeacherProfile
+except ImportError:
+    TeacherProfile = None
+
+try:
+    from courses.models import CourseEnrollment, Course
+except ImportError:
+    CourseEnrollment = None
+    Course = None
+
+try:
+    from assessments.models import Assessment, StudentAssessmentAttempt
+except ImportError:
+    Assessment = None
+    StudentAssessmentAttempt = None
+
+try:
+    from analytics.models import LearningAnalytics
+except ImportError:
+    LearningAnalytics = None
 
 User = get_user_model()
 
@@ -116,52 +140,57 @@ class RegisterView(APIView):
                     approval_status=approval_status
                 )
 
-                # Create user profile
-                UserProfile.objects.create(
+                # Create user profile (only if it doesn't exist)
+                user_profile, created = UserProfile.objects.get_or_create(
                     user=user,
-                    bio=data.get('bio', ''),
-                    preferred_language=data.get('preferred_language', 'en')
+                    defaults={
+                        'bio': data.get('bio', ''),
+                        'preferred_language': data.get('preferred_language', 'en')
+                    }
                 )
 
                 # Create specific profile based on user type
                 if user_type == 'student':
                     student_id = generate_student_id()
-                    StudentProfile.objects.create(
-                        user=user,
-                        student_id=student_id,
-                        grade_level=data.get('grade_level', 'Freshman'),
-                        guardian_name=data.get('guardian_name', ''),
-                        guardian_phone=data.get('guardian_phone', ''),
-                        guardian_email=data.get('guardian_email', ''),
-                        emergency_contact=data.get('emergency_contact', ''),
-                        emergency_phone=data.get('emergency_phone', ''),
-                        learning_style=data.get('learning_style', 'adaptive'),
-                        current_gpa=0.0,
-                        academic_status='pending'  # Student needs approval
-                    )
+                    if StudentProfile:
+                        StudentProfile.objects.create(
+                            user=user,
+                            student_id=student_id,
+                            grade_level=data.get('grade_level', 'Freshman'),
+                            guardian_name=data.get('guardian_name', ''),
+                            guardian_phone=data.get('guardian_phone', ''),
+                            guardian_email=data.get('guardian_email', ''),
+                            emergency_contact=data.get('emergency_contact', ''),
+                            emergency_phone=data.get('emergency_phone', ''),
+                            learning_style=data.get('learning_style', 'adaptive'),
+                            current_gpa=0.0,
+                            academic_status='pending'  # Student needs approval
+                        )
 
                     message = 'Registration successful! Your student account is pending approval from teachers/administrators. You will receive an email notification once your account is approved and you can access the platform.'
 
                 elif user_type == 'teacher':
                     # Teachers need approval
-                    TeacherProfile.objects.create(
-                        user=user,
-                        employee_id=generate_employee_id(),
-                        department=data.get('department', 'General'),
-                        specialization=data.get('specialization', []),
-                        experience_years=data.get('experience_years', 0),
-                        is_approved=False,  # Requires admin approval
-                        teaching_rating=0.0
-                    )
+                    if TeacherProfile:
+                        TeacherProfile.objects.create(
+                            user=user,
+                            employee_id=generate_employee_id(),
+                            department=data.get('department', 'General'),
+                            specialization=data.get('specialization', []),
+                            experience_years=data.get('experience_years', 0),
+                            is_approved=False,  # Requires admin approval
+                            teaching_rating=0.0
+                        )
 
                     # Create teacher approval request
-                    TeacherApproval.objects.create(
-                        teacher=user,
-                        qualifications=data.get('qualifications', []),
-                        department_preference=data.get('department', 'General'),
-                        specialization=data.get('specialization', []),
-                        reason_for_joining=data.get('reason_for_joining', '')
-                    )
+                    if TeacherApproval:
+                        TeacherApproval.objects.create(
+                            teacher=user,
+                            qualifications=data.get('qualifications', []),
+                            department_preference=data.get('department', 'General'),
+                            specialization=data.get('specialization', []),
+                            reason_for_joining=data.get('reason_for_joining', '')
+                        )
 
                     message = 'Registration successful! Your teacher account is pending approval from administrators. You will be notified once your application is reviewed.'
 
@@ -402,23 +431,29 @@ def dashboard_data(request):
                 courses_count = enrollments.count()
 
                 # Get pending assignments
-                pending_assessments = Assessment.objects.filter(
-                    course__in=[enrollment.course for enrollment in enrollments],
-                    available_until__gte=timezone.now()
-                ).exclude(
-                    attempts__student=student_profile,
-                    attempts__status='submitted'
-                ).count()
+                if Assessment:
+                    pending_assessments = Assessment.objects.filter(
+                        course__in=[enrollment.course for enrollment in enrollments],
+                        available_until__gte=timezone.now()
+                    ).exclude(
+                        attempts__student=student_profile,
+                        attempts__status='submitted'
+                    ).count()
+                else:
+                    pending_assessments = 0
 
                 # Calculate study hours from learning progress
-                study_hours_data = LearningProgress.objects.filter(
-                    student=student_profile
-                ).aggregate(
-                    total_hours=Sum('time_spent')
-                )
-                study_hours = 0
-                if study_hours_data['total_hours']:
-                    study_hours = int(study_hours_data['total_hours'].total_seconds() // 3600)
+                if LearningProgress:
+                    study_hours_data = LearningProgress.objects.filter(
+                        student=student_profile
+                    ).aggregate(
+                        total_hours=Sum('time_spent')
+                    )
+                    study_hours = 0
+                    if study_hours_data['total_hours']:
+                        study_hours = int(study_hours_data['total_hours'].total_seconds() // 3600)
+                else:
+                    study_hours = 0
 
                 dashboard_data['stats'] = {
                     'gpa': float(student_profile.current_gpa) if student_profile.current_gpa else 0.0,
@@ -428,38 +463,45 @@ def dashboard_data(request):
                 }
 
                 # Get recent activities (real data)
-                recent_attempts = StudentAssessmentAttempt.objects.filter(
-                    student=student_profile
-                ).select_related('assessment').order_by('-submitted_at')[:5]
+                if StudentAssessmentAttempt:
+                    recent_attempts = StudentAssessmentAttempt.objects.filter(
+                        student=student_profile
+                    ).select_related('assessment').order_by('-submitted_at')[:5]
 
-                dashboard_data['recent_activity'] = [
-                    {
-                        'time': attempt.submitted_at.strftime('%d %b %Y') if attempt.submitted_at else 'In progress',
-                        'activity': f"{'Completed' if attempt.status == 'submitted' else 'Started'} {attempt.assessment.title}",
-                        'score': f'{attempt.percentage:.0f}%' if attempt.percentage else 'Pending'
-                    }
-                    for attempt in recent_attempts
-                ]
+                    dashboard_data['recent_activity'] = [
+                        {
+                            'time': attempt.submitted_at.strftime(
+                                '%d %b %Y') if attempt.submitted_at else 'In progress',
+                            'activity': f"{'Completed' if attempt.status == 'submitted' else 'Started'} {attempt.assessment.title}",
+                            'score': f'{attempt.percentage:.0f}%' if attempt.percentage else 'Pending'
+                        }
+                        for attempt in recent_attempts
+                    ]
+                else:
+                    dashboard_data['recent_activity'] = []
 
                 # Get upcoming tasks (real assignments)
-                upcoming_assessments = Assessment.objects.filter(
-                    course__in=[enrollment.course for enrollment in enrollments],
-                    available_until__gte=timezone.now()
-                ).exclude(
-                    attempts__student=student_profile,
-                    attempts__status='submitted'
-                ).order_by('available_until')[:5]
+                if Assessment:
+                    upcoming_assessments = Assessment.objects.filter(
+                        course__in=[enrollment.course for enrollment in enrollments],
+                        available_until__gte=timezone.now()
+                    ).exclude(
+                        attempts__student=student_profile,
+                        attempts__status='submitted'
+                    ).order_by('available_until')[:5]
 
-                dashboard_data['upcoming_tasks'] = [
-                    {
-                        'task': assessment.title,
-                        'due': assessment.available_until.strftime('%d %b %Y'),
-                        'priority': 'high' if (assessment.available_until - timezone.now()).days <= 1 else
-                        'medium' if (assessment.available_until - timezone.now()).days <= 3 else 'low',
-                        'course': assessment.course.title
-                    }
-                    for assessment in upcoming_assessments
-                ]
+                    dashboard_data['upcoming_tasks'] = [
+                        {
+                            'task': assessment.title,
+                            'due': assessment.available_until.strftime('%d %b %Y'),
+                            'priority': 'high' if (assessment.available_until - timezone.now()).days <= 1 else
+                            'medium' if (assessment.available_until - timezone.now()).days <= 3 else 'low',
+                            'course': assessment.course.title
+                        }
+                        for assessment in upcoming_assessments
+                    ]
+                else:
+                    dashboard_data['upcoming_tasks'] = []
 
             except StudentProfile.DoesNotExist:
                 dashboard_data['stats'] = {'gpa': 0.0, 'courses': 0, 'assignments': 0, 'study_hours': 0}
@@ -470,16 +512,22 @@ def dashboard_data(request):
                 teacher_courses = Course.objects.filter(instructor=teacher_profile)
 
                 # Count students across all courses
-                total_students = CourseEnrollment.objects.filter(
-                    course__in=teacher_courses,
-                    status='active'
-                ).count()
+                if CourseEnrollment:
+                    total_students = CourseEnrollment.objects.filter(
+                        course__in=teacher_courses,
+                        status='active'
+                    ).count()
+                else:
+                    total_students = 0
 
                 # Count assignments to grade
-                assignments_to_grade = StudentAssessmentAttempt.objects.filter(
-                    assessment__course__in=teacher_courses,
-                    status='submitted'
-                ).exclude(status='graded').count()
+                if StudentAssessmentAttempt:
+                    assignments_to_grade = StudentAssessmentAttempt.objects.filter(
+                        assessment__course__in=teacher_courses,
+                        status='submitted'
+                    ).exclude(status='graded').count()
+                else:
+                    assignments_to_grade = 0
 
                 dashboard_data['stats'] = {
                     'students': total_students,
@@ -489,71 +537,82 @@ def dashboard_data(request):
                 }
 
                 # Get recent student activities in teacher's courses
-                recent_attempts = StudentAssessmentAttempt.objects.filter(
-                    assessment__course__in=teacher_courses
-                ).select_related('student__user', 'assessment').order_by('-submitted_at')[:5]
+                if StudentAssessmentAttempt:
+                    recent_attempts = StudentAssessmentAttempt.objects.filter(
+                        assessment__course__in=teacher_courses
+                    ).select_related('student__user', 'assessment').order_by('-submitted_at')[:5]
 
-                dashboard_data['recent_activity'] = [
-                    {
-                        'time': attempt.submitted_at.strftime('%d %b %Y') if attempt.submitted_at else 'In progress',
-                        'activity': f"{attempt.student.user.get_full_name()} completed {attempt.assessment.title}",
-                        'score': f'{attempt.percentage:.0f}%' if attempt.percentage else 'Pending'
-                    }
-                    for attempt in recent_attempts
-                ]
+                    dashboard_data['recent_activity'] = [
+                        {
+                            'time': attempt.submitted_at.strftime(
+                                '%d %b %Y') if attempt.submitted_at else 'In progress',
+                            'activity': f"{attempt.student.user.get_full_name()} completed {attempt.assessment.title}",
+                            'score': f'{attempt.percentage:.0f}%' if attempt.percentage else 'Pending'
+                        }
+                        for attempt in recent_attempts
+                    ]
+                else:
+                    dashboard_data['recent_activity'] = []
 
                 # Get upcoming deadlines in teacher's courses
-                upcoming_assessments = Assessment.objects.filter(
-                    course__in=teacher_courses,
-                    available_until__gte=timezone.now()
-                ).order_by('available_until')[:5]
+                if Assessment:
+                    upcoming_assessments = Assessment.objects.filter(
+                        course__in=teacher_courses,
+                        available_until__gte=timezone.now()
+                    ).order_by('available_until')[:5]
 
-                dashboard_data['upcoming_tasks'] = [
-                    {
-                        'task': f"Grade {assessment.title}",
-                        'due': assessment.available_until.strftime('%d %b %Y'),
-                        'priority': 'high' if (assessment.available_until - timezone.now()).days <= 1 else 'medium',
-                        'course': assessment.course.title
-                    }
-                    for assessment in upcoming_assessments
-                ]
+                    dashboard_data['upcoming_tasks'] = [
+                        {
+                            'task': f"Grade {assessment.title}",
+                            'due': assessment.available_until.strftime('%d %b %Y'),
+                            'priority': 'high' if (assessment.available_until - timezone.now()).days <= 1 else 'medium',
+                            'course': assessment.course.title
+                        }
+                        for assessment in upcoming_assessments
+                    ]
+                else:
+                    dashboard_data['upcoming_tasks'] = []
 
             except TeacherProfile.DoesNotExist:
                 dashboard_data['stats'] = {'students': 0, 'courses': 0, 'assignments': 0, 'rating': 0.0}
 
         elif user.user_type == 'admin':
-            pending_teachers = User.objects.filter(
-                user_type='teacher',
-                approval_status='pending'
-            ).count()
+            if User:
+                pending_teachers = User.objects.filter(
+                    user_type='teacher',
+                    approval_status='pending'
+                ).count()
 
-            pending_students = User.objects.filter(
-                user_type='student',
-                approval_status='pending'
-            ).count()
+                pending_students = User.objects.filter(
+                    user_type='student',
+                    approval_status='pending'
+                ).count()
 
-            dashboard_data['stats'] = {
-                'total_users': User.objects.count(),
-                'pending_teachers': pending_teachers,
-                'pending_students': pending_students,
-                'students': User.objects.filter(user_type='student', approval_status='approved').count(),
-                'teachers': User.objects.filter(user_type='teacher', approval_status='approved').count()
-            }
-
-            # Recent approval activities
-            recent_approvals = User.objects.filter(
-                approval_status='approved',
-                approved_at__isnull=False
-            ).order_by('-approved_at')[:5]
-
-            dashboard_data['recent_activity'] = [
-                {
-                    'time': user_item.approved_at.strftime('%d %b %Y'),
-                    'activity': f"Approved {user_item.user_type}: {user_item.get_full_name()}",
-                    'score': 'Approved'
+                dashboard_data['stats'] = {
+                    'total_users': User.objects.count(),
+                    'pending_teachers': pending_teachers,
+                    'pending_students': pending_students,
+                    'students': User.objects.filter(user_type='student', approval_status='approved').count(),
+                    'teachers': User.objects.filter(user_type='teacher', approval_status='approved').count()
                 }
-                for user_item in recent_approvals
-            ]
+
+                # Recent approval activities
+                if User:
+                    recent_approvals = User.objects.filter(
+                        approval_status='approved',
+                        approved_at__isnull=False
+                    ).order_by('-approved_at')[:5]
+
+                    dashboard_data['recent_activity'] = [
+                        {
+                            'time': user_item.approved_at.strftime('%d %b %Y'),
+                            'activity': f"Approved {user_item.user_type}: {user_item.get_full_name()}",
+                            'score': 'Approved'
+                        }
+                        for user_item in recent_approvals
+                    ]
+                else:
+                    dashboard_data['recent_activity'] = []
 
         return Response(dashboard_data, status=status.HTTP_200_OK)
 
@@ -676,11 +735,12 @@ def approve_teacher(request, teacher_id):
             teacher.save()
 
             # Update teacher profile
-            teacher_profile = TeacherProfile.objects.get(user=teacher)
-            teacher_profile.is_approved = True
-            teacher_profile.approved_by = request.user
-            teacher_profile.approved_at = timezone.now()
-            teacher_profile.save()
+            if hasattr(teacher, 'teacher_profile'):
+                teacher_profile = teacher.teacher_profile
+                teacher_profile.is_approved = True
+                teacher_profile.approved_by = request.user
+                teacher_profile.approved_at = timezone.now()
+                teacher_profile.save()
 
             # Update approval request
             if hasattr(teacher, 'teacher_approval'):
@@ -725,9 +785,10 @@ def approve_student(request, student_id):
             student.save()
 
             # Update student profile
-            student_profile = StudentProfile.objects.get(user=student)
-            student_profile.academic_status = 'active'
-            student_profile.save()
+            if hasattr(student, 'student_profile'):
+                student_profile = student.student_profile
+                student_profile.academic_status = 'active'
+                student_profile.save()
 
         return Response({
             'message': f'Student {student.get_full_name()} has been approved successfully.',
@@ -821,4 +882,63 @@ def reject_student(request, student_id):
     except Exception as e:
         return Response({
             'error': f'Failed to reject student: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def all_users(request):
+    """Get all system users (Admin only)"""
+    if request.user.user_type != 'admin':
+        return Response({
+            'error': 'Permission denied. Admin access required.'
+        }, status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        users = User.objects.all().order_by('-date_joined')
+        users_data = []
+
+        for user in users:
+            user_data = UserSerializer(user).data
+            users_data.append(user_data)
+
+        return Response({
+            'users': users_data,
+            'total_count': users.count()
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return Response({
+            'error': f'Failed to fetch users: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def toggle_user_status(request, user_id):
+    """Toggle user active status (Admin only)"""
+    if request.user.user_type != 'admin':
+        return Response({
+            'error': 'Permission denied. Admin access required.'
+        }, status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        target_user = User.objects.get(id=user_id)
+        new_status = request.data.get('is_active', not target_user.is_active)
+
+        target_user.is_active = new_status
+        target_user.save()
+
+        return Response({
+            'message': f'User {target_user.get_full_name()} {"activated" if new_status else "deactivated"} successfully.',
+            'user': UserSerializer(target_user).data
+        }, status=status.HTTP_200_OK)
+
+    except User.DoesNotExist:
+        return Response({
+            'error': 'User not found.'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({
+            'error': f'Failed to update user status: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

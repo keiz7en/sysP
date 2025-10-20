@@ -1,18 +1,39 @@
-from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework import status, permissions, viewsets
 from rest_framework.views import APIView
 from django.contrib.auth import get_user_model
-from django.db.models import Q, Avg, Count, Sum
 from django.utils import timezone
-from datetime import datetime, timedelta, date
+from django.db.models import Q, Avg, Count, Sum
+from datetime import datetime, timedelta
+import json
 
 from .models import StudentProfile, AcademicRecord, AttendanceRecord, LearningProgress, StudentBehaviorMetrics
 from .serializers import StudentProfileSerializer
-from courses.models import Course, CourseEnrollment
-from assessments.models import Assessment, StudentAssessmentAttempt
-from analytics.models import LearningAnalytics
-from career.models import JobMarketData
+
+# Safe imports for other apps
+try:
+    from courses.models import Course, CourseEnrollment
+except ImportError:
+    Course = None
+    CourseEnrollment = None
+
+try:
+    from assessments.models import Assessment, StudentAssessmentAttempt
+except ImportError:
+    Assessment = None
+    StudentAssessmentAttempt = None
+
+try:
+    from analytics.models import LearningAnalytics
+except ImportError:
+    LearningAnalytics = None
+
+try:
+    from career.models import JobMarketData
+except ImportError:
+    JobMarketData = None
 
 User = get_user_model()
 
@@ -53,18 +74,37 @@ class StudentDashboardView(APIView):
             status='active'
         ).select_related('course', 'course__instructor__user')
 
-        # Only return data if it exists
+        # Return comprehensive student dashboard data
         dashboard_data = {
             'student_info': {
                 'student_id': student_profile.student_id,
                 'name': f"{request.user.first_name} {request.user.last_name}",
                 'grade_level': student_profile.grade_level,
                 'current_gpa': float(student_profile.current_gpa),
-                'academic_status': student_profile.academic_status
+                'total_credits': student_profile.total_credits,
+                'academic_status': student_profile.academic_status,
+                'learning_style': student_profile.learning_style,
+                'enrollment_date': student_profile.enrollment_date.strftime('%Y-%m-%d')
             },
             'enrollments_count': enrollments.count(),
-            'has_courses': enrollments.exists()
+            'has_courses': enrollments.exists(),
+            'is_new_student': not enrollments.exists(),
+            'message': 'No courses enrolled yet. Teachers will add you to courses.' if not enrollments.exists() else None
         }
+
+        # If student has courses, add enrollment details
+        if enrollments.exists():
+            enrollments_data = []
+            for enrollment in enrollments:
+                enrollments_data.append({
+                    'course_title': enrollment.course.title,
+                    'course_code': enrollment.course.code,
+                    'instructor_name': enrollment.course.instructor.user.get_full_name(),
+                    'progress_percentage': float(enrollment.progress_percentage),
+                    'enrollment_date': enrollment.enrollment_date.strftime('%Y-%m-%d'),
+                    'status': enrollment.status
+                })
+            dashboard_data['current_enrollments'] = enrollments_data
 
         return Response(dashboard_data, status=status.HTTP_200_OK)
 
@@ -480,3 +520,314 @@ class LearningInsightsView(APIView):
 
         except StudentProfile.DoesNotExist:
             return Response({'error': 'Student profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_academic_transcript(request):
+    """Generate automated academic transcript"""
+    try:
+        student = request.user.student_profile
+        academic_records = student.academic_records.all().order_by('-year', '-semester')
+
+        transcript_data = {
+            'student_info': {
+                'name': request.user.get_full_name(),
+                'student_id': student.student_id,
+                'program': 'Computer Science',  # Add program field to model later
+                'current_gpa': float(student.current_gpa),
+                'total_credits': student.total_credits,
+                'academic_status': student.academic_status
+            },
+            'academic_records': [],
+            'semester_summary': {},
+            'overall_statistics': {
+                'total_courses': 0,
+                'credits_earned': student.total_credits,
+                'cumulative_gpa': float(student.current_gpa),
+                'graduation_progress': min(100, (student.total_credits / 120) * 100)
+            }
+        }
+
+        # Group by semester/year
+        semester_groups = {}
+        for record in academic_records:
+            key = f"{record.semester} {record.year}"
+            if key not in semester_groups:
+                semester_groups[key] = []
+            semester_groups[key].append({
+                'course': record.course.title,
+                'course_code': record.course.code,
+                'credits': record.credits,
+                'grade': record.grade,
+                'gpa_points': float(record.gpa_points)
+            })
+
+        transcript_data['academic_records'] = semester_groups
+        transcript_data['overall_statistics']['total_courses'] = len(academic_records)
+
+        return Response(transcript_data)
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_ai_progress_analysis(request):
+    """AI analysis of academic progress and dropout risk"""
+    try:
+        student = request.user.student_profile
+
+        # Simulate AI analysis
+        progress_analysis = {
+            'academic_performance': {
+                'current_gpa': float(student.current_gpa),
+                'trend': 'improving' if student.current_gpa > 3.0 else 'needs_attention',
+                'percentile': min(95, max(5, int((float(student.current_gpa) / 4.0) * 100))),
+                'strengths': ['Problem Solving', 'Mathematical Reasoning'],
+                'weaknesses': ['Time Management', 'Essay Writing'] if student.current_gpa < 3.5 else []
+            },
+            'dropout_risk': {
+                'risk_level': 'low' if student.current_gpa > 3.0 else 'medium',
+                'risk_score': max(0.1, 1.0 - (float(student.current_gpa) / 4.0)),
+                'risk_factors': ['Low GPA'] if student.current_gpa < 3.0 else [],
+                'protective_factors': ['High Engagement', 'Regular Attendance', 'Good Study Habits'],
+                'recommendations': [
+                    'Continue current study pattern' if student.current_gpa > 3.5 else 'Consider tutoring support',
+                    'Join study groups',
+                    'Meet with academic advisor regularly'
+                ]
+            },
+            'learning_velocity': {
+                'current_pace': 'optimal',
+                'credits_per_semester': 15,
+                'projected_graduation': '2025-05-01',
+                'acceleration_opportunities': ['Summer courses', 'Online electives']
+            },
+            'skill_development': {
+                'technical_skills': 85,
+                'soft_skills': 75,
+                'domain_expertise': 80,
+                'improvement_areas': ['Communication', 'Leadership']
+            }
+        }
+
+        return Response(progress_analysis)
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_personalized_learning_path(request):
+    """AI-generated personalized learning path - Fixed for frontend compatibility"""
+    try:
+        if request.user.user_type != 'student':
+            return Response({'error': 'Student access only'}, status=status.HTTP_403_FORBIDDEN)
+
+        student_profile = StudentProfile.objects.get(user=request.user)
+
+        # Get real enrollments
+        enrollments = CourseEnrollment.objects.filter(
+            student=student_profile,
+            status='active'
+        ).select_related('course')
+
+        # If no enrollments, return sample data structure
+        if not enrollments.exists():
+            sample_learning_data = {
+                'learning_paths': [
+                    {
+                        'id': 1,
+                        'course_title': 'Introduction to Computer Science',
+                        'current_module': 'Getting Started with Programming',
+                        'progress_percentage': 0.0,
+                        'difficulty_level': 'Beginner',
+                        'learning_style': 'visual',
+                        'estimated_completion': '3 months',
+                        'next_milestone': 'Complete first programming assignment',
+                        'ai_recommendations': [
+                            'Start with basic concepts and build foundation',
+                            'Practice coding daily for best results',
+                            'Use visual learning resources'
+                        ],
+                        'strengths': ['Logical thinking', 'Problem-solving aptitude'],
+                        'areas_for_improvement': ['Programming syntax', 'Algorithm design']
+                    },
+                    {
+                        'id': 2,
+                        'course_title': 'Mathematics for Computer Science',
+                        'current_module': 'Discrete Mathematics Basics',
+                        'progress_percentage': 0.0,
+                        'difficulty_level': 'Intermediate',
+                        'learning_style': 'kinesthetic',
+                        'estimated_completion': '4 months',
+                        'next_milestone': 'Master set theory and logic',
+                        'ai_recommendations': [
+                            'Focus on hands-on problem solving',
+                            'Work through plenty of practice problems',
+                            'Connect abstract concepts to real applications'
+                        ],
+                        'strengths': ['Mathematical reasoning', 'Pattern recognition'],
+                        'areas_for_improvement': ['Abstract thinking', 'Proof techniques']
+                    }
+                ],
+                'overall_progress': 0.0,
+                'learning_style': student_profile.learning_style or 'adaptive',
+                'ai_insights': {
+                    'learning_velocity': 1.0,
+                    'engagement_score': 85.0,
+                    'difficulty_preference': student_profile.preferred_difficulty or 'intermediate',
+                    'recommended_study_time': 2.5
+                }
+            }
+            return Response(sample_learning_data)
+
+        # Build learning paths from actual enrollments
+        learning_paths = []
+        total_progress = 0
+
+        for idx, enrollment in enumerate(enrollments):
+            course = enrollment.course
+            progress = float(enrollment.progress_percentage)
+            total_progress += progress
+
+            # Generate AI recommendations based on progress
+            ai_recommendations = []
+            if progress < 25:
+                ai_recommendations = [
+                    'Focus on understanding fundamental concepts',
+                    'Complete introductory materials first',
+                    'Ask questions during lectures'
+                ]
+            elif progress < 50:
+                ai_recommendations = [
+                    'Practice applying concepts through exercises',
+                    'Review previous materials if needed',
+                    'Start working on practical projects'
+                ]
+            elif progress < 75:
+                ai_recommendations = [
+                    'Focus on advanced topics and applications',
+                    'Prepare for assessments and evaluations',
+                    'Consider peer tutoring opportunities'
+                ]
+            else:
+                ai_recommendations = [
+                    'Prepare for final assessments',
+                    'Focus on course completion',
+                    'Plan next learning steps'
+                ]
+
+            # Determine difficulty level
+            difficulty_map = {
+                'beginner': 'Beginner',
+                'intermediate': 'Intermediate',
+                'advanced': 'Advanced',
+                'expert': 'Expert'
+            }
+            difficulty = difficulty_map.get(
+                getattr(course, 'difficulty_level', 'intermediate').lower(),
+                'Intermediate'
+            )
+
+            # Generate next milestone based on progress
+            if progress < 25:
+                next_milestone = f"Complete foundational modules of {course.title}"
+            elif progress < 50:
+                next_milestone = f"Finish mid-course projects in {course.title}"
+            elif progress < 75:
+                next_milestone = f"Prepare for final assessments in {course.title}"
+            else:
+                next_milestone = f"Complete {course.title} successfully"
+
+            learning_path = {
+                'id': idx + 1,
+                'course_title': course.title,
+                'current_module': f"Module {int(progress / 25) + 1}: {course.title} Content",
+                'progress_percentage': progress,
+                'difficulty_level': difficulty,
+                'learning_style': student_profile.learning_style or 'adaptive',
+                'estimated_completion': course.end_date.strftime('%B %Y') if hasattr(course,
+                                                                                     'end_date') and course.end_date else '4 months',
+                'next_milestone': next_milestone,
+                'ai_recommendations': ai_recommendations,
+                'strengths': [
+                    'Consistent study habits',
+                    'Good progress pace' if progress > 50 else 'Building foundation'
+                ],
+                'areas_for_improvement': [
+                    'Time management' if progress < 30 else 'Advanced concepts',
+                    'Practical application' if progress < 60 else 'Exam preparation'
+                ]
+            }
+            learning_paths.append(learning_path)
+
+        # Calculate overall metrics
+        overall_progress = total_progress / len(enrollments) if enrollments else 0
+
+        # Determine learning velocity based on progress
+        learning_velocity = 1.2 if overall_progress > 70 else 1.0 if overall_progress > 40 else 0.8
+
+        # Calculate engagement score
+        engagement_score = min(100, max(50, overall_progress + 20))
+
+        learning_data = {
+            'learning_paths': learning_paths,
+            'overall_progress': round(overall_progress, 1),
+            'learning_style': student_profile.learning_style or 'adaptive',
+            'ai_insights': {
+                'learning_velocity': learning_velocity,
+                'engagement_score': engagement_score,
+                'difficulty_preference': student_profile.preferred_difficulty or 'intermediate',
+                'recommended_study_time': 2.5 if overall_progress < 50 else 3.0
+            }
+        }
+
+        return Response(learning_data)
+
+    except StudentProfile.DoesNotExist:
+        return Response({'error': 'Student profile not found'}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({'error': f'Server error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_engagement_analytics(request):
+    """Student engagement and interaction analytics"""
+    try:
+        student = request.user.student_profile
+
+        # Simulate engagement data
+        engagement_data = {
+            'overall_engagement': {
+                'score': 85,
+                'level': 'high',
+                'trend': 'increasing',
+                'comparison_to_peers': 'above_average'
+            },
+            'interaction_patterns': {
+                'login_frequency': 'daily',
+                'session_duration': '2.5 hours avg',
+                'peak_activity_hours': ['14:00-16:00', '19:00-21:00'],
+                'preferred_content_types': ['Interactive', 'Video', 'Text'],
+                'discussion_participation': 75
+            },
+            'learning_behavior': {
+                'quiz_attempts_per_week': 8,
+                'average_response_time': '45 seconds',
+                'help_seeking_behavior': 'moderate',
+                'collaboration_index': 80,
+                'self_regulation_score': 85
+            },
+            'recommendations': [
+                'Continue current engagement pattern',
+                'Consider peer tutoring opportunities',
+                'Explore advanced challenge problems'
+            ]
+        }
+
+        return Response(engagement_data)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

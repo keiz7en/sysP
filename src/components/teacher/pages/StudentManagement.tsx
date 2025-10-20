@@ -28,6 +28,7 @@ interface Course {
 }
 
 const StudentManagement: React.FC = () => {
+    const {user, token} = useAuth()
     const [students, setStudents] = useState<Student[]>([])
     const [courses, setCourses] = useState<Course[]>([])
     const [loading, setLoading] = useState(true)

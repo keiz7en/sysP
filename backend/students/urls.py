@@ -13,4 +13,10 @@ urlpatterns = [
     path('career-guidance/', views.CareerGuidanceView.as_view(), name='career-guidance'),
     path('assessments/', views.AssessmentsView.as_view(), name='assessments'),
     path('learning-insights/', views.LearningInsightsView.as_view(), name='learning-insights'),
+
+    # New comprehensive endpoints
+    path('transcript/', views.get_academic_transcript, name='academic-transcript'),
+    path('ai-analysis/', views.get_ai_progress_analysis, name='ai-progress-analysis'),
+    path('learning-path/', views.get_personalized_learning_path, name='personalized-learning-path'),
+    path('engagement/', views.get_engagement_analytics, name='engagement-analytics'),
 ]

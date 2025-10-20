@@ -2,7 +2,7 @@ import React, {useState, useEffect} from 'react'
 import {motion} from 'framer-motion'
 import toast from 'react-hot-toast'
 import {useAuth} from '../../../contexts/AuthContext'
-import {teacherAPI} from '../../../services/api'
+import {getTeacherDashboard} from '../../../services/api'
 
 interface DashboardData {
     teacher_info: {
@@ -49,7 +49,7 @@ const TeacherHome: React.FC = () => {
                 return
             }
 
-            const data = await teacherAPI.getDashboard(token)
+            const data = await getTeacherDashboard(token)
             setDashboardData(data)
         } catch (error: any) {
             console.error('Error fetching dashboard data:', error)
@@ -147,6 +147,9 @@ const TeacherHome: React.FC = () => {
         )
     }
 
+    // Check if teacher has no courses/students (empty state)
+    const hasNoData = dashboardData.statistics.total_courses === 0 && dashboardData.statistics.total_students === 0;
+
     return (
         <div style={{padding: '2rem', maxWidth: '1200px', margin: '0 auto'}}>
             {/* Welcome Header */}
@@ -161,18 +164,18 @@ const TeacherHome: React.FC = () => {
                     color: '#1f2937',
                     marginBottom: '0.5rem'
                 }}>
-                    Welcome back, {dashboardData.teacher_info.name}! 👋
+                    Welcome back, {dashboardData.teacher_info.name}! 👨‍🏫
                 </h1>
                 <p style={{
                     fontSize: '1.1rem',
                     color: '#6b7280',
                     marginBottom: '0'
                 }}>
-                    Here's your teaching dashboard overview
+                    {hasNoData ? 'Ready to start teaching!' : 'Here\'s your teaching dashboard overview'}
                 </p>
             </motion.div>
 
-            {/* Teacher Info Card */}
+            {/* Teacher Profile Card */}
             <motion.div
                 initial={{opacity: 0, y: 20}}
                 animate={{opacity: 1, y: 0}}
@@ -200,7 +203,7 @@ const TeacherHome: React.FC = () => {
                     </div>
                     <div>
                         <h3 style={{fontSize: '1.2rem', fontWeight: '600', marginBottom: '0.5rem'}}>
-                            📊 Performance
+                            📊 Teaching Profile
                         </h3>
                         <p style={{margin: 0, opacity: 0.9}}>
                             Experience: {dashboardData.teacher_info.experience_years} years
@@ -212,236 +215,330 @@ const TeacherHome: React.FC = () => {
                 </div>
             </motion.div>
 
-            {/* Statistics Cards */}
-            <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                gap: '1.5rem',
-                marginBottom: '2rem'
-            }}>
+            {hasNoData ? (
+                // Empty State for New Teachers
                 <motion.div
                     initial={{opacity: 0, y: 20}}
                     animate={{opacity: 1, y: 0}}
                     transition={{delay: 0.2}}
                     style={{
                         background: 'white',
-                        padding: '1.5rem',
                         borderRadius: '12px',
                         boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                        border: '1px solid #e5e7eb'
-                    }}
-                >
-                    <div style={{
-                        fontSize: '2rem',
-                        fontWeight: '700',
-                        color: '#3b82f6',
-                        marginBottom: '0.5rem'
-                    }}>
-                        {dashboardData.statistics.total_courses}
-                    </div>
-                    <div style={{
-                        fontSize: '0.9rem',
-                        color: '#6b7280',
-                        fontWeight: '500'
-                    }}>
-                        📚 Total Courses
-                    </div>
-                </motion.div>
-
-                <motion.div
-                    initial={{opacity: 0, y: 20}}
-                    animate={{opacity: 1, y: 0}}
-                    transition={{delay: 0.3}}
-                    style={{
-                        background: 'white',
-                        padding: '1.5rem',
-                        borderRadius: '12px',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                        border: '1px solid #e5e7eb'
-                    }}
-                >
-                    <div style={{
-                        fontSize: '2rem',
-                        fontWeight: '700',
-                        color: '#10b981',
-                        marginBottom: '0.5rem'
-                    }}>
-                        {dashboardData.statistics.total_students}
-                    </div>
-                    <div style={{
-                        fontSize: '0.9rem',
-                        color: '#6b7280',
-                        fontWeight: '500'
-                    }}>
-                        👥 Total Students
-                    </div>
-                </motion.div>
-
-                <motion.div
-                    initial={{opacity: 0, y: 20}}
-                    animate={{opacity: 1, y: 0}}
-                    transition={{delay: 0.4}}
-                    style={{
-                        background: 'white',
-                        padding: '1.5rem',
-                        borderRadius: '12px',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                        border: '1px solid #e5e7eb'
-                    }}
-                >
-                    <div style={{
-                        fontSize: '2rem',
-                        fontWeight: '700',
-                        color: '#f59e0b',
-                        marginBottom: '0.5rem'
-                    }}>
-                        {dashboardData.statistics.active_students}
-                    </div>
-                    <div style={{
-                        fontSize: '0.9rem',
-                        color: '#6b7280',
-                        fontWeight: '500'
-                    }}>
-                        ✅ Active Students
-                    </div>
-                </motion.div>
-
-                <motion.div
-                    initial={{opacity: 0, y: 20}}
-                    animate={{opacity: 1, y: 0}}
-                    transition={{delay: 0.5}}
-                    style={{
-                        background: 'white',
-                        padding: '1.5rem',
-                        borderRadius: '12px',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                        border: '1px solid #e5e7eb'
-                    }}
-                >
-                    <div style={{
-                        fontSize: '2rem',
-                        fontWeight: '700',
-                        color: '#8b5cf6',
-                        marginBottom: '0.5rem'
-                    }}>
-                        {dashboardData.statistics.completion_rate.toFixed(1)}%
-                    </div>
-                    <div style={{
-                        fontSize: '0.9rem',
-                        color: '#6b7280',
-                        fontWeight: '500'
-                    }}>
-                        🎯 Completion Rate
-                    </div>
-                </motion.div>
-            </div>
-
-            {/* Recent Enrollments */}
-            <motion.div
-                initial={{opacity: 0, y: 20}}
-                animate={{opacity: 1, y: 0}}
-                transition={{delay: 0.6}}
-                style={{
-                    background: 'white',
-                    borderRadius: '12px',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                    border: '1px solid #e5e7eb',
-                    overflow: 'hidden',
-                    marginBottom: '2rem'
-                }}
-            >
-                <div style={{
-                    padding: '1.5rem',
-                    borderBottom: '1px solid #e5e7eb',
-                    background: '#f9fafb'
-                }}>
-                    <h3 style={{margin: 0, fontSize: '1.25rem', fontWeight: '600', color: '#1f2937'}}>
-                        📝 Recent Student Enrollments
-                    </h3>
-                </div>
-
-                {dashboardData.recent_enrollments.length === 0 ? (
-                    <div style={{
+                        border: '1px solid #e5e7eb',
                         padding: '3rem',
-                        textAlign: 'center',
-                        color: '#6b7280'
+                        textAlign: 'center'
+                    }}
+                >
+                    <div style={{fontSize: '4rem', marginBottom: '1rem'}}>🚀</div>
+                    <h3 style={{fontSize: '1.5rem', fontWeight: '600', marginBottom: '1rem', color: '#1f2937'}}>
+                        Ready to Start Teaching!
+                    </h3>
+                    <p style={{
+                        fontSize: '1rem',
+                        color: '#6b7280',
+                        marginBottom: '2rem',
+                        maxWidth: '600px',
+                        margin: '0 auto 2rem auto'
                     }}>
-                        <div style={{fontSize: '2rem', marginBottom: '1rem'}}>📚</div>
-                        <p>No recent enrollments</p>
-                        <p style={{fontSize: '0.9rem', marginTop: '0.5rem'}}>
-                            Students will appear here when they enroll in your courses
-                        </p>
-                    </div>
-                ) : (
-                    <div style={{padding: '1rem'}}>
-                        {dashboardData.recent_enrollments.map((enrollment, index) => (
-                            <motion.div
-                                key={`${enrollment.student_id}-${index}`}
-                                initial={{opacity: 0, x: -20}}
-                                animate={{opacity: 1, x: 0}}
-                                transition={{delay: 0.7 + (index * 0.1)}}
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between',
-                                    padding: '1rem',
-                                    marginBottom: '0.5rem',
-                                    backgroundColor: '#f9fafb',
-                                    borderRadius: '8px',
-                                    border: '1px solid #e5e7eb'
-                                }}
-                            >
-                                <div style={{flex: 1}}>
-                                    <div style={{
-                                        fontSize: '0.9rem',
-                                        fontWeight: '600',
-                                        color: '#1f2937',
-                                        marginBottom: '0.25rem'
-                                    }}>
-                                        {enrollment.student_name}
-                                    </div>
-                                    <div style={{
-                                        fontSize: '0.8rem',
-                                        color: '#6b7280'
-                                    }}>
-                                        ID: {enrollment.student_id} • {enrollment.course_title}
-                                    </div>
-                                </div>
+                        Welcome to your teaching dashboard! You don't have any courses or students yet, but you can get
+                        started by managing students and creating courses.
+                    </p>
 
-                                <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
-                                    <div style={{textAlign: 'right'}}>
-                                        <div style={{fontSize: '0.8rem', color: '#6b7280'}}>
-                                            Progress
-                                        </div>
-                                        <div style={{
-                                            fontSize: '0.9rem',
-                                            fontWeight: '600',
-                                            color: '#3b82f6'
-                                        }}>
-                                            {enrollment.progress.toFixed(0)}%
-                                        </div>
-                                    </div>
-
-                                    <div style={{textAlign: 'right'}}>
-                                        <div style={{fontSize: '0.8rem', color: '#6b7280'}}>
-                                            Enrolled
-                                        </div>
-                                        <div style={{fontSize: '0.8rem', color: '#1f2937'}}>
-                                            {new Date(enrollment.enrollment_date).toLocaleDateString()}
-                                        </div>
-                                    </div>
-                                </div>
-                            </motion.div>
-                        ))}
+                    <div style={{
+                        background: '#f0f9ff',
+                        border: '1px solid #bae6fd',
+                        borderRadius: '8px',
+                        padding: '1.5rem',
+                        marginBottom: '2rem',
+                        textAlign: 'left'
+                    }}>
+                        <h4 style={{fontSize: '1.1rem', fontWeight: '600', color: '#1e40af', marginBottom: '1rem'}}>
+                            Getting Started:
+                        </h4>
+                        <div style={{color: '#1e40af', fontSize: '0.9rem', lineHeight: '1.6'}}>
+                            <p style={{margin: '0 0 0.5rem 0'}}>• Use "Student Management" to add students to your
+                                courses</p>
+                            <p style={{margin: '0 0 0.5rem 0'}}>• Create and manage course content and materials</p>
+                            <p style={{margin: '0 0 0.5rem 0'}}>• Set up assessments and track student progress</p>
+                            <p style={{margin: '0'}}>• Access AI-powered teaching analytics and insights</p>
+                        </div>
                     </div>
-                )}
-            </motion.div>
+
+                    <div style={{display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap'}}>
+                        <button
+                            onClick={() => window.location.href = '/teacher/students'}
+                            style={{
+                                padding: '0.75rem 1.5rem',
+                                backgroundColor: '#3b82f6',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                fontSize: '1rem',
+                                fontWeight: '600',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem'
+                            }}
+                        >
+                            👥 Manage Students
+                        </button>
+                        <button
+                            onClick={() => window.location.href = '/teacher/courses'}
+                            style={{
+                                padding: '0.75rem 1.5rem',
+                                backgroundColor: '#10b981',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                fontSize: '1rem',
+                                fontWeight: '600',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem'
+                            }}
+                        >
+                            📚 View Courses
+                        </button>
+                    </div>
+                </motion.div>
+            ) : (
+                // Dashboard with Data
+                <>
+                    {/* Statistics Cards */}
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                        gap: '1.5rem',
+                        marginBottom: '2rem'
+                    }}>
+                        <motion.div
+                            initial={{opacity: 0, y: 20}}
+                            animate={{opacity: 1, y: 0}}
+                            transition={{delay: 0.2}}
+                            style={{
+                                background: 'white',
+                                padding: '1.5rem',
+                                borderRadius: '12px',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                                border: '1px solid #e5e7eb'
+                            }}
+                        >
+                            <div style={{
+                                fontSize: '2rem',
+                                fontWeight: '700',
+                                color: '#3b82f6',
+                                marginBottom: '0.5rem'
+                            }}>
+                                {dashboardData.statistics.total_courses}
+                            </div>
+                            <div style={{
+                                fontSize: '0.9rem',
+                                color: '#6b7280',
+                                fontWeight: '500'
+                            }}>
+                                📚 Total Courses
+                            </div>
+                        </motion.div>
+
+                        <motion.div
+                            initial={{opacity: 0, y: 20}}
+                            animate={{opacity: 1, y: 0}}
+                            transition={{delay: 0.3}}
+                            style={{
+                                background: 'white',
+                                padding: '1.5rem',
+                                borderRadius: '12px',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                                border: '1px solid #e5e7eb'
+                            }}
+                        >
+                            <div style={{
+                                fontSize: '2rem',
+                                fontWeight: '700',
+                                color: '#10b981',
+                                marginBottom: '0.5rem'
+                            }}>
+                                {dashboardData.statistics.total_students}
+                            </div>
+                            <div style={{
+                                fontSize: '0.9rem',
+                                color: '#6b7280',
+                                fontWeight: '500'
+                            }}>
+                                👥 Total Students
+                            </div>
+                        </motion.div>
+
+                        <motion.div
+                            initial={{opacity: 0, y: 20}}
+                            animate={{opacity: 1, y: 0}}
+                            transition={{delay: 0.4}}
+                            style={{
+                                background: 'white',
+                                padding: '1.5rem',
+                                borderRadius: '12px',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                                border: '1px solid #e5e7eb'
+                            }}
+                        >
+                            <div style={{
+                                fontSize: '2rem',
+                                fontWeight: '700',
+                                color: '#f59e0b',
+                                marginBottom: '0.5rem'
+                            }}>
+                                {dashboardData.statistics.active_students}
+                            </div>
+                            <div style={{
+                                fontSize: '0.9rem',
+                                color: '#6b7280',
+                                fontWeight: '500'
+                            }}>
+                                ✅ Active Students
+                            </div>
+                        </motion.div>
+
+                        <motion.div
+                            initial={{opacity: 0, y: 20}}
+                            animate={{opacity: 1, y: 0}}
+                            transition={{delay: 0.5}}
+                            style={{
+                                background: 'white',
+                                padding: '1.5rem',
+                                borderRadius: '12px',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                                border: '1px solid #e5e7eb'
+                            }}
+                        >
+                            <div style={{
+                                fontSize: '2rem',
+                                fontWeight: '700',
+                                color: '#8b5cf6',
+                                marginBottom: '0.5rem'
+                            }}>
+                                {dashboardData.statistics.completion_rate.toFixed(1)}%
+                            </div>
+                            <div style={{
+                                fontSize: '0.9rem',
+                                color: '#6b7280',
+                                fontWeight: '500'
+                            }}>
+                                🎯 Completion Rate
+                            </div>
+                        </motion.div>
+                    </div>
+
+                    {/* Recent Enrollments */}
+                    <motion.div
+                        initial={{opacity: 0, y: 20}}
+                        animate={{opacity: 1, y: 0}}
+                        transition={{delay: 0.6}}
+                        style={{
+                            background: 'white',
+                            borderRadius: '12px',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                            border: '1px solid #e5e7eb',
+                            overflow: 'hidden',
+                            marginBottom: '2rem'
+                        }}
+                    >
+                        <div style={{
+                            padding: '1.5rem',
+                            borderBottom: '1px solid #e5e7eb',
+                            background: '#f9fafb'
+                        }}>
+                            <h3 style={{margin: 0, fontSize: '1.25rem', fontWeight: '600', color: '#1f2937'}}>
+                                📝 Recent Student Enrollments
+                            </h3>
+                        </div>
+
+                        {dashboardData.recent_enrollments.length === 0 ? (
+                            <div style={{
+                                padding: '3rem',
+                                textAlign: 'center',
+                                color: '#6b7280'
+                            }}>
+                                <div style={{fontSize: '2rem', marginBottom: '1rem'}}>📚</div>
+                                <p>No recent enrollments</p>
+                                <p style={{fontSize: '0.9rem', marginTop: '0.5rem'}}>
+                                    Student enrollments will appear here when they join your courses
+                                </p>
+                            </div>
+                        ) : (
+                            <div style={{padding: '1rem'}}>
+                                {dashboardData.recent_enrollments.map((enrollment, index) => (
+                                    <motion.div
+                                        key={`${enrollment.student_id}-${index}`}
+                                        initial={{opacity: 0, x: -20}}
+                                        animate={{opacity: 1, x: 0}}
+                                        transition={{delay: 0.7 + (index * 0.1)}}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            padding: '1rem',
+                                            marginBottom: '0.5rem',
+                                            backgroundColor: '#f9fafb',
+                                            borderRadius: '8px',
+                                            border: '1px solid #e5e7eb'
+                                        }}
+                                    >
+                                        <div style={{flex: 1}}>
+                                            <div style={{
+                                                fontSize: '0.9rem',
+                                                fontWeight: '600',
+                                                color: '#1f2937',
+                                                marginBottom: '0.25rem'
+                                            }}>
+                                                {enrollment.student_name}
+                                            </div>
+                                            <div style={{
+                                                fontSize: '0.8rem',
+                                                color: '#6b7280'
+                                            }}>
+                                                ID: {enrollment.student_id} • {enrollment.course_title}
+                                            </div>
+                                        </div>
+
+                                        <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
+                                            <div style={{textAlign: 'right'}}>
+                                                <div style={{fontSize: '0.8rem', color: '#6b7280'}}>
+                                                    Progress
+                                                </div>
+                                                <div style={{
+                                                    fontSize: '0.9rem',
+                                                    fontWeight: '600',
+                                                    color: '#3b82f6'
+                                                }}>
+                                                    {enrollment.progress.toFixed(0)}%
+                                                </div>
+                                            </div>
+
+                                            <div style={{textAlign: 'right'}}>
+                                                <div style={{fontSize: '0.8rem', color: '#6b7280'}}>
+                                                    Enrolled
+                                                </div>
+                                                <div style={{fontSize: '0.8rem', color: '#1f2937'}}>
+                                                    {new Date(enrollment.enrollment_date).toLocaleDateString()}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                ))}
+                            </div>
+                        )}
+                    </motion.div>
+                </>
+            )}
 
             {/* Quick Actions */}
             <motion.div
                 initial={{opacity: 0, y: 20}}
                 animate={{opacity: 1, y: 0}}
-                transition={{delay: 0.8}}
+                transition={{delay: hasNoData ? 0.3 : 0.8}}
                 style={{
                     background: 'white',
                     borderRadius: '12px',
@@ -505,6 +602,7 @@ const TeacherHome: React.FC = () => {
                     </button>
 
                     <button
+                        onClick={() => toast.info('Assessment tools coming soon!')}
                         style={{
                             padding: '1rem',
                             backgroundColor: '#f59e0b',
@@ -524,6 +622,7 @@ const TeacherHome: React.FC = () => {
                     </button>
 
                     <button
+                        onClick={() => toast.info('Analytics coming soon!')}
                         style={{
                             padding: '1rem',
                             backgroundColor: '#8b5cf6',

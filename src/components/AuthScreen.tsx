@@ -84,8 +84,7 @@ const AuthScreen: React.FC = () => {
         try {
             const success = await login(loginForm.username, loginForm.password, userType)
             if (!success) {
-                // Show demo credentials hint
-                toast.info(`💡 Try demo accounts: ${userType}@demo.com with any password`)
+                toast.error('Invalid credentials. Please check your username and password.')
             }
         } catch (error) {
             toast.error('Login failed. Please try again.')
@@ -140,13 +139,6 @@ const AuthScreen: React.FC = () => {
         }
     }
 
-    const loadDemoCredentials = () => {
-        setLoginForm({
-            username: `${userType}@demo.com`,
-            password: 'demo123'
-        })
-        toast.info('✨ Demo credentials loaded! Click Sign In to continue.')
-    }
 
     const clearErrors = (field: string) => {
         if (errors[field]) {
@@ -387,32 +379,6 @@ const AuthScreen: React.FC = () => {
                                 {isLoading ? 'Signing In...' : 'Sign In'}
                             </button>
 
-                            <button
-                                type="button"
-                                onClick={loadDemoCredentials}
-                                style={{
-                                    width: '100%',
-                                    padding: '12px',
-                                    backgroundColor: 'transparent',
-                                    color: '#6366f1',
-                                    border: '2px solid #6366f1',
-                                    borderRadius: '12px',
-                                    fontSize: '14px',
-                                    fontWeight: 600,
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s'
-                                }}
-                                onMouseEnter={(e) => {
-                                    e.currentTarget.style.backgroundColor = '#6366f1'
-                                    e.currentTarget.style.color = 'white'
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.backgroundColor = 'transparent'
-                                    e.currentTarget.style.color = '#6366f1'
-                                }}
-                            >
-                                🚀 Load Demo Credentials
-                            </button>
                         </motion.form>
                     ) : (
                         /* Registration Form */
@@ -639,7 +605,7 @@ const AuthScreen: React.FC = () => {
                     )}
                 </AnimatePresence>
 
-                {/* Footer */}
+                {/* Information Footer */}
                 <div style={{
                     textAlign: 'center',
                     marginTop: '2rem',
@@ -648,14 +614,14 @@ const AuthScreen: React.FC = () => {
                     borderRadius: '12px'
                 }}>
                     <p style={{color: '#64748b', fontSize: '0.9rem', margin: '0 0 0.5rem 0'}}>
-                        🚀 <strong>Demo Accounts Available:</strong>
+                        🔐 <strong>Secure Registration Process</strong>
                     </p>
                     <div style={{display: 'grid', gap: '0.25rem', fontSize: '0.8rem', color: '#64748b'}}>
-                        <div>👤 <strong>Student:</strong> student@demo.com</div>
-                        <div>👨‍🏫 <strong>Teacher:</strong> teacher@demo.com</div>
-                        <div>👑 <strong>Admin:</strong> admin@demo.com</div>
+                        <div>🎓 <strong>Students:</strong> Account requires teacher/admin approval</div>
+                        <div>👨‍🏫 <strong>Teachers:</strong> Application reviewed by administrators</div>
+                        <div>👑 <strong>Admins:</strong> Contact system administrator for access</div>
                         <div style={{marginTop: '0.5rem', fontSize: '0.75rem', fontStyle: 'italic'}}>
-                            Password: Any password works in demo mode
+                            All users will receive email notifications about their account status
                         </div>
                     </div>
                 </div>

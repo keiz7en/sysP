@@ -13,6 +13,10 @@ import TeacherHome from './pages/TeacherHome'
 import StudentManagement from './pages/StudentManagement'
 import CourseManagement from './pages/CourseManagement'
 import TeacherProfile from './pages/TeacherProfile'
+import TeachingAnalytics from './pages/TeachingAnalytics'
+import AssignmentManagement from './pages/AssignmentManagement'
+import Gradebook from './pages/Gradebook'
+import StudentApprovals from './pages/StudentApprovals'
 
 const TeacherDashboard: React.FC = () => {
     const {user} = useAuth()
@@ -32,6 +36,13 @@ const TeacherDashboard: React.FC = () => {
             icon: '👥',
             path: '/teacher/students',
             description: 'Add/remove students with auto IDs'
+        },
+        {
+            id: 'approvals',
+            label: 'Student Approvals',
+            icon: '✅',
+            path: '/teacher/approvals',
+            description: 'Approve student registrations'
         },
         {
             id: 'courses',
@@ -106,7 +117,7 @@ const TeacherDashboard: React.FC = () => {
                 <Navbar
                     onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
                     user={user}
-                    userType="teacher"
+                    sidebarOpen={sidebarOpen}
                 />
 
                 {/* Page Content */}
@@ -121,19 +132,14 @@ const TeacherDashboard: React.FC = () => {
                     }}
                 >
                     <Routes>
-                        <Route path="/" element={<TeacherHome/>}/>
-                        <Route path="/students" element={<StudentManagement/>}/>
-                        <Route path="/courses" element={<CourseManagement/>}/>
-                        <Route path="/analytics"
-                               element={<div style={{padding: '2rem', textAlign: 'center'}}><h2>📊 Teaching
-                                   Analytics</h2><p>Detailed analytics coming soon!</p></div>}/>
-                        <Route path="/assignments"
-                               element={<div style={{padding: '2rem', textAlign: 'center'}}><h2>📝 Assignments</h2>
-                                   <p>Assignment management coming soon!</p></div>}/>
-                        <Route path="/gradebook"
-                               element={<div style={{padding: '2rem', textAlign: 'center'}}><h2>📋 Gradebook</h2><p>Grade
-                                   tracking coming soon!</p></div>}/>
-                        <Route path="/profile" element={<TeacherProfile/>}/>
+                        <Route index element={<TeacherHome/>}/>
+                        <Route path="students" element={<StudentManagement/>}/>
+                        <Route path="approvals" element={<StudentApprovals/>}/>
+                        <Route path="courses" element={<CourseManagement/>}/>
+                        <Route path="analytics" element={<TeachingAnalytics/>}/>
+                        <Route path="assignments" element={<AssignmentManagement/>}/>
+                        <Route path="gradebook" element={<Gradebook/>}/>
+                        <Route path="profile" element={<TeacherProfile/>}/>
                         <Route path="*" element={<Navigate to="/teacher" replace/>}/>
                     </Routes>
                 </motion.main>

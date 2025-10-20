@@ -12,6 +12,17 @@ class StudentProfileSerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = ('student_id', 'enrollment_date')
 
+    def get_user_details(self, obj):
+        return {
+            'id': obj.user.id,
+            'username': obj.user.username,
+            'first_name': obj.user.first_name,
+            'last_name': obj.user.last_name,
+            'email': obj.user.email,
+            'user_type': obj.user.user_type,
+            'approval_status': obj.user.approval_status
+        }
+
 
 class AcademicRecordSerializer(serializers.ModelSerializer):
     """Serializer for academic records"""

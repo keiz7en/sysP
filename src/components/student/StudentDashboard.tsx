@@ -129,16 +129,16 @@ const StudentDashboard: React.FC = () => {
                     }}
                 >
                     <Routes>
-                        <Route path="/" element={<StudentHome/>}/>
-                        <Route path="/records" element={<StudentRecords/>}/>
-                        <Route path="/learning" element={<AdaptiveLearning/>}/>
-                        <Route path="/career" element={<CareerGuidance/>}/>
-                        <Route path="/assessments" element={<AcademicAutomation/>}/>
-                        <Route path="/insights" element={<ResearchInsights/>}/>
-                        <Route path="/accessibility" element={<EngagementAccessibility/>}/>
-                        <Route path="/chat" element={<StudentChat/>}/>
-                        <Route path="/profile" element={<StudentProfile/>}/>
-                        <Route path="*" element={<Navigate to="/" replace/>}/>
+                        <Route index element={<StudentHome/>}/>
+                        <Route path="records" element={<StudentRecords/>}/>
+                        <Route path="learning" element={<AdaptiveLearning/>}/>
+                        <Route path="career" element={<CareerGuidance/>}/>
+                        <Route path="assessments" element={<AcademicAutomation/>}/>
+                        <Route path="insights" element={<ResearchInsights/>}/>
+                        <Route path="accessibility" element={<EngagementAccessibility/>}/>
+                        <Route path="chat" element={<StudentChat/>}/>
+                        <Route path="profile" element={<StudentProfile/>}/>
+                        <Route path="*" element={<Navigate to="/student" replace/>}/>
                     </Routes>
                 </motion.main>
             </div>

@@ -5,8 +5,9 @@ import Navbar from '../shared/Navbar'
 import Sidebar from '../shared/Sidebar'
 import AdminHome from './pages/AdminHome'
 import UserManagement from './pages/UserManagement'
-import TeacherApproval from './pages/TeacherApproval'
+import TeacherApprovals from './pages/TeacherApprovals'
 import SystemSettings from './pages/SystemSettings'
+import StudentApprovals from './pages/StudentApprovals'
 import {useAuth} from '../../contexts/AuthContext'
 
 const AdminDashboard: React.FC = () => {
@@ -34,6 +35,13 @@ const AdminDashboard: React.FC = () => {
             icon: '✅',
             path: '/admin/teachers',
             description: 'Approve new teachers'
+        },
+        {
+            id: 'students',
+            label: 'Student Approval',
+            icon: '🎓',
+            path: '/admin/students',
+            description: 'Approve new students'
         },
         {
             id: 'settings',
@@ -67,16 +75,16 @@ const AdminDashboard: React.FC = () => {
                 <Navbar
                     onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
                     user={user}
-                    userType="admin"
+                    sidebarOpen={sidebarOpen}
                 />
 
                 <main style={{flex: 1, padding: '2rem'}}>
                     <Routes>
-                        <Route path="/" element={<AdminHome/>}/>
-                        <Route path="/admin" element={<AdminHome/>}/>
-                        <Route path="/admin/users" element={<UserManagement/>}/>
-                        <Route path="/admin/teachers" element={<TeacherApproval/>}/>
-                        <Route path="/admin/settings" element={<SystemSettings/>}/>
+                        <Route index element={<AdminHome/>}/>
+                        <Route path="users" element={<UserManagement/>}/>
+                        <Route path="teachers" element={<TeacherApprovals/>}/>
+                        <Route path="students" element={<StudentApprovals/>}/>
+                        <Route path="settings" element={<SystemSettings/>}/>
                         <Route path="*" element={<Navigate to="/admin" replace/>}/>
                     </Routes>
                 </main>
