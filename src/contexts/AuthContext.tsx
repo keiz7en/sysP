@@ -27,7 +27,7 @@ export interface User {
     experience_years?: number
     // Computed fields
     name: string
-    role?: string
+    role: string
 }
 
 export interface AuthContextType {

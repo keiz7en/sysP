@@ -12,6 +12,13 @@ import json
 from .models import StudentProfile, AcademicRecord, AttendanceRecord, LearningProgress, StudentBehaviorMetrics
 from .serializers import StudentProfileSerializer
 
+# Import Gemini AI service
+try:
+    from ai_services.gemini_service import gemini_service
+except ImportError:
+    gemini_service = None
+    print("⚠️ Gemini AI service not available in students/views.py")
+
 # Safe imports for other apps
 try:
     from courses.models import Course, CourseEnrollment
@@ -683,85 +690,89 @@ def get_personalized_learning_path(request):
             }
             return Response(sample_learning_data)
 
-        # Build learning paths from actual enrollments
-        learning_paths = []
-        total_progress = 0
+        # Use Gemini AI to generate personalized learning paths
+        if gemini_service:
+            learning_paths = gemini_service.generate_learning_paths(student_profile, enrollments)
+        else:
+            # If Gemini AI is not available, use default logic
+            learning_paths = []
+            total_progress = 0
 
-        for idx, enrollment in enumerate(enrollments):
-            course = enrollment.course
-            progress = float(enrollment.progress_percentage)
-            total_progress += progress
+            for idx, enrollment in enumerate(enrollments):
+                course = enrollment.course
+                progress = float(enrollment.progress_percentage)
+                total_progress += progress
 
-            # Generate AI recommendations based on progress
-            ai_recommendations = []
-            if progress < 25:
-                ai_recommendations = [
-                    'Focus on understanding fundamental concepts',
-                    'Complete introductory materials first',
-                    'Ask questions during lectures'
-                ]
-            elif progress < 50:
-                ai_recommendations = [
-                    'Practice applying concepts through exercises',
-                    'Review previous materials if needed',
-                    'Start working on practical projects'
-                ]
-            elif progress < 75:
-                ai_recommendations = [
-                    'Focus on advanced topics and applications',
-                    'Prepare for assessments and evaluations',
-                    'Consider peer tutoring opportunities'
-                ]
-            else:
-                ai_recommendations = [
-                    'Prepare for final assessments',
-                    'Focus on course completion',
-                    'Plan next learning steps'
-                ]
+                # Generate AI recommendations based on progress
+                ai_recommendations = []
+                if progress < 25:
+                    ai_recommendations = [
+                        'Focus on understanding fundamental concepts',
+                        'Complete introductory materials first',
+                        'Ask questions during lectures'
+                    ]
+                elif progress < 50:
+                    ai_recommendations = [
+                        'Practice applying concepts through exercises',
+                        'Review previous materials if needed',
+                        'Start working on practical projects'
+                    ]
+                elif progress < 75:
+                    ai_recommendations = [
+                        'Focus on advanced topics and applications',
+                        'Prepare for assessments and evaluations',
+                        'Consider peer tutoring opportunities'
+                    ]
+                else:
+                    ai_recommendations = [
+                        'Prepare for final assessments',
+                        'Focus on course completion',
+                        'Plan next learning steps'
+                    ]
 
-            # Determine difficulty level
-            difficulty_map = {
-                'beginner': 'Beginner',
-                'intermediate': 'Intermediate',
-                'advanced': 'Advanced',
-                'expert': 'Expert'
-            }
-            difficulty = difficulty_map.get(
-                getattr(course, 'difficulty_level', 'intermediate').lower(),
-                'Intermediate'
-            )
+                # Determine difficulty level
+                difficulty_map = {
+                    'beginner': 'Beginner',
+                    'intermediate': 'Intermediate',
+                    'advanced': 'Advanced',
+                    'expert': 'Expert'
+                }
+                difficulty = difficulty_map.get(
+                    getattr(course, 'difficulty_level', 'intermediate').lower(),
+                    'Intermediate'
+                )
 
-            # Generate next milestone based on progress
-            if progress < 25:
-                next_milestone = f"Complete foundational modules of {course.title}"
-            elif progress < 50:
-                next_milestone = f"Finish mid-course projects in {course.title}"
-            elif progress < 75:
-                next_milestone = f"Prepare for final assessments in {course.title}"
-            else:
-                next_milestone = f"Complete {course.title} successfully"
+                # Generate next milestone based on progress
+                if progress < 25:
+                    next_milestone = f"Complete foundational modules of {course.title}"
+                elif progress < 50:
+                    next_milestone = f"Finish mid-course projects in {course.title}"
+                elif progress < 75:
+                    next_milestone = f"Prepare for final assessments in {course.title}"
+                else:
+                    next_milestone = f"Complete {course.title} successfully"
 
-            learning_path = {
-                'id': idx + 1,
-                'course_title': course.title,
-                'current_module': f"Module {int(progress / 25) + 1}: {course.title} Content",
-                'progress_percentage': progress,
-                'difficulty_level': difficulty,
-                'learning_style': student_profile.learning_style or 'adaptive',
-                'estimated_completion': course.end_date.strftime('%B %Y') if hasattr(course,
+                learning_path = {
+                    'id': idx + 1,
+                    'course_title': course.title,
+                    'current_module': f"Module {int(progress / 25) + 1}: {course.title} Content",
+                    'progress_percentage': progress,
+                    'difficulty_level': difficulty,
+                    'learning_style': student_profile.learning_style or 'adaptive',
+                    'estimated_completion': course.end_date.strftime('%B %Y') if hasattr(course,
                                                                                      'end_date') and course.end_date else '4 months',
-                'next_milestone': next_milestone,
-                'ai_recommendations': ai_recommendations,
-                'strengths': [
-                    'Consistent study habits',
-                    'Good progress pace' if progress > 50 else 'Building foundation'
-                ],
-                'areas_for_improvement': [
-                    'Time management' if progress < 30 else 'Advanced concepts',
-                    'Practical application' if progress < 60 else 'Exam preparation'
-                ]
-            }
-            learning_paths.append(learning_path)
+                    'next_milestone': next_milestone,
+                    'ai_recommendations': ai_recommendations,
+                    'strengths': [
+                        'Consistent study habits',
+                        'Good progress pace' if progress > 50 else 'Building foundation'
+                    ],
+                    'areas_for_improvement': [
+                        'Time management' if progress < 30 else 'Advanced concepts',
+                        'Practical application' if progress < 60 else 'Exam preparation'
+                    ]
+                }
+                learning_paths.append(learning_path)
 
         # Calculate overall metrics
         overall_progress = total_progress / len(enrollments) if enrollments else 0

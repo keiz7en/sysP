@@ -1,12 +1,6 @@
 import React from 'react'
 import {motion} from 'framer-motion'
-
-interface User {
-    name: string
-    email: string
-    avatar?: string
-    role: string
-}
+import {User} from '../../contexts/AuthContext'
 
 interface NavbarProps {
     user: User | null
@@ -188,21 +182,25 @@ const Navbar: React.FC<NavbarProps> = ({user, onSidebarToggle, sidebarOpen}) => 
                          e.currentTarget.style.boxShadow = 'none'
                      }}
                 >
-                    <div style={{
-                        width: '32px',
-                        height: '32px',
-                        borderRadius: '50%',
-                        background: user?.avatar ? `url(${user.avatar})` : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: 'white',
-                        fontSize: '0.9rem',
-                        fontWeight: '600'
-                    }}>
-                        {!user?.avatar && (user?.name?.charAt(0) || '👤')}
+                    <div
+                        style={{
+                            width: '40px',
+                            height: '40px',
+                            borderRadius: '50%',
+                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'white',
+                            fontSize: '1rem',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            marginRight: '1rem'
+                        }}
+                    >
+                        {user?.name?.charAt(0) || '👤'}
                     </div>
                     <div style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-start'}}>
                         <span style={{

@@ -6,6 +6,154 @@ const getAuthHeaders = (token: string | null) => ({
     'Content-Type': 'application/json',
 })
 
+// ===========================
+// AI-POWERED STUDENT APIs (Gemini Integration)
+// ===========================
+
+export const aiStudentAPI = {
+    // Check AI Dashboard Status
+    getDashboard: async (token: string) => {
+        const response = await fetch(`${API_BASE_URL}/students/ai/dashboard/`, {
+            headers: getAuthHeaders(token)
+        })
+        if (!response.ok) throw new Error('Failed to fetch AI dashboard')
+        return response.json()
+    },
+
+    // Feature 1: Academic Analysis (Dropout Risk Prediction)
+    getAcademicAnalysis: async (token: string) => {
+        const response = await fetch(`${API_BASE_URL}/students/ai/academic-analysis/`, {
+            method: 'POST',
+            headers: getAuthHeaders(token)
+        })
+        if (!response.ok) throw new Error('Failed to get academic analysis')
+        return response.json()
+    },
+
+    // Feature 2: Personalized Learning Content
+    generatePersonalizedContent: async (token: string, data: {
+        topic: string;
+        difficulty: string;
+        learning_style?: string;
+    }) => {
+        const response = await fetch(`${API_BASE_URL}/students/ai/personalized-content/`, {
+            method: 'POST',
+            headers: getAuthHeaders(token),
+            body: JSON.stringify(data)
+        })
+        if (!response.ok) throw new Error('Failed to generate personalized content')
+        return response.json()
+    },
+
+    // Feature 2: AI Quiz Generation
+    generateQuiz: async (token: string, data: {
+        topic: string;
+        difficulty: string;
+        num_questions: number;
+    }) => {
+        const response = await fetch(`${API_BASE_URL}/students/ai/generate-quiz/`, {
+            method: 'POST',
+            headers: getAuthHeaders(token),
+            body: JSON.stringify(data)
+        })
+        if (!response.ok) throw new Error('Failed to generate quiz')
+        return response.json()
+    },
+
+    // Feature 3: Feedback Analysis
+    analyzeFeedback: async (token: string, data: {
+        feedback: string;
+        course_id?: number;
+    }) => {
+        const response = await fetch(`${API_BASE_URL}/students/ai/feedback-analysis/`, {
+            method: 'POST',
+            headers: getAuthHeaders(token),
+            body: JSON.stringify(data)
+        })
+        if (!response.ok) throw new Error('Failed to analyze feedback')
+        return response.json()
+    },
+
+    // Feature 4: Career Guidance
+    getCareerGuidance: async (token: string, data: {
+        interests: string;
+        skills?: string[];
+    }) => {
+        const response = await fetch(`${API_BASE_URL}/students/ai/career-guidance/`, {
+            method: 'POST',
+            headers: getAuthHeaders(token),
+            body: JSON.stringify(data)
+        })
+        if (!response.ok) throw new Error('Failed to get career guidance')
+        return response.json()
+    },
+
+    // Feature 4: Resume Analysis
+    analyzeResume: async (token: string, data: {
+        resume_text: string;
+        job_target: string;
+    }) => {
+        const response = await fetch(`${API_BASE_URL}/students/ai/resume-analysis/`, {
+            method: 'POST',
+            headers: getAuthHeaders(token),
+            body: JSON.stringify(data)
+        })
+        if (!response.ok) throw new Error('Failed to analyze resume')
+        return response.json()
+    },
+
+    // Feature 5: Essay Grading
+    gradeEssay: async (token: string, data: {
+        essay_text: string;
+        rubric: {
+            content: number;
+            grammar: number;
+            structure: number;
+        };
+    }) => {
+        const response = await fetch(`${API_BASE_URL}/students/ai/grade-essay/`, {
+            method: 'POST',
+            headers: getAuthHeaders(token),
+            body: JSON.stringify(data)
+        })
+        if (!response.ok) throw new Error('Failed to grade essay')
+        return response.json()
+    },
+
+    // Feature 6: Performance Prediction
+    getPerformancePrediction: async (token: string) => {
+        const response = await fetch(`${API_BASE_URL}/students/ai/performance-prediction/`, {
+            headers: getAuthHeaders(token)
+        })
+        if (!response.ok) throw new Error('Failed to get performance prediction')
+        return response.json()
+    },
+
+    // Feature 7: AI Chatbot
+    sendChatMessage: async (token: string, data: {
+        message: string;
+        context?: string;
+    }) => {
+        const response = await fetch(`${API_BASE_URL}/students/ai/chatbot/`, {
+            method: 'POST',
+            headers: getAuthHeaders(token),
+            body: JSON.stringify(data)
+        })
+        if (!response.ok) throw new Error('Failed to send chat message')
+        return response.json()
+    },
+
+    // Feature 7: Engagement Analysis
+    getEngagementAnalysis: async (token: string) => {
+        const response = await fetch(`${API_BASE_URL}/students/ai/engagement-analysis/`, {
+            method: 'POST',
+            headers: getAuthHeaders(token)
+        })
+        if (!response.ok) throw new Error('Failed to get engagement analysis')
+        return response.json()
+    },
+}
+
 export const studentAPI = {
     getDashboard: async (token: string) => {
         const response = await fetch(`${API_BASE_URL}/students/dashboard/`, {

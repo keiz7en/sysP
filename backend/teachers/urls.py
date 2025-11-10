@@ -16,6 +16,11 @@ urlpatterns = [
     path('add-student/', views.add_student_to_course, name='add-student'),
     path('remove-student/', views.remove_student_from_course, name='remove-student'),
 
+    # Student Management URLs
+    path('students/approve/<int:student_id>/', views.approve_student, name='approve-student'),
+    path('students/reject/<int:student_id>/', views.reject_student, name='reject-student'),
+    path('students/remove/<int:student_id>/', views.remove_student_from_course, name='remove-student-from-course'),
+
     # New comprehensive teacher endpoints
     path('teaching-analytics/', views.get_teaching_analytics, name='teaching-analytics'),
     path('ai-content/', views.ai_content_digitization, name='ai-content-digitization'),

@@ -159,3 +159,17 @@ X_FRAME_OPTIONS = 'DENY'
 # Custom settings for EduAI system
 EDUCATION_SYSTEM_NAME = 'EduAI - AI-Powered Education Platform'
 EDUCATION_SYSTEM_VERSION = '1.0.0'
+
+# AI Services Configuration
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', 'AIzaSyCKBlajRvVA_NTteVg6Cls49CxYDmfKknc')
+
+# AI Features Configuration
+AI_SERVICES = {
+    'GEMINI_ENABLED': True,
+    'GEMINI_MODEL': 'gemini-pro',
+    'MAX_TOKENS': 2048,
+    'TEMPERATURE': 0.7,
+}
+
+# Email Configuration (if needed for notifications)
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # For development

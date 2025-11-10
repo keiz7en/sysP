@@ -284,24 +284,22 @@ const Sidebar: React.FC<SidebarProps> = ({isOpen, onToggle, menuItems, userType,
                                 }}
                             >
                                 <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
-                                    <div style={{
-                                        width: '40px',
-                                        height: '40px',
-                                        borderRadius: '50%',
-                                        background: user?.avatar
-                                            ? `url(${user.avatar})`
-                                            : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                                        backgroundSize: 'cover',
-                                        backgroundPosition: 'center',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        color: 'white',
-                                        fontSize: '1rem',
-                                        fontWeight: '600',
-                                        flexShrink: 0
-                                    }}>
-                                        {!user?.avatar && (user?.name?.charAt(0) || '👤')}
+                                    <div
+                                        style={{
+                                            width: '40px',
+                                            height: '40px',
+                                            borderRadius: '50%',
+                                            background: '#6366f1',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            fontSize: '1.2rem',
+                                            color: 'white',
+                                            fontWeight: '600',
+                                            marginRight: '0.75rem'
+                                        }}
+                                    >
+                                        {user?.name?.charAt(0) || '👤'}
                                     </div>
                                     <div style={{flex: 1, minWidth: 0}}>
                                         <div style={{

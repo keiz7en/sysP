@@ -8,28 +8,28 @@ const TeacherProfile: React.FC = () => {
     const [profileData, setProfileData] = useState({
         first_name: user?.first_name || '',
         last_name: user?.last_name || '',
+        bio: '',
         email: user?.email || '',
         phone_number: user?.phone_number || '',
-        address: user?.address || '',
-        bio: user?.bio || '',
+        specialization: [],
         department: user?.department || '',
-        specialization: user?.specialization || [],
-        experience_years: user?.experience_years || 0
+        experience_years: user?.experience_years || 0,
+        address: user?.address || ''
     })
     const [loading, setLoading] = useState(false)
 
     useEffect(() => {
         if (user) {
             setProfileData({
-                first_name: user.first_name || '',
-                last_name: user.last_name || '',
-                email: user.email || '',
+                first_name: user.first_name,
+                last_name: user.last_name,
+                email: user.email,
                 phone_number: user.phone_number || '',
-                address: user.address || '',
-                bio: user.bio || '',
+                bio: '',
                 department: user.department || '',
-                specialization: user.specialization || [],
-                experience_years: user.experience_years || 0
+                specialization: [],
+                experience_years: user.experience_years || 0,
+                address: user.address || ''
             })
         }
     }, [user])

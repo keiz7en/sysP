@@ -5,15 +5,70 @@ from .models import User, UserProfile
 
 class UserSerializer(serializers.ModelSerializer):
     """User serializer for API responses"""
+    # Add computed fields for related profiles
+    employee_id = serializers.SerializerMethodField()
+    department = serializers.SerializerMethodField()
+    teaching_rating = serializers.SerializerMethodField()
+    is_teacher_approved = serializers.SerializerMethodField()
+
+    student_id = serializers.SerializerMethodField()
+    current_gpa = serializers.SerializerMethodField()
+    academic_status = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = [
             'id', 'username', 'email', 'first_name', 'last_name',
             'user_type', 'phone_number', 'date_of_birth', 'address',
-            'is_verified', 'created_at', 'updated_at'
+            'is_verified', 'created_at', 'updated_at', 'approval_status',
+            # Teacher fields
+            'employee_id', 'department', 'teaching_rating', 'is_teacher_approved',
+            # Student fields  
+            'student_id', 'current_gpa', 'academic_status'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def get_employee_id(self, obj):
+        """Get teacher employee ID"""
+        if obj.user_type == 'teacher' and hasattr(obj, 'teacher_profile'):
+            return obj.teacher_profile.employee_id
+        return None
+
+    def get_department(self, obj):
+        """Get teacher department"""
+        if obj.user_type == 'teacher' and hasattr(obj, 'teacher_profile'):
+            return obj.teacher_profile.department
+        return None
+
+    def get_teaching_rating(self, obj):
+        """Get teacher rating"""
+        if obj.user_type == 'teacher' and hasattr(obj, 'teacher_profile'):
+            return float(obj.teacher_profile.teaching_rating)
+        return None
+
+    def get_is_teacher_approved(self, obj):
+        """Get teacher approval status from profile"""
+        if obj.user_type == 'teacher' and hasattr(obj, 'teacher_profile'):
+            return obj.teacher_profile.is_approved
+        return None
+
+    def get_student_id(self, obj):
+        """Get student ID"""
+        if obj.user_type == 'student' and hasattr(obj, 'student_profile'):
+            return obj.student_profile.student_id
+        return None
+
+    def get_current_gpa(self, obj):
+        """Get student GPA"""
+        if obj.user_type == 'student' and hasattr(obj, 'student_profile'):
+            return float(obj.student_profile.current_gpa)
+        return None
+
+    def get_academic_status(self, obj):
+        """Get student academic status"""
+        if obj.user_type == 'student' and hasattr(obj, 'student_profile'):
+            return obj.student_profile.academic_status
+        return None
 
 
 class UserProfileSerializer(serializers.ModelSerializer):

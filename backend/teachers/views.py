@@ -34,44 +34,78 @@ class TeacherProfileViewSet(viewsets.ModelViewSet):
 
 class TeacherDashboardView(APIView):
     """Teacher dashboard with real data"""
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         if request.user.user_type != 'teacher':
-            return Response({
-                'error': 'This endpoint is only accessible to teachers'
-            }, status=status.HTTP_403_FORBIDDEN)
+            return Response({'error': 'Access denied'}, status=403)
 
         try:
-            teacher_profile = TeacherProfile.objects.get(user=request.user)
-        except TeacherProfile.DoesNotExist:
+            from courses.models import Course, CourseEnrollment
+            from students.models import StudentProfile
+        except ImportError:
+            # Fallback if courses app doesn't exist
             return Response({
-                'error': 'Teacher profile not found'
-            }, status=status.HTTP_404_NOT_FOUND)
+                'stats': {'total_students': 0, 'total_courses': 0, 'avg_completion': 0},
+                'recent_enrollments': [],
+                'message': 'Course system not configured'
+            })
 
-        # Get real teaching data from courses model (when implemented)
-        # For now, return basic structure with real teacher info
-        dashboard_data = {
-            'teacher_info': {
-                'employee_id': teacher_profile.employee_id,
-                'name': f"{request.user.first_name} {request.user.last_name}",
-                'department': teacher_profile.department,
-                'specialization': teacher_profile.specialization,
-                'teaching_rating': float(teacher_profile.teaching_rating),
-                'experience_years': teacher_profile.experience_years
-            },
-            'statistics': {
-                'total_courses': 0,  # Will be updated when courses are created
-                'total_students': 0,  # Will be updated when students enroll
-                'active_students': 0,  # Will be updated with real data
-                'completion_rate': 0.0  # Will be calculated from real data
-            },
-            'recent_enrollments': [],  # Will be populated with real enrollments
-            'has_courses': False,  # Indicates if teacher has any courses
-            'is_new_teacher': True  # Indicates this is a new teacher with no data yet
-        }
+        # Get teacher's courses
+        teacher_courses = Course.objects.filter(instructor=request.user)
 
-        return Response(dashboard_data, status=status.HTTP_200_OK)
+        # Get enrollments in teacher's courses
+        enrollments = CourseEnrollment.objects.filter(
+            course__in=teacher_courses
+        ).select_related('student', 'course', 'student__student_profile')
+
+        # Calculate stats
+        total_students = enrollments.values('student').distinct().count()
+        total_courses = teacher_courses.count()
+
+        if enrollments.exists():
+            avg_completion = enrollments.aggregate(
+                avg=Avg('progress_percentage')
+            )['avg'] or 0
+        else:
+            avg_completion = 0
+
+        # Get recent enrollments
+        recent_enrollments = []
+        for enrollment in enrollments.order_by('-enrollment_date')[:10]:
+            student = enrollment.student
+
+            # Only include students with legitimate profiles
+            try:
+                profile = student.student_profile
+                student_data = {
+                    'student_name': f"{student.first_name} {student.last_name}",
+                    'student_id': profile.student_id if profile else f"STU{student.id}",
+                    'course': enrollment.course.title,
+                    'progress': enrollment.progress_percentage,
+                    'enrollment_date': enrollment.enrollment_date.strftime('%m/%d/%Y'),
+                    'email': student.email
+                }
+                recent_enrollments.append(student_data)
+            except:
+                # Skip students without proper profiles
+                continue
+
+        # If no enrollments, show empty state message
+        if not recent_enrollments:
+            message = "No students currently enrolled in your courses. Students will appear here when they sign up and enroll."
+        else:
+            message = None
+
+        return Response({
+            'stats': {
+                'total_students': total_students,
+                'total_courses': total_courses,
+                'avg_completion': round(avg_completion, 1)
+            },
+            'recent_enrollments': recent_enrollments,
+            'message': message
+        })
 
 
 class TeacherCoursesView(APIView):
@@ -249,21 +283,93 @@ class StudentManagementView(APIView):
             return Response({'error': 'Teacher access only'}, status=403)
 
         try:
-            teacher_profile = TeacherProfile.objects.get(user=request.user)
+            # Get all students from the database (real signups)
+            from students.models import StudentProfile
 
-            # Get students from actual enrollments (when courses exist)
-            students_data = {
-                'enrolled_students': [],  # Will be populated with real enrollments
-                'pending_students': [],  # Students waiting for approval
-                'total_enrolled': 0,
-                'total_pending': 0,
-                'message': 'No students enrolled yet. Use the + Add Student button to enroll students in your courses.',
-                'can_add_students': True
+            # Get both approved and pending students for teacher management
+            all_students = User.objects.filter(user_type='student').select_related('student_profile')
+
+            # Separate approved and pending students
+            approved_students = []
+            pending_students = []
+
+            for student in all_students:
+                try:
+                    # Get or create student profile
+                    try:
+                        profile = student.student_profile
+                    except:
+                        # Create missing profile for existing student
+                        profile = StudentProfile.objects.create(
+                            user=student,
+                            student_id=f'STU{student.id:05d}',
+                            academic_status='active',
+                            current_gpa=0.0
+                        )
+
+                    student_data = {
+                        'id': student.id,
+                        'student_id': profile.student_id,
+                        'name': f"{student.first_name} {student.last_name}",
+                        'first_name': student.first_name,
+                        'last_name': student.last_name,
+                        'email': student.email,
+                        'phone': student.phone_number or '',
+                        'grade_level': profile.grade_level or 'Not specified',
+                        'current_gpa': float(profile.current_gpa) if profile.current_gpa else 0.0,
+                        'academic_status': profile.academic_status or 'active',
+                        'approval_status': student.approval_status,
+                        'enrollment_date': student.created_at.strftime('%Y-%m-%d') if student.created_at else '',
+                        'is_active': student.is_active,
+                        'progress': 0.0,  # Will be calculated from actual course progress
+                        'course_count': 0,  # Will be calculated from actual enrollments
+                        'last_activity': student.last_login.strftime('%Y-%m-%d') if student.last_login else 'Never'
+                    }
+
+                    if student.approval_status == 'approved':
+                        approved_students.append(student_data)
+                    elif student.approval_status == 'pending':
+                        pending_students.append(student_data)
+
+                except Exception as e:
+                    print(f"Error processing student {student.username}: {e}")
+                    continue
+
+            response_data = {
+                'students': approved_students,  # All approved students
+                'enrolled_students': approved_students,  # Same for now - teachers see all approved students
+                'pending_students': pending_students,  # Students needing approval
+                'total_enrolled': len(approved_students),
+                'total_pending': len(pending_students),
+                'total_students': len(approved_students) + len(pending_students),
+                'can_add_students': True,
+                'can_approve_students': True,  # Teachers can approve student registrations
+                'statistics': {
+                    'active_students': len([s for s in approved_students if s['is_active']]),
+                    'average_gpa': sum(s['current_gpa'] for s in approved_students) / len(
+                        approved_students) if approved_students else 0.0,
+                    'total_courses': 0,  # Will be updated with real course data
+                }
             }
 
-            return Response(students_data)
-        except TeacherProfile.DoesNotExist:
-            return Response({'error': 'Teacher profile not found'}, status=404)
+            if len(approved_students) == 0 and len(pending_students) == 0:
+                response_data[
+                    'message'] = 'No students have signed up yet. Students will appear here when they register.'
+            elif len(approved_students) == 0:
+                response_data['message'] = f'You have {len(pending_students)} students waiting for approval.'
+            else:
+                response_data[
+                    'message'] = f'Managing {len(approved_students)} approved students and {len(pending_students)} pending approvals.'
+
+            return Response(response_data)
+
+        except Exception as e:
+            return Response({
+                'error': f'Failed to fetch students: {str(e)}',
+                'students': [],
+                'total_enrolled': 0,
+                'message': 'Error loading student data. Please try again.'
+            }, status=500)
 
     def post(self, request):
         if request.user.user_type != 'teacher':
@@ -793,5 +899,107 @@ def get_teaching_resources(request):
         }
 
         return Response(teaching_resources)
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def approve_student(request, student_id):
+    """Approve a student registration (teachers can approve students)"""
+    if request.user.user_type != 'teacher':
+        return Response({'error': 'Teacher access only'}, status=403)
+
+    try:
+        student = User.objects.get(id=student_id, user_type='student')
+
+        if student.approval_status == 'approved':
+            return Response({'message': f'{student.first_name} {student.last_name} is already approved'})
+
+        # Approve the student
+        student.approval_status = 'approved'
+        student.save()
+
+        # Create or update student profile
+        from students.models import StudentProfile
+        try:
+            profile = student.student_profile
+        except:
+            profile = StudentProfile.objects.create(
+                user=student,
+                student_id=f'STU{student.id:05d}',
+                academic_status='active',
+                current_gpa=0.0
+            )
+
+        profile.academic_status = 'active'
+        profile.save()
+
+        return Response({
+            'message': f'Successfully approved {student.first_name} {student.last_name}',
+            'student': {
+                'id': student.id,
+                'name': f"{student.first_name} {student.last_name}",
+                'approval_status': 'approved'
+            }
+        })
+
+    except User.DoesNotExist:
+        return Response({'error': 'Student not found'}, status=404)
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def reject_student(request, student_id):
+    """Reject a student registration"""
+    if request.user.user_type != 'teacher':
+        return Response({'error': 'Teacher access only'}, status=403)
+
+    try:
+        student = User.objects.get(id=student_id, user_type='student')
+        reason = request.data.get('reason', 'No reason provided')
+
+        # Reject the student
+        student.approval_status = 'rejected'
+        student.save()
+
+        return Response({
+            'message': f'Rejected {student.first_name} {student.last_name}',
+            'reason': reason
+        })
+
+    except User.DoesNotExist:
+        return Response({'error': 'Student not found'}, status=404)
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def remove_student_from_course(request, student_id):
+    """Remove a student from teacher's courses"""
+    if request.user.user_type != 'teacher':
+        return Response({'error': 'Teacher access only'}, status=403)
+
+    try:
+        student = User.objects.get(id=student_id, user_type='student')
+
+        # For now, we'll change their status to inactive in courses
+        # In future, this will remove them from specific course enrollments
+        try:
+            profile = student.student_profile
+            profile.academic_status = 'withdrawn'
+            profile.save()
+        except:
+            pass
+
+        return Response({
+            'message': f'Removed {student.first_name} {student.last_name} from courses'
+        })
+
+    except User.DoesNotExist:
+        return Response({'error': 'Student not found'}, status=404)
     except Exception as e:
         return Response({'error': str(e)}, status=500)

@@ -213,12 +213,14 @@ const AuthScreen: React.FC = () => {
                                 }
                             }}
                             onMouseEnter={(e) => {
-                                e.target.style.backgroundColor = 'rgba(99, 102, 241, 0.1)'
-                                e.target.style.transform = 'scale(1.1)'
+                                const target = e.target as HTMLButtonElement
+                                target.style.backgroundColor = 'rgba(99, 102, 241, 0.1)'
+                                target.style.transform = 'scale(1.1)'
                             }}
                             onMouseLeave={(e) => {
-                                e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)'
-                                e.target.style.transform = 'scale(1)'
+                                const target = e.target as HTMLButtonElement
+                                target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)'
+                                target.style.transform = 'scale(1)'
                             }}
                     >?
                     </button>

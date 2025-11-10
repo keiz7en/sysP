@@ -84,9 +84,17 @@ const TeacherDashboard: React.FC = () => {
     // Check if user is approved teacher
     useEffect(() => {
         if (user && user.user_type === 'teacher') {
-            // Check if teacher profile exists (approved)
-            if (!user.teacher_profile && !user.employee_id) {
-                toast.error('Your teacher account is pending approval. Please contact admin.')
+            // Check if teacher is approved using the correct fields
+            if (user.approval_status !== 'approved') {
+                toast.error('Your teacher account is pending approval. Please contact admin.', {
+                    duration: 6000,
+                    icon: '⏳'
+                })
+            } else if (!user.employee_id) {
+                toast.success('Setting up your teacher profile...', {
+                    duration: 3000,
+                    icon: '⚙️'
+                })
             }
         }
     }, [user])
@@ -143,23 +151,41 @@ const TeacherDashboard: React.FC = () => {
                         <Route path="*" element={<Navigate to="/teacher" replace/>}/>
                     </Routes>
                     {/* Check if teacher profile exists and show setup message if needed */}
-                    {user && !user.teacher_profile && (
+                    {user && user.user_type === 'teacher' && user.approval_status === 'approved' && !user.employee_id && (
                         <motion.div
                             initial={{opacity: 0, y: 20}}
                             animate={{opacity: 1, y: 0}}
                             transition={{duration: 0.3}}
                             style={{
                                 padding: '2rem',
-                                backgroundColor: '#f8fafc',
-                                border: '1px solid #ddd',
-                                borderRadius: '10px',
-                                boxShadow: '0 0 10px rgba(0, 0, 0, 0.1)',
-                                marginBottom: '2rem'
+                                backgroundColor: '#fff3cd',
+                                border: '1px solid #ffeaa7',
+                                borderRadius: '12px',
+                                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                                marginBottom: '2rem',
+                                textAlign: 'center'
                             }}
                         >
-                            <h2>Setup Your Teacher Profile</h2>
-                            <p>Please complete your teacher profile to access all features.</p>
-                            <button onClick={() => console.log('Setup profile')}>Setup Profile</button>
+                            <h2 style={{color: '#856404', marginBottom: '1rem'}}>
+                                🏗️ Complete Your Teacher Profile
+                            </h2>
+                            <p style={{color: '#856404', marginBottom: '1.5rem'}}>
+                                Your teacher account is approved! Please complete your profile to access all features.
+                            </p>
+                            <button
+                                onClick={() => window.location.href = '/teacher/profile'}
+                                style={{
+                                    backgroundColor: '#fd7e14',
+                                    color: 'white',
+                                    border: 'none',
+                                    padding: '12px 24px',
+                                    borderRadius: '8px',
+                                    cursor: 'pointer',
+                                    fontWeight: '600'
+                                }}
+                            >
+                                Setup Profile Now
+                            </button>
                         </motion.div>
                     )}
                 </motion.main>

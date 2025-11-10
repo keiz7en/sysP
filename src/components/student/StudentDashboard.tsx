@@ -13,6 +13,7 @@ import ResearchInsights from './pages/ResearchInsights'
 import EngagementAccessibility from './pages/EngagementAccessibility'
 import StudentProfile from './pages/StudentProfile'
 import StudentChat from './pages/StudentChat'
+import AILearningAssistant from './pages/AILearningAssistant'
 
 // Import shared components
 import Sidebar from '../shared/Sidebar'
@@ -29,6 +30,13 @@ const StudentDashboard: React.FC = () => {
             icon: '🏠',
             path: '/student',
             description: 'Overview and quick access'
+        },
+        {
+            id: 'ai-assistant',
+            label: 'AI Learning Assistant',
+            icon: '🤖',
+            path: '/student/ai-assistant',
+            description: '24/7 AI-powered academic support, career guidance, and personalized help'
         },
         {
             id: 'records',
@@ -130,6 +138,7 @@ const StudentDashboard: React.FC = () => {
                 >
                     <Routes>
                         <Route index element={<StudentHome/>}/>
+                        <Route path="ai-assistant" element={<AILearningAssistant/>}/>
                         <Route path="records" element={<StudentRecords/>}/>
                         <Route path="learning" element={<AdaptiveLearning/>}/>
                         <Route path="career" element={<CareerGuidance/>}/>

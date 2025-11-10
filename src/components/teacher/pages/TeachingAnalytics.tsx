@@ -141,29 +141,6 @@ const TeachingAnalytics: React.FC = () => {
                         {error}
                     </p>
 
-                    {debugInfo && (
-                        <div style={{
-                            background: '#f9fafb',
-                            border: '1px solid #e5e7eb',
-                            borderRadius: '8px',
-                            padding: '1rem',
-                            marginBottom: '2rem',
-                            textAlign: 'left'
-                        }}>
-                            <h4 style={{fontSize: '1rem', marginBottom: '0.5rem', color: '#374151'}}>
-                                Debug Information:
-                            </h4>
-                            <pre style={{
-                                fontSize: '0.8rem',
-                                color: '#6b7280',
-                                margin: 0,
-                                whiteSpace: 'pre-wrap'
-                            }}>
-                                {JSON.stringify(debugInfo, null, 2)}
-                            </pre>
-                        </div>
-                    )}
-
                     <div style={{
                         background: '#eff6ff',
                         border: '1px solid #bae6fd',
