@@ -23,6 +23,24 @@ interface AssessmentStats {
     totalAssessments: number;
 }
 
+interface AIQuestion {
+    question: string;
+    options: string[];
+    correct_answer: string;
+    explanation: string;
+    points: number;
+    type: string;
+}
+
+interface AIAssessment {
+    assessment_title: string;
+    total_duration: number;
+    questions: AIQuestion[];
+    passing_score: number;
+    ai_generated: boolean;
+    model: string;
+}
+
 const AcademicAutomation: React.FC = () => {
     const {token} = useAuth()
     const [assessments, setAssessments] = useState<Assessment[]>([])
@@ -36,6 +54,17 @@ const AcademicAutomation: React.FC = () => {
         totalAssessments: 0
     })
     const [selectedType, setSelectedType] = useState<'all' | 'Quiz' | 'Exam' | 'Assignment'>('all')
+
+    // AI Assessment Generation State
+    const [showAIGenerator, setShowAIGenerator] = useState(false)
+    const [aiGenerating, setAiGenerating] = useState(false)
+    const [aiAssessment, setAiAssessment] = useState<AIAssessment | null>(null)
+    const [assessmentForm, setAssessmentForm] = useState({
+        topic: '',
+        difficulty: 'intermediate',
+        num_questions: 5,
+        assessment_type: 'quiz'
+    })
 
     useEffect(() => {
         fetchAssessments()
@@ -204,6 +233,53 @@ const AcademicAutomation: React.FC = () => {
         // Here you would implement the actual assessment taking functionality
     }
 
+    const generateAIAssessment = async () => {
+        if (!assessmentForm.topic.trim()) {
+            toast.error('Please enter a topic')
+            return
+        }
+
+        setAiGenerating(true)
+        const loadingToast = toast.loading('🤖 AI is generating your assessment...')
+
+        try {
+            console.log('🔥 Sending request to generate AI assessment:', assessmentForm)
+
+            const response = await fetch('/api/students/generate-ai-assessment/', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Token ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(assessmentForm)
+            })
+
+            const data = await response.json()
+            console.log('📥 Response received:', data)
+
+            if (response.ok) {
+                setAiAssessment(data)
+                toast.dismiss(loadingToast)
+                toast.success(`✨ Generated: ${data.assessment_title}`, {duration: 5000})
+            } else {
+                console.error('❌ API Error:', data)
+                toast.dismiss(loadingToast)
+                toast.error(data.error || 'Failed to generate AI assessment')
+            }
+        } catch (error) {
+            console.error('❌ Network Error:', error)
+            toast.dismiss(loadingToast)
+            toast.error('Network error. Please check your connection and try again.')
+        } finally {
+            setAiGenerating(false)
+        }
+    }
+
+    const handleGenerateSubmit = (e: React.FormEvent) => {
+        e.preventDefault()
+        generateAIAssessment()
+    }
+
     if (loading) {
         return (
             <div style={{
@@ -316,6 +392,178 @@ const AcademicAutomation: React.FC = () => {
                     </div>
                     <div style={{fontSize: '0.9rem', opacity: 0.9}}>Average Score</div>
                 </motion.div>
+            </div>
+
+            {/* AI Assessment Generation */}
+            <div style={{marginBottom: '2rem'}}>
+                <button
+                    onClick={() => setShowAIGenerator(!showAIGenerator)}
+                    style={{
+                        padding: '0.75rem 1.5rem',
+                        backgroundColor: '#3b82f6',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontSize: '0.9rem',
+                        fontWeight: '600',
+                        minWidth: '120px'
+                    }}
+                >
+                    Generate AI Assessment
+                </button>
+                {showAIGenerator && (
+                    <div style={{
+                        marginTop: '1rem',
+                        padding: '1rem',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '12px',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                    }}>
+                        <form onSubmit={handleGenerateSubmit}>
+                            <div style={{marginBottom: '1rem'}}>
+                                <label style={{
+                                    fontSize: '0.9rem',
+                                    fontWeight: '600',
+                                    color: '#374151',
+                                    marginBottom: '0.5rem'
+                                }}>Topic:</label>
+                                <input
+                                    type="text"
+                                    value={assessmentForm.topic}
+                                    onChange={(e) => setAssessmentForm({...assessmentForm, topic: e.target.value})}
+                                    style={{
+                                        padding: '0.5rem',
+                                        border: '1px solid #e5e7eb',
+                                        borderRadius: '8px',
+                                        width: '100%'
+                                    }}
+                                />
+                            </div>
+                            <div style={{marginBottom: '1rem'}}>
+                                <label style={{
+                                    fontSize: '0.9rem',
+                                    fontWeight: '600',
+                                    color: '#374151',
+                                    marginBottom: '0.5rem'
+                                }}>Difficulty:</label>
+                                <select
+                                    value={assessmentForm.difficulty}
+                                    onChange={(e) => setAssessmentForm({...assessmentForm, difficulty: e.target.value})}
+                                    style={{
+                                        padding: '0.5rem',
+                                        border: '1px solid #e5e7eb',
+                                        borderRadius: '8px',
+                                        width: '100%'
+                                    }}
+                                >
+                                    <option value="easy">Easy</option>
+                                    <option value="intermediate">Intermediate</option>
+                                    <option value="hard">Hard</option>
+                                </select>
+                            </div>
+                            <div style={{marginBottom: '1rem'}}>
+                                <label style={{
+                                    fontSize: '0.9rem',
+                                    fontWeight: '600',
+                                    color: '#374151',
+                                    marginBottom: '0.5rem'
+                                }}>Number of Questions:</label>
+                                <input
+                                    type="number"
+                                    value={assessmentForm.num_questions}
+                                    onChange={(e) => setAssessmentForm({
+                                        ...assessmentForm,
+                                        num_questions: parseInt(e.target.value)
+                                    })}
+                                    style={{
+                                        padding: '0.5rem',
+                                        border: '1px solid #e5e7eb',
+                                        borderRadius: '8px',
+                                        width: '100%'
+                                    }}
+                                />
+                            </div>
+                            <div style={{marginBottom: '1rem'}}>
+                                <label style={{
+                                    fontSize: '0.9rem',
+                                    fontWeight: '600',
+                                    color: '#374151',
+                                    marginBottom: '0.5rem'
+                                }}>Assessment Type:</label>
+                                <select
+                                    value={assessmentForm.assessment_type}
+                                    onChange={(e) => setAssessmentForm({
+                                        ...assessmentForm,
+                                        assessment_type: e.target.value
+                                    })}
+                                    style={{
+                                        padding: '0.5rem',
+                                        border: '1px solid #e5e7eb',
+                                        borderRadius: '8px',
+                                        width: '100%'
+                                    }}
+                                >
+                                    <option value="quiz">Quiz</option>
+                                    <option value="exam">Exam</option>
+                                    <option value="assignment">Assignment</option>
+                                </select>
+                            </div>
+                            <button
+                                type="submit"
+                                style={{
+                                    padding: '0.75rem 1.5rem',
+                                    backgroundColor: '#3b82f6',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '8px',
+                                    cursor: 'pointer',
+                                    fontSize: '0.9rem',
+                                    fontWeight: '600',
+                                    minWidth: '120px'
+                                }}
+                            >
+                                {aiGenerating ? 'Generating...' : 'Generate'}
+                            </button>
+                        </form>
+                        {aiAssessment && (
+                            <div style={{marginTop: '1rem'}}>
+                                <h3 style={{fontSize: '1.3rem', fontWeight: '600', margin: 0, color: '#1f2937'}}>
+                                    {aiAssessment.assessment_title}
+                                </h3>
+                                <div style={{fontSize: '0.9rem', color: '#6b7280', marginBottom: '1rem'}}>
+                                    Total Duration: {aiAssessment.total_duration} minutes
+                                </div>
+                                <div style={{fontSize: '0.9rem', color: '#6b7280', marginBottom: '1rem'}}>
+                                    Passing Score: {aiAssessment.passing_score}%
+                                </div>
+                                <ul style={{listStyle: 'none', padding: 0, margin: 0}}>
+                                    {aiAssessment.questions.map((question, index) => (
+                                        <li key={index} style={{marginBottom: '1rem'}}>
+                                            <div style={{
+                                                fontSize: '1rem',
+                                                fontWeight: '600',
+                                                color: '#374151',
+                                                marginBottom: '0.5rem'
+                                            }}>
+                                                Question {index + 1}: {question.question}
+                                            </div>
+                                            <div style={{fontSize: '0.9rem', color: '#6b7280', marginBottom: '0.5rem'}}>
+                                                Options: {question.options.join(', ')}
+                                            </div>
+                                            <div style={{fontSize: '0.9rem', color: '#6b7280', marginBottom: '0.5rem'}}>
+                                                Correct Answer: {question.correct_answer}
+                                            </div>
+                                            <div style={{fontSize: '0.9rem', color: '#6b7280', marginBottom: '0.5rem'}}>
+                                                Explanation: {question.explanation}
+                                            </div>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Filter Tabs */}

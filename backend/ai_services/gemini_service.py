@@ -261,27 +261,40 @@ class GeminiAIService:
     def chat_response(self, message: str, context: str = "") -> str:
         """Generate chatbot response"""
         if not self.available:
-            return "I'm here to help! Please ask me about courses, career guidance, or academic support."
+            return "I'm here to help! I'm an AI learning assistant. You can ask me about:\n• Programming and coding (like Python 'Hello World')\n• Study strategies and plans\n• Career guidance and job prospects\n• Course recommendations\n• Homework help and concept explanations\n\nWhat would you like to know?"
 
         try:
             system_context = """
-            You are an AI academic advisor for an education platform. Help students with:
-            - Course selection and enrollment
-            - Study tips and academic support
-            - Career guidance and job market insights
-            - Scholarship and admission information
+            You are an intelligent AI learning assistant for students. Your role is to:
             
-            Be helpful, concise, and encouraging. Keep responses under 150 words.
+            1. **Academic Support**: Help with homework, explain concepts clearly, provide examples
+            2. **Programming Help**: Explain code, debug issues, teach programming concepts step-by-step
+            3. **Study Planning**: Create personalized study plans, suggest learning strategies
+            4. **Career Guidance**: Advise on career paths, skill development, job prospects
+            5. **Course Selection**: Recommend courses based on goals and interests
+            6. **Motivation**: Encourage and motivate students in their learning journey
+            
+            Guidelines:
+            - Be friendly, helpful, and encouraging
+            - Explain concepts clearly with examples when needed
+            - For coding questions, provide code examples with explanations
+            - For study plans, be specific with actionable steps
+            - For career questions, provide realistic, helpful advice
+            - Keep responses concise but informative (2-4 paragraphs)
+            - Use bullet points for lists and steps
+            - Always be supportive and positive
+            
+            Remember: You're helping students learn and grow!
             """
 
-            full_prompt = f"{system_context}\n\nContext: {context}\n\nStudent: {message}\n\nAdvisor:"
+            full_prompt = f"{system_context}\n\nContext: {context}\n\nStudent Question: {message}\n\nYour Response:"
 
             response = self.model.generate_content(full_prompt)
             return response.text.strip()
 
         except Exception as e:
             print(f"Gemini chat error: {e}")
-            return "I'm here to help with your education journey. What would you like to know?"
+            return "I'm here to help with your education journey! I can assist with:\n• Programming and coding questions\n• Study strategies and planning\n• Career advice and guidance\n• Course recommendations\n• Homework and concept explanations\n\nWhat would you like to know?"
 
     def generate_learning_paths(self, student_profile, enrollments) -> list:
         """Generate AI-powered personalized learning paths for student courses"""
@@ -457,6 +470,195 @@ class GeminiAIService:
             learning_paths.append(learning_path)
 
         return learning_paths
+
+    def generate_ai_assessment(self, topic: str, difficulty: str, num_questions: int, assessment_type: str) -> Dict[
+        str, Any]:
+        """Generate AI-powered assessment with questions"""
+        if not self.available:
+            return self._mock_assessment(topic, num_questions, assessment_type)
+
+        try:
+            prompt = f"""
+            Create a {assessment_type} assessment about {topic} at {difficulty} difficulty level.
+            
+            Generate {num_questions} questions with the following structure:
+            - "question": The question text
+            - "options": Array of 4 options (for multiple choice) or empty array for essay questions
+            - "correct_answer": The correct option or key points (for essay)
+            - "explanation": Detailed explanation of the correct answer
+            - "points": Points for this question (10 for MCQ, 20 for essay)
+            - "type": "multiple_choice" or "essay" or "short_answer"
+            
+            Make questions:
+            - Relevant to {topic}
+            - At {difficulty} difficulty level
+            - Educational and clear
+            - Progressively challenging
+            
+            Return JSON object with:
+            - "assessment_title": Title for the assessment
+            - "total_duration": Recommended time in minutes
+            - "questions": Array of question objects
+            - "passing_score": Minimum percentage to pass
+            
+            Format as valid JSON only, no markdown.
+            """
+
+            response = self.model.generate_content(prompt)
+            result_text = response.text.strip()
+
+            # Clean markdown
+            if result_text.startswith('```json'):
+                result_text = result_text[7:]
+            if result_text.startswith('```'):
+                result_text = result_text[3:]
+            if result_text.endswith('```'):
+                result_text = result_text[:-3]
+
+            result = json.loads(result_text.strip())
+            result['ai_generated'] = True
+            result['model'] = 'Gemini 2.5 Flash'
+            return result
+
+        except Exception as e:
+            print(f"Gemini assessment generation error: {e}")
+            return self._mock_assessment(topic, num_questions, assessment_type)
+
+    def analyze_learning_insights(self, student_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Generate AI-powered learning insights and recommendations"""
+        if not self.available:
+            return self._mock_learning_insights(student_data)
+
+        try:
+            courses_str = "\n".join([f"- {c['title']}: {c['score']}%" for c in student_data.get('courses', [])])
+
+            prompt = f"""
+            Analyze this student's learning data and provide comprehensive insights:
+            
+            Student Profile:
+            - Learning Style: {student_data.get('learning_style', 'adaptive')}
+            - Current GPA: {student_data.get('gpa', 0)}
+            - Study Hours/Month: {student_data.get('study_hours', 0)}
+            - Average Session: {student_data.get('avg_session', 0)} minutes
+            
+            Course Performance:
+            {courses_str}
+            
+            Provide a JSON response with:
+            - "performance_analysis": Object with:
+              - "overall_trend": "improving", "stable", or "declining"
+              - "strongest_areas": Array of 2-3 areas
+              - "areas_needing_attention": Array of 2-3 areas
+              - "grade_prediction": Predicted GPA for next semester
+            
+            - "learning_patterns": Object with:
+              - "optimal_study_time": Best time of day (inferred from data)
+              - "attention_span": Optimal study session duration
+              - "learning_efficiency": Percentage (0-100)
+              - "retention_rate": Percentage (0-100)
+            
+            - "ai_recommendations": Array of 4-5 specific, actionable recommendations with:
+              - "title": Short title
+              - "description": Detailed explanation
+              - "priority": "high", "medium", or "low"
+              - "impact": Expected impact description
+            
+            - "study_optimization": Object with:
+              - "suggested_schedule": Brief schedule suggestion
+              - "focus_areas": Array of topics to focus on
+              - "time_allocation": Suggestions for time management
+            
+            Make recommendations specific, actionable, and personalized.
+            Format as valid JSON only, no markdown.
+            """
+
+            response = self.model.generate_content(prompt)
+            result_text = response.text.strip()
+
+            # Clean markdown
+            if result_text.startswith('```json'):
+                result_text = result_text[7:]
+            if result_text.startswith('```'):
+                result_text = result_text[3:]
+            if result_text.endswith('```'):
+                result_text = result_text[:-3]
+
+            result = json.loads(result_text.strip())
+            result['ai_powered'] = True
+            result['model'] = 'Gemini 2.5 Flash'
+            return result
+
+        except Exception as e:
+            print(f"Gemini learning insights error: {e}")
+            return self._mock_learning_insights(student_data)
+
+    def _mock_assessment(self, topic: str, num_questions: int, assessment_type: str) -> Dict[str, Any]:
+        """Fallback assessment when AI is not available"""
+        questions = []
+        for i in range(num_questions):
+            questions.append({
+                'question': f"Question {i + 1}: What is an important concept in {topic}?",
+                'options': ['Option A', 'Option B', 'Option C', 'Option D'] if assessment_type != 'essay' else [],
+                'correct_answer': 'A',
+                'explanation': f"This is the correct answer because it demonstrates understanding of {topic}.",
+                'points': 10 if assessment_type != 'essay' else 20,
+                'type': 'multiple_choice' if assessment_type != 'essay' else 'essay'
+            })
+
+        return {
+            'assessment_title': f"{topic} {assessment_type.title()}",
+            'total_duration': num_questions * 2,
+            'questions': questions,
+            'passing_score': 60,
+            'ai_generated': False,
+            'model': 'Mock (Configure Gemini API)'
+        }
+
+    def _mock_learning_insights(self, student_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Fallback learning insights when AI is not available"""
+        gpa = student_data.get('gpa', 3.0)
+
+        return {
+            'performance_analysis': {
+                'overall_trend': 'improving' if gpa > 2.5 else 'stable',
+                'strongest_areas': ['Problem Solving', 'Consistent Study Habits'],
+                'areas_needing_attention': ['Time Management', 'Advanced Topics'],
+                'grade_prediction': min(4.0, gpa + 0.2)
+            },
+            'learning_patterns': {
+                'optimal_study_time': '10:00 AM - 12:00 PM',
+                'attention_span': '45-50 minutes',
+                'learning_efficiency': 85,
+                'retention_rate': 80
+            },
+            'ai_recommendations': [
+                {
+                    'title': 'Optimize Study Schedule',
+                    'description': 'Schedule challenging subjects during peak concentration hours',
+                    'priority': 'high',
+                    'impact': 'Could improve performance by 15%'
+                },
+                {
+                    'title': 'Take Regular Breaks',
+                    'description': 'Use 45-minute study blocks with 10-minute breaks',
+                    'priority': 'medium',
+                    'impact': 'Improves retention and reduces fatigue'
+                },
+                {
+                    'title': 'Active Recall Practice',
+                    'description': 'Use flashcards and self-testing for better retention',
+                    'priority': 'high',
+                    'impact': 'Significantly improves long-term memory'
+                }
+            ],
+            'study_optimization': {
+                'suggested_schedule': 'Morning sessions for complex topics, evening for review',
+                'focus_areas': ['Advanced concepts', 'Practice problems'],
+                'time_allocation': 'Spend 40% on weak areas, 30% on practice, 30% on review'
+            },
+            'ai_powered': False,
+            'model': 'Mock (Configure Gemini API)'
+        }
 
     # Mock fallback methods
 

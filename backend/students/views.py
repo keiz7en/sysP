@@ -621,7 +621,7 @@ def get_ai_progress_analysis(request):
 
         return Response(progress_analysis)
     except Exception as e:
-        return Response({'error': str(e)}, status=500)
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['GET'])
@@ -842,3 +842,179 @@ def get_engagement_analytics(request):
         return Response(engagement_data)
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def generate_ai_assessment(request):
+    """Generate AI-powered assessment questions using Gemini"""
+    try:
+        if request.user.user_type != 'student':
+            return Response({'error': 'Student access only'}, status=status.HTTP_403_FORBIDDEN)
+
+        student_profile = StudentProfile.objects.get(user=request.user)
+
+        # Get parameters from request
+        topic = request.data.get('topic', 'Computer Science')
+        difficulty = request.data.get('difficulty', 'intermediate')
+        num_questions = request.data.get('num_questions', 5)
+        assessment_type = request.data.get('assessment_type', 'quiz')
+
+        print(
+            f" Generating AI Assessment: topic={topic}, difficulty={difficulty}, num_questions={num_questions}, type={assessment_type}")
+
+        # Use Gemini AI to generate assessment
+        if gemini_service and gemini_service.available:
+            try:
+                print(" Gemini service is available, calling generate_ai_assessment...")
+                assessment_data = gemini_service.generate_ai_assessment(
+                    topic=topic,
+                    difficulty=difficulty,
+                    num_questions=num_questions,
+                    assessment_type=assessment_type
+                )
+                print(f" Generated assessment: {assessment_data.get('assessment_title', 'Unknown')}")
+                return Response(assessment_data, status=status.HTTP_200_OK)
+            except Exception as e:
+                print(f" Gemini AI error: {str(e)}")
+                # Continue to fallback
+
+        print(" Using fallback mock assessment")
+        # Fallback mock assessment
+        assessment_data = {
+            'assessment_title': f"{topic} {assessment_type.title()}",
+            'total_duration': num_questions * 2,
+            'questions': [],
+            'passing_score': 60,
+            'ai_generated': False,
+            'model': 'Mock (Gemini API encountered an error)'
+        }
+
+        for i in range(num_questions):
+            assessment_data['questions'].append({
+                'question': f"Question {i + 1}: What is an important concept in {topic}?",
+                'options': ['Option A', 'Option B', 'Option C', 'Option D'] if assessment_type != 'essay' else [],
+                'correct_answer': 'A',
+                'explanation': f"This is the correct answer because it demonstrates understanding of {topic}.",
+                'points': 10 if assessment_type != 'essay' else 20,
+                'type': 'multiple_choice' if assessment_type != 'essay' else 'essay'
+            })
+
+        return Response(assessment_data, status=status.HTTP_200_OK)
+
+    except StudentProfile.DoesNotExist:
+        return Response({'error': 'Student profile not found'}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        print(f" Server error in generate_ai_assessment: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return Response({'error': f'Server error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_ai_learning_insights(request):
+    """Get AI-powered learning insights and recommendations using Gemini"""
+    try:
+        if request.user.user_type != 'student':
+            return Response({'error': 'Student access only'}, status=status.HTTP_403_FORBIDDEN)
+
+        student_profile = StudentProfile.objects.get(user=request.user)
+
+        # Get student's course performance
+        enrollments = CourseEnrollment.objects.filter(
+            student=student_profile,
+            status='active'
+        ).select_related('course')
+
+        # Prepare student data for AI analysis
+        student_data = {
+            'learning_style': student_profile.learning_style or 'adaptive',
+            'gpa': float(student_profile.current_gpa),
+            'study_hours': 120,  # Can be calculated from analytics
+            'avg_session': 50,  # Average study session in minutes
+            'courses': []
+        }
+
+        # Add course performance data
+        total_score = 0
+        scored_courses = 0
+
+        for enrollment in enrollments:
+            assessment_scores = StudentAssessmentAttempt.objects.filter(
+                student=student_profile,
+                assessment__course=enrollment.course,
+                status='graded'
+            ).aggregate(avg_score=Avg('percentage'))
+
+            avg_score = assessment_scores['avg_score']
+            if avg_score is not None:
+                student_data['courses'].append({
+                    'title': enrollment.course.title,
+                    'score': float(avg_score),
+                    'progress': float(enrollment.progress_percentage)
+                })
+                total_score += float(avg_score)
+                scored_courses += 1
+
+        # Use Gemini AI to generate insights
+        if gemini_service and gemini_service.available and scored_courses > 0:
+            insights_data = gemini_service.analyze_learning_insights(student_data)
+        else:
+            # Fallback insights
+            insights_data = {
+                'performance_analysis': {
+                    'overall_trend': 'improving' if student_data['gpa'] > 3.0 else 'stable',
+                    'strongest_areas': ['Problem Solving', 'Consistent Study Habits'],
+                    'areas_needing_attention': ['Time Management', 'Advanced Topics'],
+                    'grade_prediction': min(4.0, student_data['gpa'] + 0.2)
+                },
+                'learning_patterns': {
+                    'optimal_study_time': '10:00 AM - 12:00 PM',
+                    'attention_span': '45-50 minutes',
+                    'learning_efficiency': 85,
+                    'retention_rate': 80
+                },
+                'ai_recommendations': [
+                    {
+                        'title': 'Optimize Study Schedule',
+                        'description': 'Schedule challenging subjects during peak concentration hours',
+                        'priority': 'high',
+                        'impact': 'Could improve performance by 15%'
+                    },
+                    {
+                        'title': 'Take Regular Breaks',
+                        'description': 'Use 45-minute study blocks with 10-minute breaks',
+                        'priority': 'medium',
+                        'impact': 'Improves retention and reduces fatigue'
+                    },
+                    {
+                        'title': 'Active Recall Practice',
+                        'description': 'Use flashcards and self-testing for better retention',
+                        'priority': 'high',
+                        'impact': 'Significantly improves long-term memory'
+                    }
+                ],
+                'study_optimization': {
+                    'suggested_schedule': 'Morning sessions for complex topics, evening for review',
+                    'focus_areas': ['Advanced concepts', 'Practice problems'],
+                    'time_allocation': 'Spend 40% on weak areas, 30% on practice, 30% on review'
+                },
+                'ai_powered': False,
+                'model': 'Mock (Gemini API not configured)'
+            }
+
+        # Add study metrics
+        insights_data['study_metrics'] = {
+            'total_study_hours': student_data['study_hours'],
+            'average_session_minutes': student_data['avg_session'],
+            'courses_analyzed': scored_courses,
+            'average_score': round(total_score / scored_courses, 1) if scored_courses > 0 else 0
+        }
+
+        return Response(insights_data, status=status.HTTP_200_OK)
+
+    except StudentProfile.DoesNotExist:
+        return Response({'error': 'Student profile not found'}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({'error': f'Server error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

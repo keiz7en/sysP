@@ -1,6 +1,7 @@
 import React, {useState, useEffect, useRef} from 'react'
 import {motion, AnimatePresence} from 'framer-motion'
 import {useAuth} from '../../../contexts/AuthContext'
+import {aiStudentAPI} from '../../../services/api'
 
 interface ChatMessage {
     id: string;
@@ -8,6 +9,7 @@ interface ChatMessage {
     sender: 'user' | 'ai';
     timestamp: Date;
     type?: 'text' | 'code' | 'math' | 'image' | 'link';
+    ai_powered?: boolean;
 }
 
 interface QuickAction {
@@ -18,11 +20,11 @@ interface QuickAction {
 }
 
 const StudentChat: React.FC = () => {
-    const {user} = useAuth()
+    const {user, token} = useAuth()
     const [messages, setMessages] = useState<ChatMessage[]>([
         {
             id: '1',
-            text: `Hello ${user?.first_name || 'there'}! 👋 I'm your AI assistant. I can help you with:
+            text: `Hello ${user?.first_name || 'there'}! 👋 I'm your AI assistant powered by Gemini. I can help you with:
 
 • **Academic questions** - Homework help, concept explanations
 • **Course guidance** - Study plans, assignment assistance  
@@ -32,7 +34,8 @@ const StudentChat: React.FC = () => {
 
 What would you like to explore today?`,
             sender: 'ai',
-            timestamp: new Date()
+            timestamp: new Date(),
+            ai_powered: true
         }
     ])
     const [message, setMessage] = useState('')
@@ -58,138 +61,34 @@ What would you like to explore today?`,
         messagesEndRef.current?.scrollIntoView({behavior: 'smooth'})
     }
 
-    const generateAIResponse = (userMessage: string): string => {
-        const lowerMessage = userMessage.toLowerCase()
+    const generateAIResponse = async (userMessage: string): Promise<{ text: string; ai_powered: boolean }> => {
+        try {
+            if (!token) {
+                return {
+                    text: "Please log in to use the AI assistant.",
+                    ai_powered: false
+                };
+            }
 
-        // Simple keyword-based responses (in a real app, this would be an AI API call)
-        if (lowerMessage.includes('homework') || lowerMessage.includes('assignment')) {
-            return `I'd be happy to help with your homework! 📚
+            const response = await aiStudentAPI.sendChatMessage(token, {
+                message: userMessage,
+                context: 'Student learning assistant - provide helpful, educational responses',
+            });
 
-Here's how I can assist:
-• Break down complex problems step-by-step
-• Explain key concepts and formulas
-• Provide practice examples
-• Check your work and give feedback
-
-**What subject is your homework in?** Please share the specific question or topic you're working on, and I'll provide detailed guidance.`
+            return {
+                text: response.response,
+                ai_powered: response.ai_powered
+            };
+        } catch (error) {
+            console.error('AI Response Error:', error);
+            return {
+                text: "I'm sorry, I encountered an error processing your request. Please try again or rephrase your question.",
+                ai_powered: false
+            };
         }
-
-        if (lowerMessage.includes('concept') || lowerMessage.includes('explain') || lowerMessage.includes('understand')) {
-            return `Great question! I love explaining concepts! 🧠
-
-**To give you the best explanation, please tell me:**
-• What specific concept are you struggling with?
-• What subject/course is this for?
-• What part confuses you the most?
-
-I can explain things using:
-• Simple analogies and examples
-• Visual descriptions
-• Step-by-step breakdowns
-• Real-world applications
-
-What concept would you like me to explain?`
-        }
-
-        if (lowerMessage.includes('study') || lowerMessage.includes('plan') || lowerMessage.includes('exam')) {
-            return `Let's create an effective study plan! 📅
-
-**I'll help you build a personalized study schedule based on:**
-• Your upcoming exams and deadlines
-• Subject difficulty and your confidence level
-• Available study time per day
-• Your learning style preferences
-
-**To get started, please share:**
-• What subjects/courses do you need to study?
-• When are your exams?
-• How much time can you dedicate daily?
-• Which topics do you find most challenging?
-
-I'll create a structured plan with specific goals and milestones!`
-        }
-
-        if (lowerMessage.includes('career') || lowerMessage.includes('job') || lowerMessage.includes('future')) {
-            return `Career guidance is one of my specialties! 💼
-
-**I can help you with:**
-• Exploring career paths in your field
-• Understanding job market trends
-• Skill development recommendations
-• Resume and interview preparation
-• Networking strategies
-• Graduate school decisions
-
-**Let's start with:**
-• What's your major or field of interest?
-• Are you looking for internships, entry-level jobs, or career changes?
-• What are your key strengths and interests?
-• Any specific companies or roles you're considering?
-
-I'll provide personalized insights and actionable next steps!`
-        }
-
-        if (lowerMessage.includes('help') || lowerMessage.includes('technical') || lowerMessage.includes('platform') || lowerMessage.includes('how')) {
-            return `I'm here to help with technical questions! 🔧
-
-**Platform features I can guide you through:**
-• Navigating your dashboard and course materials
-• Submitting assignments and tracking grades
-• Using the adaptive learning system
-• Setting up accessibility features
-• Managing your profile and preferences
-• Understanding AI assessments
-
-**Common tasks:**
-• "How do I submit an assignment?"
-• "Where can I see my grades?"
-• "How do I change my learning preferences?"
-• "How do I access course materials?"
-
-What specific feature or task do you need help with?`
-        }
-
-        if (lowerMessage.includes('research') || lowerMessage.includes('resources') || lowerMessage.includes('citation')) {
-            return `Research assistance coming right up! 🔍
-
-**I can help you with:**
-• Finding credible academic sources
-• Understanding citation formats (APA, MLA, Chicago)
-• Organizing research materials
-• Creating research outlines
-• Fact-checking information
-• Database search strategies
-
-**For the best results, tell me:**
-• What's your research topic?
-• What type of sources do you need? (books, journals, websites)
-• What citation style is required?
-• What's the scope of your project?
-
-I'll provide specific resources and research strategies tailored to your needs!`
-        }
-
-        if (lowerMessage.includes('thank') || lowerMessage.includes('thanks')) {
-            return `You're very welcome! 😊 I'm always here to help. 
-
-Is there anything else you'd like assistance with? I'm ready to support your learning journey 24/7!`
-        }
-
-        // Default response
-        return `I'm here to help! 🤖
-
-I noticed you asked about "${userMessage}". While I want to give you the most helpful response, I might need a bit more context.
-
-**Here's what I'm great at helping with:**
-• **Academic Support** - Homework, concepts, study strategies
-• **Career Guidance** - Job search, skill development, industry insights  
-• **Technical Help** - Platform features, troubleshooting
-• **Research** - Finding sources, citations, fact-checking
-
-Could you rephrase your question or let me know which area you'd like help with? The more specific you are, the better I can assist! 💪`
     }
 
-    const handleSend = () => {
+    const handleSend = async () => {
         if (message.trim()) {
             // Add user message
             const userMessage: ChatMessage = {
@@ -200,24 +99,26 @@ Could you rephrase your question or let me know which area you'd like help with?
             }
 
             setMessages(prev => [...prev, userMessage])
+            const currentMessage = message.trim()
             setMessage('')
             setSelectedQuickAction(null)
 
-            // Simulate AI typing
+            // Show AI typing
             setIsTyping(true)
 
-            // Generate and add AI response after delay
-            setTimeout(() => {
-                const aiResponse: ChatMessage = {
-                    id: (Date.now() + 1).toString(),
-                    text: generateAIResponse(message.trim()),
-                    sender: 'ai',
-                    timestamp: new Date()
-                }
+            // Get AI response
+            const aiResponseData = await generateAIResponse(currentMessage)
 
-                setMessages(prev => [...prev, aiResponse])
-                setIsTyping(false)
-            }, 1500 + Math.random() * 1000) // Random delay for realism
+            const aiResponse: ChatMessage = {
+                id: (Date.now() + 1).toString(),
+                text: aiResponseData.text,
+                sender: 'ai',
+                timestamp: new Date(),
+                ai_powered: aiResponseData.ai_powered
+            }
+
+            setMessages(prev => [...prev, aiResponse])
+            setIsTyping(false)
         }
     }
 
@@ -249,10 +150,10 @@ Could you rephrase your question or let me know which area you'd like help with?
             {/* Header */}
             <div style={{marginBottom: '2rem'}}>
                 <h1 style={{fontSize: '2.5rem', fontWeight: '700', marginBottom: '0.5rem', color: '#1f2937'}}>
-                    🤖 AI Learning Assistant
+                    🔍 Fact AI Check
                 </h1>
                 <p style={{fontSize: '1.1rem', color: '#6b7280', margin: 0}}>
-                    24/7 AI-powered academic support, career guidance, and personalized help
+                    AI-powered fact checking, verification, and educational support with Gemini
                 </p>
             </div>
 
@@ -342,9 +243,22 @@ Could you rephrase your question or let me know which area you'd like help with?
                                         fontSize: '0.75rem',
                                         opacity: 0.7,
                                         textAlign: 'right',
-                                        marginTop: '0.5rem'
+                                        marginTop: '0.5rem',
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center'
                                     }}>
-                                        {msg.timestamp.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}
+                                        {msg.ai_powered && msg.sender === 'ai' && (
+                                            <span style={{fontSize: '0.7rem', opacity: 0.8}}>
+                                                ✨ Powered by Gemini AI
+                                            </span>
+                                        )}
+                                        <span>
+                                            {msg.timestamp.toLocaleTimeString([], {
+                                                hour: '2-digit',
+                                                minute: '2-digit'
+                                            })}
+                                        </span>
                                     </div>
                                 </div>
                             </motion.div>
@@ -397,7 +311,7 @@ Could you rephrase your question or let me know which area you'd like help with?
                                         />
                                     ))}
                                 </div>
-                                AI is typing...
+                                🤖 AI is thinking...
                             </div>
                         </motion.div>
                     )}

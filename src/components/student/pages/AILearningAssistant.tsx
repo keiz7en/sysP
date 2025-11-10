@@ -120,10 +120,12 @@ const AILearningAssistant: React.FC = () => {
         const currentInput = chatInput;
         setChatInput('');
 
+        setLoading(true);
+
         try {
             const response = await aiStudentAPI.sendChatMessage(token, {
                 message: currentInput,
-                context: 'Student academic support',
+                context: 'Student learning assistant - provide helpful, educational responses',
             });
 
             const aiMessage = {
@@ -137,11 +139,13 @@ const AILearningAssistant: React.FC = () => {
             console.error('Error:', error);
             const errorMessage = {
                 role: 'ai',
-                content: 'Sorry, I encountered an error. Please try again.',
+                content: 'Sorry, I encountered an error processing your request. Please try again or rephrase your question.',
                 timestamp: new Date(),
                 ai_powered: false,
             };
             setChatMessages(prev => [...prev, errorMessage]);
+        } finally {
+            setLoading(false);
         }
     };
 

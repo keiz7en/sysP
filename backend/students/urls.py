@@ -30,6 +30,8 @@ urlpatterns = [
     path('ai-progress-analysis/', views.get_ai_progress_analysis, name='ai-progress-analysis'),
     path('personalized-learning-path/', views.get_personalized_learning_path, name='personalized-learning-path'),
     path('engagement-analytics/', views.get_engagement_analytics, name='engagement-analytics'),
+    path('generate-ai-assessment/', views.generate_ai_assessment, name='generate-ai-assessment'),
+    path('ai-learning-insights/', views.get_ai_learning_insights, name='ai-learning-insights'),
 
     # ========== AI-POWERED ENDPOINTS (Gemini AI) ==========
     # Feature 1: Student Information & Academic Records (AI-Enhanced)

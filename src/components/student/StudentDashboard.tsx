@@ -82,10 +82,10 @@ const StudentDashboard: React.FC = () => {
         },
         {
             id: 'chat',
-            label: 'AI Assistant',
-            icon: '🤖',
+            label: 'Fact AI Check',
+            icon: '🔍',
             path: '/student/chat',
-            description: '24/7 AI-powered help'
+            description: 'AI-powered fact checking and verification'
         },
         {
             id: 'profile',
