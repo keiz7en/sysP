@@ -1,19 +1,102 @@
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 
 User = get_user_model()
 
 
+class Subject(models.Model):
+    """Subject categories that teachers can teach"""
+    name = models.CharField(max_length=100, unique=True)
+    code = models.CharField(max_length=20, unique=True)
+    description = models.TextField(blank=True)
+    category = models.CharField(
+        max_length=50,
+        choices=[
+            ('mathematics', 'Mathematics'),
+            ('science', 'Science'),
+            ('physics', 'Physics'),
+            ('chemistry', 'Chemistry'),
+            ('biology', 'Biology'),
+            ('computer_science', 'Computer Science'),
+            ('ai_ml', 'AI & Machine Learning'),
+            ('languages', 'Languages'),
+            ('social_studies', 'Social Studies'),
+            ('arts', 'Arts'),
+            ('commerce', 'Commerce'),
+            ('other', 'Other'),
+        ]
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'subjects'
+        ordering = ['category', 'name']
+
+    def __str__(self):
+        return f"{self.code} - {self.name}"
+
+
+class TeacherSubjectRequest(models.Model):
+    """Tracks teacher requests to teach specific subjects"""
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+    
+    teacher = models.ForeignKey('teachers.TeacherProfile', on_delete=models.CASCADE, related_name='subject_requests')
+    subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='teacher_requests')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    request_date = models.DateTimeField(auto_now_add=True)
+    approved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_subject_requests')
+    approved_at = models.DateTimeField(null=True, blank=True)
+    rejection_reason = models.TextField(blank=True)
+    
+    class Meta:
+        db_table = 'teacher_subject_requests'
+        unique_together = ['teacher', 'subject']
+        ordering = ['-request_date']
+
+    def __str__(self):
+        return f"{self.teacher.user.username} - {self.subject.name} ({self.status})"
+
+
+class TeacherApprovedSubject(models.Model):
+    """Tracks approved subjects for teachers (after admin approval)"""
+    teacher = models.ForeignKey('teachers.TeacherProfile', on_delete=models.CASCADE, related_name='approved_subjects')
+    subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='teacher_approvals')
+    approved_date = models.DateTimeField(auto_now_add=True)
+    approved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='subject_approvals')
+    
+    class Meta:
+        db_table = 'teacher_approved_subjects'
+        unique_together = ['teacher', 'subject']
+
+    def __str__(self):
+        return f"{self.teacher.user.username} -> {self.subject.name}"
+
+
 class Course(models.Model):
     """Course model linking teachers and students"""
+    STATUS_CHOICES = [
+        ('draft', 'Draft'),
+        ('pending', 'Pending Approval'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+        ('active', 'Active'),
+        ('archived', 'Archived'),
+    ]
+    
     title = models.CharField(max_length=200)
     code = models.CharField(max_length=20, unique=True)
     description = models.TextField(blank=True)
+    subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='courses')
     instructor = models.ForeignKey('teachers.TeacherProfile', on_delete=models.CASCADE, related_name='courses')
     credits = models.IntegerField(default=3)
     enrollment_limit = models.IntegerField(default=30)
-    is_active = models.BooleanField(default=True)
     difficulty_level = models.CharField(
         max_length=20,
         choices=[
@@ -24,9 +107,17 @@ class Course(models.Model):
         default='intermediate'
     )
 
+    # Status and approval chain
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+    is_open_for_enrollment = models.BooleanField(default=False)
+    
     # Course schedule
-    start_date = models.DateField(auto_now_add=True)
+    start_date = models.DateField(null=True, blank=True)
     end_date = models.DateField(null=True, blank=True)
+    
+    # AI Content tracking
+    ai_content_enabled = models.BooleanField(default=False)
+    syllabus_ai_generated = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -34,6 +125,10 @@ class Course(models.Model):
     class Meta:
         db_table = 'courses'
         ordering = ['title']
+        indexes = [
+            models.Index(fields=['instructor', 'status']),
+            models.Index(fields=['subject', 'status']),
+        ]
 
     def __str__(self):
         return f'{self.code} - {self.title}'
@@ -45,6 +140,14 @@ class Course(models.Model):
     @property
     def is_full(self):
         return self.enrolled_count >= self.enrollment_limit
+    
+    def is_approved_and_open(self):
+        """Check if course is approved and open for enrollment"""
+        return self.status == 'approved' and self.is_open_for_enrollment
+    
+    def can_enable_ai_features(self):
+        """Check if AI features should be enabled for this course"""
+        return self.status == 'approved' and self.ai_content_enabled
 
 
 class CourseModule(models.Model):
@@ -75,21 +178,33 @@ class CourseModule(models.Model):
 
 
 class CourseEnrollment(models.Model):
-    """Student enrollment in courses"""
-    student = models.ForeignKey('students.StudentProfile', on_delete=models.CASCADE, related_name='enrollments')
-    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='enrollments')
-    enrollment_date = models.DateTimeField(auto_now_add=True)
-
-    STATUS_CHOICES = [
+    """Student enrollment in courses with approval chain"""
+    ENROLLMENT_STATUS_CHOICES = [
+        ('pending', 'Pending Teacher Approval'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
         ('active', 'Active'),
         ('completed', 'Completed'),
         ('dropped', 'Dropped'),
         ('suspended', 'Suspended'),
     ]
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
+    
+    student = models.ForeignKey('students.StudentProfile', on_delete=models.CASCADE, related_name='enrollments')
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='enrollments')
+    enrollment_date = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=20, choices=ENROLLMENT_STATUS_CHOICES, default='pending')
+    
+    # Approval tracking
+    approved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_enrollments')
+    approved_at = models.DateTimeField(null=True, blank=True)
+    rejection_reason = models.TextField(blank=True)
+    
+    # AI Access Control
+    ai_features_unlocked = models.BooleanField(default=False)
+    ai_unlock_date = models.DateTimeField(null=True, blank=True)
 
     # Academic tracking
-    grade = models.CharField(max_length=5, blank=True)  # A+, A, B+, etc.
+    grade = models.CharField(max_length=5, blank=True)
     completion_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
     final_score = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
 
@@ -98,6 +213,45 @@ class CourseEnrollment(models.Model):
 
     class Meta:
         db_table = 'course_enrollments'
+        unique_together = ['student', 'course']
+        ordering = ['-enrollment_date']
+        indexes = [
+            models.Index(fields=['student', 'status']),
+            models.Index(fields=['course', 'status']),
+        ]
+    
+    def __str__(self):
+        return f"{self.student.user.username} - {self.course.code}"
+    
+    def is_ai_enabled(self):
+        """Check if AI features should be enabled for this enrollment"""
+        return (
+            self.status in ['active', 'approved'] and
+            self.ai_features_unlocked and
+            self.course.can_enable_ai_features()
+        )
+    
+    def approve_enrollment(self, approved_by_user):
+        """Approve enrollment and unlock AI features"""
+        from django.utils import timezone
+        self.status = 'active'
+        self.approved_by = approved_by_user
+        self.approved_at = timezone.now()
+        self.ai_features_unlocked = True
+        self.ai_unlock_date = timezone.now()
+        self.save()
+    
+    def reject_enrollment(self, reason=''):
+        """Reject enrollment"""
+        self.status = 'rejected'
+        self.rejection_reason = reason
+        self.ai_features_unlocked = False
+        self.save()
+    
+    def lock_ai_features(self):
+        """Lock AI features if conditions are not met"""
+        self.ai_features_unlocked = False
+        self.save()
         unique_together = ['student', 'course']
         ordering = ['-enrollment_date']
 

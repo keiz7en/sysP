@@ -589,7 +589,10 @@ const AcademicAutomation: React.FC = () => {
                             color: selectedType === type ? 'white' : '#374151'
                         }}
                     >
-                        {type === 'all' ? 'All' : type}s
+                        {type === 'all' ? 'All' :
+                            type === 'Quiz' ? 'Quizzes' :
+                                type === 'Exam' ? 'Exams' :
+                                    'Assignments'}
                     </button>
                 ))}
             </div>

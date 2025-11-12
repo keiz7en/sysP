@@ -1,14 +1,17 @@
-from django.urls import path
-from . import views
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from . import views, management_views
 
 app_name = 'courses'
 
+router = DefaultRouter()
+router.register(r'subjects', management_views.SubjectViewSet, basename='subject')
+router.register(r'subject-requests', management_views.TeacherSubjectRequestViewSet, basename='subject-request')
+router.register(r'approved-subjects', management_views.TeacherApprovedSubjectViewSet, basename='approved-subject')
+router.register(r'courses', management_views.CourseViewSet, basename='course')
+router.register(r'enrollments', management_views.CourseEnrollmentViewSet, basename='enrollment')
+
 urlpatterns = [
-    path('', views.CourseViewSet.as_view({'get': 'list', 'post': 'create'}), name='course-list'),
-    path('<int:pk>/', views.CourseViewSet.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'}), name='course-detail'),
-    path('modules/', views.CourseModuleViewSet.as_view({'get': 'list', 'post': 'create'}), name='module-list'),
-    path('modules/<int:pk>/', views.CourseModuleViewSet.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'}), name='module-detail'),
-    path('enrollments/', views.CourseEnrollmentViewSet.as_view({'get': 'list', 'post': 'create'}), name='enrollment-list'),
-    path('enrollments/<int:pk>/', views.CourseEnrollmentViewSet.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'}), name='enrollment-detail'),
+    path('', include(router.urls)),
     path('statistics/', views.course_statistics, name='course-statistics'),
 ]

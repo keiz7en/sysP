@@ -3,17 +3,26 @@ from users.models import User
 
 
 class TeacherProfile(models.Model):
-    """Extended profile for teachers"""
+    """Extended profile for teachers with subject management"""
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='teacher_profile')
     employee_id = models.CharField(max_length=20, unique=True)
     department = models.CharField(max_length=100)
-    specialization = models.JSONField(default=list)  # List of subjects/skills
-    qualifications = models.JSONField(default=list)  # Educational qualifications
+    specialization = models.JSONField(default=list)
+    qualifications = models.JSONField(default=list)
     experience_years = models.IntegerField(default=0)
     hire_date = models.DateField(auto_now_add=True)
 
     # Approval system
     is_approved = models.BooleanField(default=False)
+    approval_status = models.CharField(
+        max_length=20,
+        choices=[
+            ('pending', 'Pending'),
+            ('approved', 'Approved'),
+            ('rejected', 'Rejected'),
+        ],
+        default='pending'
+    )
     approved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_teachers')
     approved_at = models.DateTimeField(null=True, blank=True)
 
@@ -37,6 +46,25 @@ class TeacherProfile(models.Model):
 
     class Meta:
         db_table = 'teacher_profiles'
+    
+    def __str__(self):
+        return f"{self.user.first_name} {self.user.last_name} ({self.employee_id})"
+    
+    def get_approved_subjects(self):
+        """Get all approved subjects for this teacher"""
+        return self.approved_subjects.all()
+    
+    def get_pending_subject_requests(self):
+        """Get pending subject requests"""
+        return self.subject_requests.filter(status='pending')
+    
+    def can_teach_subject(self, subject):
+        """Check if teacher is approved to teach a specific subject"""
+        return self.approved_subjects.filter(subject=subject).exists()
+    
+    def can_create_course_in_subject(self, subject):
+        """Check if teacher can create a course in a specific subject"""
+        return self.is_approved and self.can_teach_subject(subject)
 
 
 class TeachingSchedule(models.Model):

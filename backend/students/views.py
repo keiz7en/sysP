@@ -104,12 +104,16 @@ class StudentDashboardView(APIView):
             enrollments_data = []
             for enrollment in enrollments:
                 enrollments_data.append({
+                    'id': enrollment.id,
+                    'course_id': enrollment.course.id,
                     'course_title': enrollment.course.title,
                     'course_code': enrollment.course.code,
                     'instructor_name': enrollment.course.instructor.user.get_full_name(),
                     'progress_percentage': float(enrollment.progress_percentage),
                     'enrollment_date': enrollment.enrollment_date.strftime('%Y-%m-%d'),
-                    'status': enrollment.status
+                    'status': enrollment.status,
+                    'credits': enrollment.course.credits,
+                    'difficulty_level': enrollment.course.difficulty_level
                 })
             dashboard_data['current_enrollments'] = enrollments_data
 
@@ -1017,4 +1021,66 @@ def get_ai_learning_insights(request):
     except StudentProfile.DoesNotExist:
         return Response({'error': 'Student profile not found'}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
+        return Response({'error': f'Server error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_available_courses(request):
+    """Get all available CS courses for students to see"""
+    try:
+        if request.user.user_type != 'student':
+            return Response({'error': 'Student access only'}, status=status.HTTP_403_FORBIDDEN)
+
+        student_profile = StudentProfile.objects.get(user=request.user)
+
+        # Get ALL active CS courses
+        all_courses = Course.objects.filter(code__startswith='CS', is_active=True)
+
+        # Get courses student is already enrolled in
+        enrolled_course_ids = CourseEnrollment.objects.filter(
+            student=student_profile,
+            status='active'
+        ).values_list('course_id', flat=True)
+
+        available_courses = []
+        for course in all_courses:
+            # Count current enrollments
+            current_enrollments = CourseEnrollment.objects.filter(
+                course=course,
+                status='active'
+            ).count()
+
+            is_enrolled = course.id in enrolled_course_ids
+            is_full = current_enrollments >= course.enrollment_limit
+
+            available_courses.append({
+                'id': course.id,
+                'title': course.title,
+                'code': course.code,
+                'description': course.description,
+                'credits': course.credits,
+                'difficulty_level': course.difficulty_level,
+                'instructor_name': course.instructor.user.get_full_name(),
+                'current_enrollments': current_enrollments,
+                'enrollment_limit': course.enrollment_limit,
+                'is_enrolled': is_enrolled,
+                'is_full': is_full,
+                'can_enroll': not is_enrolled and not is_full,
+                'start_date': course.start_date.isoformat() if course.start_date else None,
+                'end_date': course.end_date.isoformat() if course.end_date else None
+            })
+
+        return Response({
+            'available_courses': available_courses,
+            'total_courses': len(available_courses),
+            'enrolled_count': len(enrolled_course_ids),
+            'message': 'Note: Teachers will enroll you in courses' if not enrolled_course_ids else None
+        })
+
+    except StudentProfile.DoesNotExist:
+        return Response({'error': 'Student profile not found'}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        import traceback
+        print(f"Error getting available courses: {traceback.format_exc()}")
         return Response({'error': f'Server error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

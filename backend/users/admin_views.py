@@ -5,11 +5,12 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from django.db import transaction, models
 from django.shortcuts import get_object_or_404
+from django.conf import settings as django_settings
 from datetime import datetime, date
 import random
 import string
 
-from .models import User, UserProfile
+from .models import User, UserProfile, SystemSettings
 from teachers.models import TeacherProfile
 from students.models import StudentProfile
 from .serializers import UserSerializer
@@ -357,6 +358,110 @@ class UserManagementView(APIView):
                 {'error': 'User not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class SystemSettingsView(APIView):
+    """Admin system settings management with database persistence"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        """Get current system settings from database"""
+        try:
+            if request.user.user_type != 'admin':
+                return Response(
+                    {'error': 'Access denied. Admin account required.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            # Get settings from database (creates if doesn't exist)
+            settings_obj = SystemSettings.get_settings()
+
+            settings_data = {
+                'auto_approve_students': settings_obj.auto_approve_students,
+                'auto_approve_teachers': settings_obj.auto_approve_teachers,
+                'require_email_verification': settings_obj.require_email_verification,
+                'allow_public_registration': settings_obj.allow_public_registration,
+                'max_login_attempts': settings_obj.max_login_attempts,
+                'session_timeout': settings_obj.session_timeout,
+                'backup_frequency': settings_obj.backup_frequency,
+                'maintenance_mode': settings_obj.maintenance_mode,
+                'notification_settings': {
+                    'email_notifications': settings_obj.email_notifications,
+                    'sms_notifications': settings_obj.sms_notifications,
+                    'in_app_notifications': settings_obj.in_app_notifications
+                }
+            }
+
+            return Response({
+                'settings': settings_data,
+                'last_updated': settings_obj.updated_at,
+                'updated_by': settings_obj.updated_by.username if settings_obj.updated_by else None
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def post(self, request):
+        """Update system settings in database"""
+        try:
+            if request.user.user_type != 'admin':
+                return Response(
+                    {'error': 'Access denied. Admin account required.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            settings_data = request.data.get('settings', {})
+
+            # Validate settings
+            if not isinstance(settings_data, dict):
+                return Response(
+                    {'error': 'Invalid settings format'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Get settings from database
+            settings_obj = SystemSettings.get_settings()
+
+            # Update settings
+            settings_obj.auto_approve_students = settings_data.get('auto_approve_students',
+                                                                   settings_obj.auto_approve_students)
+            settings_obj.auto_approve_teachers = settings_data.get('auto_approve_teachers',
+                                                                   settings_obj.auto_approve_teachers)
+            settings_obj.allow_public_registration = settings_data.get('allow_public_registration',
+                                                                       settings_obj.allow_public_registration)
+            settings_obj.require_email_verification = settings_data.get('require_email_verification',
+                                                                        settings_obj.require_email_verification)
+            settings_obj.max_login_attempts = settings_data.get('max_login_attempts', settings_obj.max_login_attempts)
+            settings_obj.session_timeout = settings_data.get('session_timeout', settings_obj.session_timeout)
+            settings_obj.backup_frequency = settings_data.get('backup_frequency', settings_obj.backup_frequency)
+            settings_obj.maintenance_mode = settings_data.get('maintenance_mode', settings_obj.maintenance_mode)
+
+            # Update notification settings
+            notification_settings = settings_data.get('notification_settings', {})
+            settings_obj.email_notifications = notification_settings.get('email_notifications',
+                                                                         settings_obj.email_notifications)
+            settings_obj.sms_notifications = notification_settings.get('sms_notifications',
+                                                                       settings_obj.sms_notifications)
+            settings_obj.in_app_notifications = notification_settings.get('in_app_notifications',
+                                                                          settings_obj.in_app_notifications)
+
+            # Track who updated
+            settings_obj.updated_by = request.user
+            settings_obj.save()
+
+            return Response({
+                'message': 'System settings updated successfully',
+                'settings': settings_data
+            }, status=status.HTTP_200_OK)
+
         except Exception as e:
             return Response(
                 {'error': str(e)},

@@ -128,7 +128,7 @@ const StudentManagement: React.FC = () => {
         }
     }
 
-    const handleRemoveStudent = async (studentId: string) => {
+    const handleRemoveStudent = async (studentId: number) => {
         if (!confirm('Are you sure you want to remove this student from the course?')) {
             return
         }
@@ -596,7 +596,7 @@ const StudentManagement: React.FC = () => {
                                     </td>
                                     <td style={{padding: '1rem'}}>
                                         <button
-                                            onClick={() => handleRemoveStudent(student.student_id)}
+                                            onClick={() => handleRemoveStudent(student.id)}
                                             style={{
                                                 padding: '0.5rem',
                                                 backgroundColor: '#fef2f2',

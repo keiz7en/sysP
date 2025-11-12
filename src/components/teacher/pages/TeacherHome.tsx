@@ -9,21 +9,64 @@ interface DashboardData {
         name: string
         employee_id: string
         department: string
+        specialization: string[]
         experience_years: number
         teaching_rating: number
+        student_satisfaction: number
+        teaching_style: string
+        is_approved: boolean
     }
     statistics: {
         total_courses: number
         total_students: number
         active_students: number
         completion_rate: number
+        average_grade: number
+        engagement_rate: number
     }
     recent_enrollments: Array<{
         student_name: string
         student_id: string
         course_title: string
-        enrollment_date: string
         progress: number
+        enrollment_date: string
+        status: string
+        engagement_level: string
+    }>
+    teaching_effectiveness?: {
+        content_digitization_enabled: boolean
+        automated_assessment_enabled: boolean
+        ai_feedback_analysis_enabled: boolean
+        speech_to_text_enabled: boolean
+        obe_mapping_enabled: boolean
+    }
+    research_insights?: {
+        dropout_prediction_available: boolean
+        performance_trends_available: boolean
+        instructional_medium_analysis: boolean
+        admission_success_correlation: boolean
+    }
+    engagement_features?: {
+        interaction_monitoring: boolean
+        adaptive_lesson_design: boolean
+        voice_recognition: boolean
+        automated_transcription: boolean
+        accessibility_enhanced: boolean
+    }
+    ai_features?: {
+        gemini_ai_enabled: boolean
+        personalized_content_generation: boolean
+        automated_grading: boolean
+        performance_prediction: boolean
+        career_guidance_integration: boolean
+        chatbot_assistant: boolean
+    }
+    recommendations?: Array<{
+        type: string
+        priority: string
+        title: string
+        description: string
+        action: string
     }>
 }
 
@@ -64,6 +107,32 @@ const TeacherHome: React.FC = () => {
             }
         } finally {
             setLoading(false)
+        }
+    }
+
+    const getPriorityColor = (priority: string) => {
+        switch (priority) {
+            case 'high':
+                return '#ef4444'
+            case 'medium':
+                return '#f59e0b'
+            case 'info':
+                return '#3b82f6'
+            default:
+                return '#6b7280'
+        }
+    }
+
+    const getEngagementColor = (level: string) => {
+        switch (level) {
+            case 'high':
+                return '#10b981'
+            case 'medium':
+                return '#f59e0b'
+            case 'low':
+                return '#ef4444'
+            default:
+                return '#6b7280'
         }
     }
 
@@ -151,8 +220,8 @@ const TeacherHome: React.FC = () => {
     const hasNoData = dashboardData.statistics.total_courses === 0 && dashboardData.statistics.total_students === 0;
 
     return (
-        <div style={{padding: '2rem', maxWidth: '1200px', margin: '0 auto'}}>
-            {/* Welcome Header */}
+        <div style={{padding: '2rem', maxWidth: '1400px', margin: '0 auto'}}>
+            {/* Welcome Header - Education & Career Focus */}
             <motion.div
                 initial={{opacity: 0, y: -20}}
                 animate={{opacity: 1, y: 0}}
@@ -171,49 +240,233 @@ const TeacherHome: React.FC = () => {
                     color: '#6b7280',
                     marginBottom: '0'
                 }}>
-                    {hasNoData ? 'Ready to start teaching!' : 'Here\'s your teaching dashboard overview'}
+                    {hasNoData ? '🚀 Ready to transform education with AI-powered teaching!' : '📊 Your comprehensive teaching dashboard with AI insights'}
                 </p>
             </motion.div>
 
-            {/* Teacher Profile Card */}
+            {/* AI-Powered Recommendations */}
+            {dashboardData.recommendations && dashboardData.recommendations.length > 0 && (
+                <motion.div
+                    initial={{opacity: 0, y: 20}}
+                    animate={{opacity: 1, y: 0}}
+                    transition={{delay: 0.1}}
+                    style={{marginBottom: '2rem'}}
+                >
+                    <h3 style={{fontSize: '1.2rem', fontWeight: '600', marginBottom: '1rem', color: '#1f2937'}}>
+                        💡 AI-Powered Recommendations
+                    </h3>
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+                        gap: '1rem'
+                    }}>
+                        {dashboardData.recommendations.map((rec, index) => (
+                            <motion.div
+                                key={index}
+                                initial={{opacity: 0, x: -20}}
+                                animate={{opacity: 1, x: 0}}
+                                transition={{delay: 0.1 + (index * 0.05)}}
+                                style={{
+                                    background: 'white',
+                                    border: `2px solid ${getPriorityColor(rec.priority)}`,
+                                    borderRadius: '12px',
+                                    padding: '1.5rem',
+                                    boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+                                }}
+                            >
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    marginBottom: '0.5rem'
+                                }}>
+                                    <span style={{
+                                        fontSize: '0.75rem',
+                                        fontWeight: '600',
+                                        color: getPriorityColor(rec.priority),
+                                        textTransform: 'uppercase'
+                                    }}>
+                                        {rec.priority}
+                                    </span>
+                                </div>
+                                <h4 style={{
+                                    fontSize: '1.1rem',
+                                    fontWeight: '600',
+                                    marginBottom: '0.5rem',
+                                    color: '#1f2937'
+                                }}>
+                                    {rec.title}
+                                </h4>
+                                <p style={{
+                                    fontSize: '0.9rem',
+                                    color: '#6b7280',
+                                    marginBottom: '1rem',
+                                    lineHeight: '1.5'
+                                }}>
+                                    {rec.description}
+                                </p>
+                                <button
+                                    onClick={() => toast.info(rec.action)}
+                                    style={{
+                                        padding: '0.5rem 1rem',
+                                        backgroundColor: getPriorityColor(rec.priority),
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '6px',
+                                        cursor: 'pointer',
+                                        fontSize: '0.85rem',
+                                        fontWeight: '600'
+                                    }}
+                                >
+                                    {rec.action}
+                                </button>
+                            </motion.div>
+                        ))}
+                    </div>
+                </motion.div>
+            )}
+
+            {/* Teacher Profile Card - Teacher & Course Management */}
             <motion.div
                 initial={{opacity: 0, y: 20}}
                 animate={{opacity: 1, y: 0}}
-                transition={{delay: 0.1}}
+                transition={{delay: 0.2}}
                 style={{
                     background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                     color: 'white',
                     padding: '2rem',
                     borderRadius: '12px',
-                    marginBottom: '2rem'
+                    marginBottom: '2rem',
+                    boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)'
                 }}
             >
                 <div
                     style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '2rem'}}>
                     <div>
                         <h3 style={{fontSize: '1.2rem', fontWeight: '600', marginBottom: '0.5rem'}}>
-                            👨‍🏫 Teacher Information
+                            👨‍🏫 Teacher Profile
                         </h3>
-                        <p style={{margin: 0, opacity: 0.9}}>
-                            Employee ID: {dashboardData.teacher_info.employee_id}
+                        <p style={{margin: 0, opacity: 0.9, fontSize: '0.9rem'}}>
+                            ID: {dashboardData.teacher_info.employee_id}
                         </p>
-                        <p style={{margin: 0, opacity: 0.9}}>
+                        <p style={{margin: 0, opacity: 0.9, fontSize: '0.9rem'}}>
                             Department: {dashboardData.teacher_info.department}
+                        </p>
+                        <p style={{margin: 0, opacity: 0.9, fontSize: '0.9rem'}}>
+                            Style: {dashboardData.teacher_info.teaching_style}
                         </p>
                     </div>
                     <div>
                         <h3 style={{fontSize: '1.2rem', fontWeight: '600', marginBottom: '0.5rem'}}>
-                            📊 Teaching Profile
+                            🎯 Specialization
                         </h3>
-                        <p style={{margin: 0, opacity: 0.9}}>
+                        <div style={{display: 'flex', flexWrap: 'wrap', gap: '0.5rem'}}>
+                            {dashboardData.teacher_info.specialization.map((spec, i) => (
+                                <span key={i} style={{
+                                    background: 'rgba(255,255,255,0.2)',
+                                    padding: '0.25rem 0.75rem',
+                                    borderRadius: '12px',
+                                    fontSize: '0.85rem'
+                                }}>
+                                    {spec}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                    <div>
+                        <h3 style={{fontSize: '1.2rem', fontWeight: '600', marginBottom: '0.5rem'}}>
+                            📊 Performance
+                        </h3>
+                        <p style={{margin: 0, opacity: 0.9, fontSize: '0.9rem'}}>
                             Experience: {dashboardData.teacher_info.experience_years} years
                         </p>
-                        <p style={{margin: 0, opacity: 0.9}}>
+                        <p style={{margin: 0, opacity: 0.9, fontSize: '0.9rem'}}>
                             Rating: {dashboardData.teacher_info.teaching_rating.toFixed(1)}/5.0 ⭐
+                        </p>
+                        <p style={{margin: 0, opacity: 0.9, fontSize: '0.9rem'}}>
+                            Satisfaction: {dashboardData.teacher_info.student_satisfaction.toFixed(1)}/5.0 💯
                         </p>
                     </div>
                 </div>
             </motion.div>
+
+            {/* Core Statistics - Academic Records & Performance */}
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: '1.5rem',
+                marginBottom: '2rem'
+            }}>
+                {[
+                    {
+                        icon: '📚',
+                        label: 'Total Courses',
+                        value: dashboardData.statistics.total_courses,
+                        color: '#3b82f6'
+                    },
+                    {
+                        icon: '👥',
+                        label: 'Total Students',
+                        value: dashboardData.statistics.total_students,
+                        color: '#10b981'
+                    },
+                    {
+                        icon: '✅',
+                        label: 'Active Students',
+                        value: dashboardData.statistics.active_students,
+                        color: '#f59e0b'
+                    },
+                    {
+                        icon: '🎯',
+                        label: 'Completion Rate',
+                        value: `${dashboardData.statistics.completion_rate}%`,
+                        color: '#8b5cf6'
+                    },
+                    {
+                        icon: '📈',
+                        label: 'Average Grade',
+                        value: `${dashboardData.statistics.average_grade}%`,
+                        color: '#ec4899'
+                    },
+                    {
+                        icon: '💬',
+                        label: 'Engagement Rate',
+                        value: `${dashboardData.statistics.engagement_rate}%`,
+                        color: '#14b8a6'
+                    }
+                ].map((stat, index) => (
+                    <motion.div
+                        key={stat.label}
+                        initial={{opacity: 0, y: 20}}
+                        animate={{opacity: 1, y: 0}}
+                        transition={{delay: 0.3 + (index * 0.05)}}
+                        style={{
+                            background: 'white',
+                            padding: '1.5rem',
+                            borderRadius: '12px',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                            border: '1px solid #e5e7eb'
+                        }}
+                    >
+                        <div style={{fontSize: '2rem', marginBottom: '0.5rem'}}>{stat.icon}</div>
+                        <div style={{
+                            fontSize: '2rem',
+                            fontWeight: '700',
+                            color: stat.color,
+                            marginBottom: '0.5rem'
+                        }}>
+                            {stat.value}
+                        </div>
+                        <div style={{
+                            fontSize: '0.9rem',
+                            color: '#6b7280',
+                            fontWeight: '500'
+                        }}>
+                            {stat.label}
+                        </div>
+                    </motion.div>
+                ))}
+            </div>
 
             {hasNoData ? (
                 // Empty State for New Teachers
@@ -307,130 +560,6 @@ const TeacherHome: React.FC = () => {
             ) : (
                 // Dashboard with Data
                 <>
-                    {/* Statistics Cards */}
-                    <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                        gap: '1.5rem',
-                        marginBottom: '2rem'
-                    }}>
-                        <motion.div
-                            initial={{opacity: 0, y: 20}}
-                            animate={{opacity: 1, y: 0}}
-                            transition={{delay: 0.2}}
-                            style={{
-                                background: 'white',
-                                padding: '1.5rem',
-                                borderRadius: '12px',
-                                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                                border: '1px solid #e5e7eb'
-                            }}
-                        >
-                            <div style={{
-                                fontSize: '2rem',
-                                fontWeight: '700',
-                                color: '#3b82f6',
-                                marginBottom: '0.5rem'
-                            }}>
-                                {dashboardData.statistics.total_courses}
-                            </div>
-                            <div style={{
-                                fontSize: '0.9rem',
-                                color: '#6b7280',
-                                fontWeight: '500'
-                            }}>
-                                📚 Total Courses
-                            </div>
-                        </motion.div>
-
-                        <motion.div
-                            initial={{opacity: 0, y: 20}}
-                            animate={{opacity: 1, y: 0}}
-                            transition={{delay: 0.3}}
-                            style={{
-                                background: 'white',
-                                padding: '1.5rem',
-                                borderRadius: '12px',
-                                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                                border: '1px solid #e5e7eb'
-                            }}
-                        >
-                            <div style={{
-                                fontSize: '2rem',
-                                fontWeight: '700',
-                                color: '#10b981',
-                                marginBottom: '0.5rem'
-                            }}>
-                                {dashboardData.statistics.total_students}
-                            </div>
-                            <div style={{
-                                fontSize: '0.9rem',
-                                color: '#6b7280',
-                                fontWeight: '500'
-                            }}>
-                                👥 Total Students
-                            </div>
-                        </motion.div>
-
-                        <motion.div
-                            initial={{opacity: 0, y: 20}}
-                            animate={{opacity: 1, y: 0}}
-                            transition={{delay: 0.4}}
-                            style={{
-                                background: 'white',
-                                padding: '1.5rem',
-                                borderRadius: '12px',
-                                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                                border: '1px solid #e5e7eb'
-                            }}
-                        >
-                            <div style={{
-                                fontSize: '2rem',
-                                fontWeight: '700',
-                                color: '#f59e0b',
-                                marginBottom: '0.5rem'
-                            }}>
-                                {dashboardData.statistics.active_students}
-                            </div>
-                            <div style={{
-                                fontSize: '0.9rem',
-                                color: '#6b7280',
-                                fontWeight: '500'
-                            }}>
-                                ✅ Active Students
-                            </div>
-                        </motion.div>
-
-                        <motion.div
-                            initial={{opacity: 0, y: 20}}
-                            animate={{opacity: 1, y: 0}}
-                            transition={{delay: 0.5}}
-                            style={{
-                                background: 'white',
-                                padding: '1.5rem',
-                                borderRadius: '12px',
-                                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                                border: '1px solid #e5e7eb'
-                            }}
-                        >
-                            <div style={{
-                                fontSize: '2rem',
-                                fontWeight: '700',
-                                color: '#8b5cf6',
-                                marginBottom: '0.5rem'
-                            }}>
-                                {dashboardData.statistics.completion_rate.toFixed(1)}%
-                            </div>
-                            <div style={{
-                                fontSize: '0.9rem',
-                                color: '#6b7280',
-                                fontWeight: '500'
-                            }}>
-                                🎯 Completion Rate
-                            </div>
-                        </motion.div>
-                    </div>
-
                     {/* Recent Enrollments */}
                     <motion.div
                         initial={{opacity: 0, y: 20}}

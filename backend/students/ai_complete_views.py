@@ -27,35 +27,67 @@ except ImportError:
 # FEATURE 1: Student Information & Academic Records (AI-Enhanced)
 # ============================================================================
 
+def check_ai_access(student, course=None):
+    """
+    Check if student has AI access for a course
+    Returns: (has_access: bool, reason: str, enrollment: CourseEnrollment)
+    """
+    if not course:
+        return False, "Course is required", None
+    
+    try:
+        enrollment = CourseEnrollment.objects.get(student=student, course=course)
+        
+        # Check entire approval chain
+        if not course.can_enable_ai_features():
+            return False, "Course is not approved or AI features are disabled", enrollment
+        
+        if not enrollment.is_ai_enabled():
+            return False, "Your enrollment is not approved yet. Teacher approval required.", enrollment
+        
+        return True, "AI access granted", enrollment
+    except CourseEnrollment.DoesNotExist:
+        return False, "You are not enrolled in this course", None
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def ai_academic_analysis(request):
     """
-    AI-powered academic progress analysis
+    AI-powered academic progress analysis - APPROVAL CHAIN ENFORCED
     Identifies strengths, weaknesses, and dropout risks
+    Requires: course_id parameter to scope analysis to specific course
     """
     try:
         if request.user.user_type != 'student':
             return Response({'error': 'Student access only'}, status=403)
 
+        from courses.models import Course
+        
         student_profile = StudentProfile.objects.get(user=request.user)
+        course_id = request.data.get('course_id')
+        
+        if not course_id:
+            return Response({'error': 'course_id parameter required for AI access'}, status=400)
+        
+        course = Course.objects.get(id=course_id)
+        
+        # ENFORCE APPROVAL CHAIN
+        has_access, reason, enrollment = check_ai_access(student_profile, course)
+        if not has_access:
+            return Response({'error': reason}, status=403)
 
-        # Gather academic data
-        enrollments = CourseEnrollment.objects.filter(
-            student=student_profile, status='active'
-        )
-        attempts = StudentAssessmentAttempt.objects.filter(
-            student=student_profile, status='graded'
-        )
-
-        avg_grade = attempts.aggregate(avg=Avg('percentage'))['avg'] or 0
-        avg_progress = enrollments.aggregate(avg=Avg('progress_percentage'))['avg'] or 0
+        # Gather academic data ONLY from this course
+        avg_grade = float(enrollment.final_score) if enrollment.final_score else 70
+        avg_progress = float(enrollment.completion_percentage)
 
         student_data = {
-            'avg_grade': float(avg_grade) if avg_grade else 70,
-            'attendance': 85,  # Should come from attendance records
-            'engagement': float(avg_progress),
-            'completion': 75
+            'avg_grade': avg_grade,
+            'attendance': 85,
+            'engagement': avg_progress,
+            'completion': avg_progress,
+            'subject': course.subject.name,
+            'course': course.title
         }
 
         # Use Gemini AI for analysis
@@ -78,15 +110,18 @@ def ai_academic_analysis(request):
         return Response({
             'status': 'success',
             'analysis': ai_analysis,
-            'student_info': {
-                'student_id': student_profile.student_id,
-                'current_gpa': float(student_profile.current_gpa),
-                'total_courses': enrollments.count()
+            'course_info': {
+                'course_id': course.id,
+                'course_title': course.title,
+                'subject': course.subject.name,
+                'progress': float(enrollment.completion_percentage)
             }
         })
 
     except StudentProfile.DoesNotExist:
         return Response({'error': 'Student profile not found'}, status=404)
+    except Course.DoesNotExist:
+        return Response({'error': 'Course not found'}, status=404)
     except Exception as e:
         return Response({'error': str(e)}, status=500)
 
@@ -99,41 +134,58 @@ def ai_academic_analysis(request):
 @permission_classes([IsAuthenticated])
 def ai_personalized_content(request):
     """
-    Generate AI-powered personalized learning content
+    Generate AI-powered personalized learning content - APPROVAL CHAIN ENFORCED
     Adapts to student's pace, performance, and learning style
+    Scoped to specific course subject only
     """
     try:
         if request.user.user_type != 'student':
             return Response({'error': 'Student access only'}, status=403)
 
-        student_profile = StudentProfile.objects.get(user=request.user)
+        from courses.models import Course
 
-        # Get parameters
-        topic = request.data.get('topic', 'Introduction to Programming')
-        difficulty = request.data.get('difficulty', 'intermediate')
+        student_profile = StudentProfile.objects.get(user=request.user)
+        course_id = request.data.get('course_id')
+        
+        if not course_id:
+            return Response({'error': 'course_id parameter required for AI access'}, status=400)
+        
+        course = Course.objects.get(id=course_id)
+        
+        # ENFORCE APPROVAL CHAIN
+        has_access, reason, enrollment = check_ai_access(student_profile, course)
+        if not has_access:
+            return Response({'error': reason}, status=403)
+
+        # Get parameters - scoped to course
+        topic = request.data.get('topic', course.title)
+        difficulty = request.data.get('difficulty', course.difficulty_level)
         learning_style = student_profile.learning_style or 'visual'
 
-        # Use Gemini AI
+        # Use Gemini AI - scoped to course subject
         if gemini_service and gemini_service.available:
             content = gemini_service.generate_personalized_content(
-                topic=topic,
+                topic=f"{course.subject.name}: {topic}",
                 difficulty=difficulty,
                 learning_style=learning_style
             )
             content['ai_powered'] = True
         else:
             content = {
-                'explanation': f"Personalized {learning_style} explanation for {topic}",
-                'practice_questions': [f"Question about {topic}"],
-                'examples': [f"Example of {topic}"],
-                'next_topics': ['Advanced concepts'],
+                'explanation': f"Personalized {learning_style} explanation for {topic} in {course.subject.name}",
+                'practice_questions': [f"Question about {topic} from {course.subject.name}"],
+                'examples': [f"Example of {topic} in {course.subject.name} context"],
+                'next_topics': [f'Advanced concepts in {course.subject.name}'],
                 'ai_powered': False
             }
 
         return Response({
             'status': 'success',
             'content': content,
-            'student_profile': {
+            'course_info': {
+                'course_id': course.id,
+                'course_title': course.title,
+                'subject': course.subject.name,
                 'learning_style': learning_style,
                 'difficulty_level': difficulty
             }
@@ -141,6 +193,8 @@ def ai_personalized_content(request):
 
     except StudentProfile.DoesNotExist:
         return Response({'error': 'Student profile not found'}, status=404)
+    except Course.DoesNotExist:
+        return Response({'error': 'Course not found'}, status=404)
     except Exception as e:
         return Response({'error': str(e)}, status=500)
 
@@ -149,44 +203,76 @@ def ai_personalized_content(request):
 @permission_classes([IsAuthenticated])
 def ai_generate_quiz(request):
     """
-    AI-generated adaptive quiz based on student performance
+    AI-generated adaptive quiz - APPROVAL CHAIN ENFORCED
+    Quiz only covers content from enrolled course subject
     """
     try:
         if request.user.user_type != 'student':
             return Response({'error': 'Student access only'}, status=403)
 
-        topic = request.data.get('topic', 'Programming Fundamentals')
-        difficulty = request.data.get('difficulty', 'intermediate')
+        from courses.models import Course
+
+        student_profile = StudentProfile.objects.get(user=request.user)
+        course_id = request.data.get('course_id')
+        
+        if not course_id:
+            return Response({'error': 'course_id parameter required for AI access'}, status=400)
+        
+        course = Course.objects.get(id=course_id)
+        
+        # ENFORCE APPROVAL CHAIN
+        has_access, reason, enrollment = check_ai_access(student_profile, course)
+        if not has_access:
+            return Response({'error': reason}, status=403)
+
+        topic = request.data.get('topic', course.title)
+        difficulty = request.data.get('difficulty', course.difficulty_level)
         num_questions = int(request.data.get('num_questions', 5))
 
-        # Use Gemini AI
+        # Use Gemini AI - scoped to course subject
         if gemini_service and gemini_service.available:
-            questions = gemini_service.generate_quiz(topic, difficulty, num_questions)
+            questions = gemini_service.generate_quiz(
+                f"{course.subject.name}: {topic}",
+                difficulty,
+                num_questions
+            )
             ai_powered = True
         else:
             questions = [
                 {
-                    'question_id': 1,
-                    'question_text': f"Question about {topic}",
+                    'question_id': i,
+                    'question_text': f"Question {i} about {topic} in {course.subject.name}",
                     'options': ['A', 'B', 'C', 'D'],
                     'correct_answer': 'A',
-                    'explanation': 'Explanation',
+                    'explanation': f'Explanation for {course.subject.name} topic',
                     'points': 10
                 }
+                for i in range(1, num_questions + 1)
             ]
             ai_powered = False
 
         return Response({
             'status': 'success',
             'quiz': {
-                'title': f"{topic} - AI Quiz",
+                'title': f"{course.subject.name} - {topic} Quiz",
                 'questions': questions,
                 'total_questions': len(questions),
                 'difficulty': difficulty,
+                'subject': course.subject.name,
+                'course_id': course.id,
                 'ai_powered': ai_powered
+            },
+            'course_info': {
+                'course_id': course.id,
+                'course_title': course.title,
+                'subject': course.subject.name
             }
         })
 
+    except StudentProfile.DoesNotExist:
+        return Response({'error': 'Student profile not found'}, status=404)
+    except Course.DoesNotExist:
+        return Response({'error': 'Course not found'}, status=404)
     except Exception as e:
         return Response({'error': str(e)}, status=500)
 
@@ -199,28 +285,47 @@ def ai_generate_quiz(request):
 @permission_classes([IsAuthenticated])
 def ai_course_feedback_analysis(request):
     """
-    AI analysis of student feedback on courses and teachers
-    Uses NLP for sentiment analysis
+    AI analysis of student feedback - APPROVAL CHAIN ENFORCED
+    NLP sentiment analysis on course feedback
     """
     try:
+        from courses.models import Course
+        
         feedback_text = request.data.get('feedback', '')
         course_id = request.data.get('course_id')
 
         if not feedback_text:
             return Response({'error': 'Feedback text required'}, status=400)
+        
+        if not course_id:
+            return Response({'error': 'course_id parameter required'}, status=400)
 
-        # Use Gemini AI for sentiment analysis
+        student_profile = StudentProfile.objects.get(user=request.user)
+        course = Course.objects.get(id=course_id)
+        
+        # ENFORCE APPROVAL CHAIN
+        has_access, reason, enrollment = check_ai_access(student_profile, course)
+        if not has_access:
+            return Response({'error': reason}, status=403)
+
+        # Use Gemini AI for sentiment analysis - scoped to course subject
         if gemini_service and gemini_service.available:
-            prompt = f"Analyze this student feedback and provide: 1) Sentiment (positive/negative/neutral), 2) Key themes, 3) Actionable insights. Feedback: {feedback_text}"
+            prompt = f"For {course.subject.name} course, analyze this feedback and provide: 1) Sentiment (positive/negative/neutral), 2) Key themes, 3) Actionable insights. Feedback: {feedback_text}"
             analysis = gemini_service.chat_response(prompt)
 
             return Response({
                 'status': 'success',
                 'analysis': {
                     'raw_analysis': analysis,
-                    'sentiment': 'positive',  # Would parse from AI response
+                    'sentiment': 'positive',
                     'key_themes': ['Course content', 'Teaching style'],
-                    'suggestions': ['More examples', 'Better pacing']
+                    'suggestions': ['More examples', 'Better pacing'],
+                    'subject': course.subject.name
+                },
+                'course_info': {
+                    'course_id': course.id,
+                    'course_title': course.title,
+                    'subject': course.subject.name
                 },
                 'ai_powered': True
             })
@@ -229,12 +334,21 @@ def ai_course_feedback_analysis(request):
                 'status': 'success',
                 'analysis': {
                     'sentiment': 'neutral',
-                    'key_themes': ['General feedback'],
+                    'key_themes': ['General feedback about ' + course.subject.name],
                     'suggestions': ['Configure Gemini AI for detailed analysis']
+                },
+                'course_info': {
+                    'course_id': course.id,
+                    'course_title': course.title,
+                    'subject': course.subject.name
                 },
                 'ai_powered': False
             })
 
+    except StudentProfile.DoesNotExist:
+        return Response({'error': 'Student profile not found'}, status=404)
+    except Course.DoesNotExist:
+        return Response({'error': 'Course not found'}, status=404)
     except Exception as e:
         return Response({'error': str(e)}, status=500)
 
@@ -247,7 +361,8 @@ def ai_course_feedback_analysis(request):
 @permission_classes([IsAuthenticated])
 def ai_career_guidance(request):
     """
-    AI-powered career guidance and job matching
+    AI-powered career guidance - APPROVAL CHAIN ENFORCED
+    Based on approved enrolled courses and their subjects
     """
     try:
         if request.user.user_type != 'student':
@@ -255,33 +370,42 @@ def ai_career_guidance(request):
 
         student_profile = StudentProfile.objects.get(user=request.user)
 
-        # Get student skills from courses
+        # Get ONLY approved enrolled courses
         enrollments = CourseEnrollment.objects.filter(
-            student=student_profile, status='active'
-        )
+            student=student_profile, status='active', ai_features_unlocked=True
+        ).select_related('course', 'course__subject')
 
+        if not enrollments.exists():
+            return Response({
+                'error': 'No approved courses found. Enroll and get teacher approval first.'
+            }, status=403)
+
+        # Build skills from APPROVED courses only
         student_skills = []
+        subjects_enrolled = set()
         for enrollment in enrollments:
             student_skills.append(enrollment.course.title)
+            subjects_enrolled.add(enrollment.course.subject.name)
 
-        interests = request.data.get('interests', 'Software Development')
+        interests = request.data.get('interests', ', '.join(subjects_enrolled))
 
-        # Use Gemini AI
+        # Use Gemini AI - scoped to enrolled subjects
         if gemini_service and gemini_service.available:
+            career_context = f"Based on studies in: {', '.join(subjects_enrolled)}"
             guidance = gemini_service.career_guidance(student_skills, interests)
             guidance['ai_powered'] = True
         else:
             guidance = {
                 'recommended_careers': [
                     {
-                        'title': 'Software Developer',
+                        'title': 'Professional in ' + ', '.join(subjects_enrolled),
                         'match_score': 80,
-                        'why': 'Skills match',
+                        'why': 'Skills match with your course studies',
                         'salary_range': '$60k-$100k'
                     }
                 ],
-                'skill_gaps': ['Advanced programming'],
-                'learning_path': ['Complete CS courses'],
+                'skill_gaps': ['Advanced concepts in ' + ', '.join(subjects_enrolled)],
+                'learning_path': ['Complete more courses in ' + ', '.join(subjects_enrolled)],
                 'market_outlook': 'Strong demand',
                 'ai_powered': False
             }
@@ -289,7 +413,9 @@ def ai_career_guidance(request):
         return Response({
             'status': 'success',
             'guidance': guidance,
-            'student_skills': student_skills
+            'student_skills': student_skills,
+            'subjects': list(subjects_enrolled),
+            'approved_courses': len(enrollments)
         })
 
     except StudentProfile.DoesNotExist:
@@ -445,31 +571,70 @@ def ai_performance_prediction(request):
 @permission_classes([IsAuthenticated])
 def ai_chatbot_advisor(request):
     """
-    AI chatbot for course, admission, and career guidance
-    24/7 NLP-based instant support
+    AI chatbot for course guidance - STRICT SUBJECT ENFORCEMENT
+    Students can ONLY ask about topics from their enrolled courses
     """
     try:
         user_message = request.data.get('message', '')
-        context = request.data.get('context', '')
+        course_id = request.data.get('course_id')
 
         if not user_message:
             return Response({'error': 'Message required'}, status=400)
 
-        # Use Gemini AI
+        if not course_id:
+            return Response({
+                'error': 'course_id required. You can only ask questions about your enrolled courses.'
+            }, status=400)
+
+        if request.user.user_type != 'student':
+            return Response({'error': 'Student access only'}, status=403)
+
+        from courses.models import Course
+
+        student_profile = StudentProfile.objects.get(user=request.user)
+        course = Course.objects.get(id=course_id)
+
+        # ENFORCE APPROVAL CHAIN - AI only for approved enrolled courses
+        has_access, reason, enrollment = check_ai_access(student_profile, course)
+        if not has_access:
+            return Response({'error': reason}, status=403)
+
+        # Build strict context - AI can ONLY respond about this course's subject
+        strict_context = f"""You are an AI tutor STRICTLY for {course.subject.name} in the course "{course.title}".
+        
+CRITICAL RULES:
+1. You can ONLY answer questions about {course.subject.name}
+2. If the question is about ANY other subject, respond: "I can only help with {course.subject.name}. Please ask about this subject."
+3. Stay within the scope of {course.subject.name} curriculum
+4. Do NOT provide information about other subjects or courses
+
+Student question: {user_message}"""
+
+        # Use Gemini AI with strict subject enforcement
         if gemini_service and gemini_service.available:
-            response_text = gemini_service.chat_response(user_message, context)
+            response_text = gemini_service.chat_response(strict_context)
             ai_powered = True
         else:
-            response_text = "Hello! I'm here to help with courses, careers, and academics. Configure Gemini AI for intelligent responses."
+            response_text = f"I'm your AI tutor for {course.subject.name}. Please configure Gemini AI for intelligent responses about {course.subject.name} topics."
             ai_powered = False
 
         return Response({
             'status': 'success',
             'response': response_text,
+            'course_info': {
+                'course_id': course.id,
+                'course_title': course.title,
+                'subject': course.subject.name,
+                'allowed_topics': f'Only {course.subject.name} topics'
+            },
             'ai_powered': ai_powered,
-            'timestamp': 'now'
+            'restrictions': f'This AI assistant can only answer questions about {course.subject.name}. Questions about other subjects will be rejected.'
         })
 
+    except StudentProfile.DoesNotExist:
+        return Response({'error': 'Student profile not found'}, status=404)
+    except Course.DoesNotExist:
+        return Response({'error': 'Course not found or you are not enrolled'}, status=404)
     except Exception as e:
         return Response({'error': str(e)}, status=500)
 

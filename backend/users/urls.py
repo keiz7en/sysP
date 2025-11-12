@@ -1,5 +1,11 @@
 from django.urls import path
+from rest_framework.routers import DefaultRouter
 from . import views
+from .admin_views import SystemSettingsView
+from .user_management_views import UserManagementViewSet
+
+router = DefaultRouter()
+router.register(r'manage', UserManagementViewSet, basename='user-manage')
 
 urlpatterns = [
     path('register/', views.register, name='register'),
@@ -19,6 +25,7 @@ urlpatterns = [
     path('admin/reject-teacher/<int:teacher_id>/', views.reject_teacher, name='reject_teacher'),
     path('admin/approve-student/<int:student_id>/', views.approve_student, name='approve_student'),
     path('admin/reject-student/<int:student_id>/', views.reject_student, name='reject_student'),
+    path('admin/system-settings/', SystemSettingsView.as_view(), name='system_settings'),
     path('all-users/', views.all_users, name='all_users'),
     path('toggle-status/<int:user_id>/', views.toggle_user_status, name='toggle_user_status'),
-]
+] + router.urls

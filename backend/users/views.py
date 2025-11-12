@@ -20,7 +20,7 @@ import json
 import random
 import string
 
-from .models import User, UserProfile, TeacherApproval
+from .models import User, UserProfile, TeacherApproval, AccessibilityProfile
 from .serializers import UserSerializer, UserProfileSerializer, LoginSerializer, UserUpdateSerializer
 
 # Import other models properly
@@ -1053,7 +1053,7 @@ def all_users(request):
 
 
 @api_view(['POST'])
-@permission_classes([permissions.IsAuthenticated])
+@permission_classes([IsAuthenticated])
 def toggle_user_status(request, user_id):
     """Toggle user active status (Admin only)"""
     if request.user.user_type != 'admin':
@@ -1357,3 +1357,56 @@ def delete_user_account(request, user_id):
         return Response({
             'error': f'Account deletion failed: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework import status
+from .models import AccessibilityProfile
+
+
+class AccessibilityFeaturesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        profile, created = AccessibilityProfile.objects.get_or_create(user=request.user)
+        return Response({'settings': profile.settings}, status=200)
+
+    def post(self, request):
+        settings_data = request.data.get('settings', {})
+        profile, created = AccessibilityProfile.objects.get_or_create(user=request.user)
+        profile.settings = settings_data
+        profile.last_updated = timezone.now()
+        profile.save()
+        return Response({'message': 'Accessibility settings saved.', 'settings': profile.settings}, status=200)
+
+
+class VoiceRecognitionView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        # Stub: In a real implementation you could process/transcribe/validate the voice input here
+        return Response({'message': 'Voice command processed (stub).'}, status=200)
+
+
+class AccessibilityScoresView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        profile, created = AccessibilityProfile.objects.get_or_create(user=request.user)
+        settings = profile.settings or {}
+        # Example logic: base metrics on settings toggled ON
+        visual = int(settings.get('highContrast', False)) + int(settings.get('largeText', False)) + int(
+            settings.get('focusIndicators', False)) + int(settings.get('reduceMotion', False))
+        audio = int(settings.get('textToSpeech', False)) + int(settings.get('voiceRecognition', False)) + int(
+            settings.get('captionsEnabled', False)) + int(settings.get('audioDescriptions', False))
+        motor = int(settings.get('keyboardNavigation', False)) + int(settings.get('screenReader', False))
+        cognitive = 1 if settings else 0  # Placeholder
+        return Response({
+            'visual': visual,
+            'audio': audio,
+            'motor': motor,
+            'cognitive': cognitive,
+            'profile_last_updated': profile.last_updated,
+        }, status=200)

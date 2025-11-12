@@ -19,11 +19,11 @@ class CourseViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         if self.request.user.user_type == 'student':
             # Students can see active courses
-            return Course.objects.filter(is_active=True)
+            return Course.objects.filter(status='active')
         elif self.request.user.user_type == 'teacher':
             # Teachers can see courses they teach or all active courses
             return Course.objects.filter(
-                Q(instructor__user=self.request.user) | Q(is_active=True)
+                Q(instructor__user=self.request.user) | Q(status='active')
             )
         elif self.request.user.user_type == 'admin':
             # Admins can see all courses
@@ -69,7 +69,7 @@ def course_statistics(request):
         if request.user.user_type == 'admin':
             stats = {
                 'total_courses': Course.objects.count(),
-                'active_courses': Course.objects.filter(is_active=True).count(),
+                'active_courses': Course.objects.filter(status='active').count(),
                 'total_enrollments': CourseEnrollment.objects.count(),
                 'average_enrollment': CourseEnrollment.objects.values('course').annotate(
                     enrollment_count=Count('id')

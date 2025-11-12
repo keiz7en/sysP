@@ -6,6 +6,7 @@ import {useAuth} from '../../contexts/AuthContext'
 // Import Student-specific pages
 import StudentHome from './pages/StudentHome'
 import StudentRecords from './pages/StudentRecords'
+import StudentCourses from './pages/StudentCourses'
 import AdaptiveLearning from './pages/AdaptiveLearning'
 import CareerGuidance from './pages/CareerGuidance'
 import AcademicAutomation from './pages/AcademicAutomation'
@@ -37,6 +38,13 @@ const StudentDashboard: React.FC = () => {
             icon: '🤖',
             path: '/student/ai-assistant',
             description: '24/7 AI-powered academic support, career guidance, and personalized help'
+        },
+        {
+            id: 'courses',
+            label: 'My Courses',
+            icon: '📚',
+            path: '/student/courses',
+            description: 'Browse and manage your course enrollments'
         },
         {
             id: 'records',
@@ -139,6 +147,7 @@ const StudentDashboard: React.FC = () => {
                     <Routes>
                         <Route index element={<StudentHome/>}/>
                         <Route path="ai-assistant" element={<AILearningAssistant/>}/>
+                        <Route path="courses" element={<StudentCourses/>}/>
                         <Route path="records" element={<StudentRecords/>}/>
                         <Route path="learning" element={<AdaptiveLearning/>}/>
                         <Route path="career" element={<CareerGuidance/>}/>

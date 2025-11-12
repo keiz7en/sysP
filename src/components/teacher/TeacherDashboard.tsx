@@ -1,7 +1,7 @@
-import React, {useState, useEffect} from 'react'
-import {motion} from 'framer-motion'
-import {Routes, Route, Navigate} from 'react-router-dom'
-import {useAuth} from '../../contexts/AuthContext'
+import React, { useState, useEffect } from 'react'
+import { motion } from 'framer-motion'
+import { Routes, Route, Navigate } from 'react-router-dom'
+import { useAuth } from '../../contexts/AuthContext'
 import toast from 'react-hot-toast'
 
 // Import shared components
@@ -10,6 +10,7 @@ import Navbar from '../shared/Navbar'
 
 // Teacher specific pages
 import TeacherHome from './pages/TeacherHome'
+import TeacherSubjectManagement from './pages/TeacherSubjectManagement'
 import StudentManagement from './pages/StudentManagement'
 import CourseManagement from './pages/CourseManagement'
 import TeacherProfile from './pages/TeacherProfile'
@@ -19,7 +20,7 @@ import Gradebook from './pages/Gradebook'
 import StudentApprovals from './pages/StudentApprovals'
 
 const TeacherDashboard: React.FC = () => {
-    const {user} = useAuth()
+    const { user } = useAuth()
     const [sidebarOpen, setSidebarOpen] = useState(true)
 
     const teacherMenuItems = [
@@ -31,18 +32,11 @@ const TeacherDashboard: React.FC = () => {
             description: 'Overview & Analytics'
         },
         {
-            id: 'students',
-            label: 'Student Management',
-            icon: '👥',
-            path: '/teacher/students',
-            description: 'Add/remove students with auto IDs'
-        },
-        {
-            id: 'approvals',
-            label: 'Student Approvals',
-            icon: '✅',
-            path: '/teacher/approvals',
-            description: 'Approve student registrations'
+            id: 'subjects',
+            label: 'Subject Management',
+            icon: '�',
+            path: '/teacher/subjects',
+            description: 'Request and manage subjects'
         },
         {
             id: 'courses',
@@ -50,6 +44,20 @@ const TeacherDashboard: React.FC = () => {
             icon: '📚',
             path: '/teacher/courses',
             description: 'Manage courses and content'
+        },
+        {
+            id: 'approvals',
+            label: 'Student Approvals',
+            icon: '✅',
+            path: '/teacher/approvals',
+            description: 'Approve student enrollments'
+        },
+        {
+            id: 'students',
+            label: 'Student Management',
+            icon: '�',
+            path: '/teacher/students',
+            description: 'View your students'
         },
         {
             id: 'analytics',
@@ -100,7 +108,7 @@ const TeacherDashboard: React.FC = () => {
     }, [user])
 
     return (
-        <div style={{display: 'flex', minHeight: '100vh', backgroundColor: '#f8fafc'}}>
+        <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f8fafc' }}>
             {/* Sidebar */}
             <Sidebar
                 isOpen={sidebarOpen}
@@ -130,9 +138,9 @@ const TeacherDashboard: React.FC = () => {
 
                 {/* Page Content */}
                 <motion.main
-                    initial={{opacity: 0, y: 20}}
-                    animate={{opacity: 1, y: 0}}
-                    transition={{duration: 0.3}}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3 }}
                     style={{
                         flex: 1,
                         padding: '2rem',
@@ -140,22 +148,23 @@ const TeacherDashboard: React.FC = () => {
                     }}
                 >
                     <Routes>
-                        <Route index element={<TeacherHome/>}/>
-                        <Route path="students" element={<StudentManagement/>}/>
-                        <Route path="approvals" element={<StudentApprovals/>}/>
-                        <Route path="courses" element={<CourseManagement/>}/>
-                        <Route path="analytics" element={<TeachingAnalytics/>}/>
-                        <Route path="assignments" element={<AssignmentManagement/>}/>
-                        <Route path="gradebook" element={<Gradebook/>}/>
-                        <Route path="profile" element={<TeacherProfile/>}/>
-                        <Route path="*" element={<Navigate to="/teacher" replace/>}/>
+                        <Route index element={<TeacherHome />} />
+                        <Route path="subjects" element={<TeacherSubjectManagement />} />
+                        <Route path="courses" element={<CourseManagement />} />
+                        <Route path="approvals" element={<StudentApprovals />} />
+                        <Route path="students" element={<StudentManagement />} />
+                        <Route path="analytics" element={<TeachingAnalytics />} />
+                        <Route path="assignments" element={<AssignmentManagement />} />
+                        <Route path="gradebook" element={<Gradebook />} />
+                        <Route path="profile" element={<TeacherProfile />} />
+                        <Route path="*" element={<Navigate to="/teacher" replace />} />
                     </Routes>
                     {/* Check if teacher profile exists and show setup message if needed */}
                     {user && user.user_type === 'teacher' && user.approval_status === 'approved' && !user.employee_id && (
                         <motion.div
-                            initial={{opacity: 0, y: 20}}
-                            animate={{opacity: 1, y: 0}}
-                            transition={{duration: 0.3}}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.3 }}
                             style={{
                                 padding: '2rem',
                                 backgroundColor: '#fff3cd',
@@ -166,10 +175,10 @@ const TeacherDashboard: React.FC = () => {
                                 textAlign: 'center'
                             }}
                         >
-                            <h2 style={{color: '#856404', marginBottom: '1rem'}}>
+                            <h2 style={{ color: '#856404', marginBottom: '1rem' }}>
                                 🏗️ Complete Your Teacher Profile
                             </h2>
-                            <p style={{color: '#856404', marginBottom: '1.5rem'}}>
+                            <p style={{ color: '#856404', marginBottom: '1.5rem' }}>
                                 Your teacher account is approved! Please complete your profile to access all features.
                             </p>
                             <button

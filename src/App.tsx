@@ -11,6 +11,16 @@ import StudentDashboard from './components/student/StudentDashboard'
 import TeacherDashboard from './components/teacher/TeacherDashboard'
 import AdminDashboard from './components/admin/AdminDashboard'
 
+// Import public pages
+import LandingPage from './components/public/LandingPage'
+import AboutPage from './components/public/AboutPage'
+import ContactPage from './components/public/ContactPage'
+import FeaturesPage from './components/public/FeaturesPage'
+
+// Import utility pages
+import NotFound from './components/utility/NotFound'
+import Unauthorized from './components/utility/Unauthorized'
+
 // Import contexts
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 
@@ -899,47 +909,65 @@ function AppContent() {
         return <OnboardingScreen onComplete={handleOnboardingComplete} />
     }
 
-    if (!user) {
-        return <AuthScreen />
-    }
-
     return (
         <AnimatePresence mode="wait">
             <motion.div
-                key={user.user_type}
+                key={user ? user.user_type : 'public'}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.3 }}
             >
                 <Routes>
-                    {/* Settings route accessible to all user types */}
-                    <Route path="/settings" element={<SettingsPage/>}/>
-
-                    {/* User type specific routes */}
-                    {user.user_type === 'student' && (
+                    {/* Public Routes - accessible without login */}
+                    {!user && (
                         <>
-                            <Route path="/student/*" element={<StudentDashboard/>}/>
-                            <Route path="/" element={<Navigate to="/student" replace/>}/>
+                            <Route path="/" element={<LandingPage/>}/>
+                            <Route path="/about" element={<AboutPage/>}/>
+                            <Route path="/contact" element={<ContactPage/>}/>
+                            <Route path="/features" element={<FeaturesPage/>}/>
+                            <Route path="/login" element={<AuthScreen/>}/>
+                            <Route path="/register" element={<AuthScreen/>}/>
                         </>
                     )}
 
-                    {user.user_type === 'teacher' && (
+                    {/* Authenticated Routes */}
+                    {user && (
                         <>
-                            <Route path="/teacher/*" element={<TeacherDashboard/>}/>
-                            <Route path="/" element={<Navigate to="/teacher" replace/>}/>
+                            {/* Settings route accessible to all user types */}
+                            <Route path="/settings" element={<SettingsPage/>}/>
+
+                            {/* User type specific routes */}
+                            {user.user_type === 'student' && (
+                                <>
+                                    <Route path="/student/*" element={<StudentDashboard/>}/>
+                                    <Route path="/" element={<Navigate to="/student" replace/>}/>
+                                </>
+                            )}
+
+                            {user.user_type === 'teacher' && (
+                                <>
+                                    <Route path="/teacher/*" element={<TeacherDashboard/>}/>
+                                    <Route path="/" element={<Navigate to="/teacher" replace/>}/>
+                                </>
+                            )}
+
+                            {user.user_type === 'admin' && (
+                                <>
+                                    <Route path="/admin/*" element={<AdminDashboard/>}/>
+                                    <Route path="/" element={<Navigate to="/admin" replace/>}/>
+                                </>
+                            )}
                         </>
                     )}
 
-                    {user.user_type === 'admin' && (
-                        <>
-                            <Route path="/admin/*" element={<AdminDashboard/>}/>
-                            <Route path="/" element={<Navigate to="/admin" replace/>}/>
-                        </>
-                    )}
+                    {/* Utility Routes - accessible to all */}
+                    <Route path="/unauthorized" element={<Unauthorized/>}/>
+                    <Route path="/404" element={<NotFound/>}/>
 
-                    {/* Fallback route */}
-                    <Route path="*" element={<Navigate to="/" replace />} />
+                    {/* Fallback routes */}
+                    {!user && <Route path="*" element={<Navigate to="/" replace/>}/>}
+                    {user && <Route path="*" element={<NotFound/>}/>}
                 </Routes>
             </motion.div>
         </AnimatePresence>

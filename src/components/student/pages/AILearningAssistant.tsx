@@ -1,13 +1,24 @@
-import React, {useState, useEffect, useRef} from 'react';
-import {motion, AnimatePresence} from 'framer-motion';
-import {useAuth} from '../../../contexts/AuthContext';
-import {aiStudentAPI} from '../../../services/api';
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '../../../contexts/AuthContext';
+import { aiStudentAPI } from '../../../services/api';
+import toast from 'react-hot-toast';
+
+interface EnrolledCourse {
+    id: number;
+    course_id: number;
+    course_title: string;
+    subject: string;
+    status: string;
+    ai_features_unlocked: boolean;
+}
 
 const AILearningAssistant: React.FC = () => {
-    const {user, token} = useAuth();
+    const { user, token } = useAuth();
     const [activeTab, setActiveTab] = useState('home');
     const [loading, setLoading] = useState(false);
-    const [aiStatus, setAiStatus] = useState<any>(null);
+    const [enrolledCourses, setEnrolledCourses] = useState<EnrolledCourse[]>([]);
+    const [selectedCourse, setSelectedCourse] = useState<EnrolledCourse | null>(null);
 
     // State for different AI features
     const [academicAnalysis, setAcademicAnalysis] = useState<any>(null);
@@ -21,92 +32,139 @@ const AILearningAssistant: React.FC = () => {
 
     const chatEndRef = useRef<HTMLDivElement>(null);
 
-    // Load AI status on component mount
+    // Load enrolled courses on component mount
     useEffect(() => {
-        loadAIStatus();
-    }, []);
+        loadEnrolledCourses();
+    }, [token]);
 
     // Auto-scroll chat to bottom
     useEffect(() => {
-        chatEndRef.current?.scrollIntoView({behavior: 'smooth'});
+        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [chatMessages]);
 
-    const loadAIStatus = async () => {
+    const loadEnrolledCourses = async () => {
         if (!token) return;
         try {
-            const response = await aiStudentAPI.getDashboard(token);
-            setAiStatus(response.dashboard);
+            setLoading(true);
+            const response = await fetch('http://localhost:8000/api/students/dashboard/', {
+                headers: {
+                    'Authorization': `Token ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                if (data.current_enrollments) {
+                    setEnrolledCourses(data.current_enrollments);
+                    if (data.current_enrollments.length > 0) {
+                        setSelectedCourse(data.current_enrollments[0]);
+                    }
+                }
+            }
         } catch (error) {
-            console.error('Error loading AI status:', error);
+            console.error('Error loading courses:', error);
+            toast.error('Failed to load your courses');
+        } finally {
+            setLoading(false);
         }
     };
 
     const handleAcademicAnalysis = async () => {
-        if (!token) return;
+        if (!token || !selectedCourse) {
+            toast.error('Please select a course first');
+            return;
+        }
         setLoading(true);
         try {
-            const response = await aiStudentAPI.getAcademicAnalysis(token);
+            const response = await aiStudentAPI.getAcademicAnalysis(token, {
+                course_id: selectedCourse.course_id
+            });
             setAcademicAnalysis(response.analysis);
             setActiveTab('academic');
-        } catch (error) {
-            console.error('Error:', error);
+        } catch (error: any) {
+            toast.error(error.message || 'Failed to analyze academic progress');
         } finally {
             setLoading(false);
         }
     };
 
     const handlePersonalizedContent = async (topic: string, difficulty: string) => {
-        if (!token) return;
+        if (!token || !selectedCourse) {
+            toast.error('Please select a course first');
+            return;
+        }
         setLoading(true);
         try {
-            const response = await aiStudentAPI.generatePersonalizedContent(token, {topic, difficulty});
+            const response = await aiStudentAPI.generatePersonalizedContent(token, {
+                course_id: selectedCourse.course_id,
+                topic,
+                difficulty
+            });
             setPersonalizedContent(response.content);
             setActiveTab('learning');
-        } catch (error) {
-            console.error('Error:', error);
+        } catch (error: any) {
+            toast.error(error.message || 'Failed to generate personalized content');
         } finally {
             setLoading(false);
         }
     };
 
     const handleQuizGeneration = async (topic: string, difficulty: string, numQuestions: number) => {
-        if (!token) return;
+        if (!token || !selectedCourse) {
+            toast.error('Please select a course first');
+            return;
+        }
         setLoading(true);
         try {
-            const response = await aiStudentAPI.generateQuiz(token, {topic, difficulty, num_questions: numQuestions});
+            const response = await aiStudentAPI.generateQuiz(token, {
+                course_id: selectedCourse.course_id,
+                topic,
+                difficulty,
+                num_questions: numQuestions
+            });
             setAiQuiz(response.quiz);
             setSelectedQuizAnswers({});
             setActiveTab('quiz');
-        } catch (error) {
-            console.error('Error:', error);
+        } catch (error: any) {
+            toast.error(error.message || 'Failed to generate quiz');
         } finally {
             setLoading(false);
         }
     };
 
     const handleCareerGuidance = async (interests: string) => {
-        if (!token) return;
+        if (!token) {
+            toast.error('Authentication required');
+            return;
+        }
         setLoading(true);
         try {
-            const response = await aiStudentAPI.getCareerGuidance(token, {interests});
+            const response = await aiStudentAPI.getCareerGuidance(token, { interests });
             setCareerGuidance(response.guidance);
             setActiveTab('career');
-        } catch (error) {
-            console.error('Error:', error);
+        } catch (error: any) {
+            toast.error(error.message || 'Failed to get career guidance');
         } finally {
             setLoading(false);
         }
     };
 
     const handleEssayGrading = async (essayText: string, rubric: any) => {
-        if (!token) return;
+        if (!token || !selectedCourse) {
+            toast.error('Please select a course first');
+            return;
+        }
         setLoading(true);
         try {
-            const response = await aiStudentAPI.gradeEssay(token, {essay_text: essayText, rubric});
+            const response = await aiStudentAPI.gradeEssay(token, {
+                course_id: selectedCourse.course_id,
+                essay_text: essayText,
+                rubric
+            });
             setEssayGrading(response.grading);
             setActiveTab('essay');
-        } catch (error) {
-            console.error('Error:', error);
+        } catch (error: any) {
+            toast.error(error.message || 'Failed to grade essay');
         } finally {
             setLoading(false);
         }
@@ -115,7 +173,7 @@ const AILearningAssistant: React.FC = () => {
     const handleChatMessage = async () => {
         if (!chatInput.trim() || !token) return;
 
-        const userMessage = {role: 'user', content: chatInput, timestamp: new Date()};
+        const userMessage = { role: 'user', content: chatInput, timestamp: new Date() };
         setChatMessages(prev => [...prev, userMessage]);
         const currentInput = chatInput;
         setChatInput('');
@@ -125,6 +183,7 @@ const AILearningAssistant: React.FC = () => {
         try {
             const response = await aiStudentAPI.sendChatMessage(token, {
                 message: currentInput,
+                course_id: selectedCourse?.course_id,
                 context: 'Student learning assistant - provide helpful, educational responses',
             });
 
@@ -135,11 +194,11 @@ const AILearningAssistant: React.FC = () => {
                 ai_powered: response.ai_powered,
             };
             setChatMessages(prev => [...prev, aiMessage]);
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error:', error);
             const errorMessage = {
                 role: 'ai',
-                content: 'Sorry, I encountered an error processing your request. Please try again or rephrase your question.',
+                content: error.message || 'Sorry, I encountered an error processing your request.',
                 timestamp: new Date(),
                 ai_powered: false,
             };
@@ -184,8 +243,8 @@ const AILearningAssistant: React.FC = () => {
             <div style={styles.container}>
                 {/* Header */}
                 <motion.div
-                    initial={{opacity: 0, y: -20}}
-                    animate={{opacity: 1, y: 0}}
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
                     style={styles.header}
                 >
                     <div style={styles.headerContent}>
@@ -197,36 +256,83 @@ const AILearningAssistant: React.FC = () => {
                         </p>
                     </div>
 
-                    {aiStatus && (
-                        <div style={styles.aiStatus}>
-                            <div style={aiStatus.gemini_available ? styles.statusActive : styles.statusInactive}>
-                                {aiStatus.gemini_available ? '✅ AI Active' : '⚠️ AI Offline'}
+                    {/* Course Selector */}
+                    <div style={{ padding: '1rem', backgroundColor: '#f0f9ff', borderRadius: '8px', minWidth: '250px' }}>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#0c4a6e' }}>
+                            📚 Select Course
+                        </label>
+                        {enrolledCourses.length > 0 ? (
+                            <select
+                                value={selectedCourse?.id || ''}
+                                onChange={(e) => {
+                                    const course = enrolledCourses.find(c => c.id === parseInt(e.target.value));
+                                    setSelectedCourse(course || null);
+                                }}
+                                style={{
+                                    width: '100%',
+                                    padding: '0.5rem',
+                                    borderRadius: '6px',
+                                    border: '2px solid #0284c7',
+                                    fontSize: '0.95rem'
+                                }}
+                            >
+                                {enrolledCourses.map(course => (
+                                    <option key={course.id} value={course.id}>
+                                        {course.course_title} ({course.subject})
+                                        {!course.ai_features_unlocked ? ' - Awaiting Approval' : ''}
+                                    </option>
+                                ))}
+                            </select>
+                        ) : (
+                            <div style={{ color: '#b91c1c', padding: '1rem', backgroundColor: '#fee2e2', borderRadius: '6px' }}>
+                                ⚠️ No approved courses found. Enroll in a course first.
                             </div>
-                            <span style={styles.modelInfo}>
-                                {aiStatus.model} {aiStatus.gemini_available ? '(Gemini Pro)' : '(Fallback Mode)'}
-                            </span>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </motion.div>
+
+                {/* Warning if no AI unlocked */}
+                {selectedCourse && !selectedCourse.ai_features_unlocked && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        style={{
+                            padding: '1rem',
+                            backgroundColor: '#fef3c7',
+                            border: '2px solid #f59e0b',
+                            borderRadius: '8px',
+                            marginBottom: '1.5rem'
+                        }}
+                    >
+                        <p style={{ color: '#92400e', margin: 0 }}>
+                            ⏳ <strong>AI Features Locked</strong> - Awaiting teacher approval for enrollment in {selectedCourse.course_title}
+                        </p>
+                    </motion.div>
+                )}
 
                 {/* Navigation Tabs */}
                 <div style={styles.tabsContainer}>
                     <div style={styles.tabs}>
                         {[
-                            {id: 'home', label: '🏠 Home', desc: 'Overview'},
-                            {id: 'academic', label: '📈 Analysis', desc: 'Academic Insights'},
-                            {id: 'learning', label: '📚 Learning', desc: 'Personalized Content'},
-                            {id: 'quiz', label: '✍️ Quiz', desc: 'AI Generated Quizzes'},
-                            {id: 'career', label: '💼 Career', desc: 'Career Guidance'},
-                            {id: 'essay', label: '📝 Essay', desc: 'Essay Grading'},
-                            {id: 'chat', label: '💬 Chat', desc: 'AI Assistant'},
+                            { id: 'home', label: '🏠 Home', desc: 'Overview' },
+                            { id: 'academic', label: '📈 Analysis', desc: 'Academic Insights', locked: !selectedCourse?.ai_features_unlocked },
+                            { id: 'learning', label: '📚 Learning', desc: 'Personalized Content', locked: !selectedCourse?.ai_features_unlocked },
+                            { id: 'quiz', label: '✍️ Quiz', desc: 'AI Generated Quizzes', locked: !selectedCourse?.ai_features_unlocked },
+                            { id: 'career', label: '💼 Career', desc: 'Career Guidance' },
+                            { id: 'essay', label: '📝 Essay', desc: 'Essay Grading', locked: !selectedCourse?.ai_features_unlocked },
+                            { id: 'chat', label: '💬 Chat', desc: 'AI Assistant' },
                         ].map((tab) => (
                             <motion.button
                                 key={tab.id}
-                                style={activeTab === tab.id ? styles.tabActive : styles.tab}
-                                onClick={() => setActiveTab(tab.id)}
-                                whileHover={{scale: 1.05}}
-                                whileTap={{scale: 0.95}}
+                                style={activeTab === tab.id ? styles.tabActive : { ...styles.tab, opacity: tab.locked ? 0.6 : 1 }}
+                                onClick={() => {
+                                    if (!tab.locked || tab.id === 'home' || tab.id === 'career' || tab.id === 'chat') {
+                                        setActiveTab(tab.id);
+                                    }
+                                }}
+                                whileHover={{ scale: tab.locked ? 1 : 1.05 }}
+                                whileTap={{ scale: 1 }}
+                                disabled={tab.locked}
                             >
                                 <div>{tab.label}</div>
                                 <div style={styles.tabDesc}>{tab.desc}</div>
@@ -239,9 +345,9 @@ const AILearningAssistant: React.FC = () => {
                 <AnimatePresence>
                     {loading && (
                         <motion.div
-                            initial={{opacity: 0}}
-                            animate={{opacity: 1}}
-                            exit={{opacity: 0}}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
                             style={styles.loadingOverlay}
                         >
                             <div style={styles.loadingContent}>
@@ -256,17 +362,17 @@ const AILearningAssistant: React.FC = () => {
                 {/* Content Area */}
                 <motion.div
                     key={activeTab}
-                    initial={{opacity: 0, x: 20}}
-                    animate={{opacity: 1, x: 0}}
-                    transition={{duration: 0.3}}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.3 }}
                     style={styles.content}
                 >
                     {/* Home Tab */}
                     {activeTab === 'home' && (
                         <div style={styles.homeGrid}>
                             <motion.div
-                                whileHover={{scale: 1.02, boxShadow: '0 8px 30px rgba(0,0,0,0.15)'}}
-                                whileTap={{scale: 0.98}}
+                                whileHover={{ scale: 1.02, boxShadow: '0 8px 30px rgba(0,0,0,0.15)' }}
+                                whileTap={{ scale: 0.98 }}
                                 style={styles.featureCard}
                                 onClick={handleAcademicAnalysis}
                             >
@@ -278,8 +384,8 @@ const AILearningAssistant: React.FC = () => {
                             </motion.div>
 
                             <motion.div
-                                whileHover={{scale: 1.02, boxShadow: '0 8px 30px rgba(0,0,0,0.15)'}}
-                                whileTap={{scale: 0.98}}
+                                whileHover={{ scale: 1.02, boxShadow: '0 8px 30px rgba(0,0,0,0.15)' }}
+                                whileTap={{ scale: 0.98 }}
                                 style={styles.featureCard}
                                 onClick={() => setActiveTab('learning')}
                             >
@@ -292,8 +398,8 @@ const AILearningAssistant: React.FC = () => {
                             </motion.div>
 
                             <motion.div
-                                whileHover={{scale: 1.02, boxShadow: '0 8px 30px rgba(0,0,0,0.15)'}}
-                                whileTap={{scale: 0.98}}
+                                whileHover={{ scale: 1.02, boxShadow: '0 8px 30px rgba(0,0,0,0.15)' }}
+                                whileTap={{ scale: 0.98 }}
                                 style={styles.featureCard}
                                 onClick={() => setActiveTab('quiz')}
                             >
@@ -305,8 +411,8 @@ const AILearningAssistant: React.FC = () => {
                             </motion.div>
 
                             <motion.div
-                                whileHover={{scale: 1.02, boxShadow: '0 8px 30px rgba(0,0,0,0.15)'}}
-                                whileTap={{scale: 0.98}}
+                                whileHover={{ scale: 1.02, boxShadow: '0 8px 30px rgba(0,0,0,0.15)' }}
+                                whileTap={{ scale: 0.98 }}
                                 style={styles.featureCard}
                                 onClick={() => setActiveTab('career')}
                             >
@@ -319,8 +425,8 @@ const AILearningAssistant: React.FC = () => {
                             </motion.div>
 
                             <motion.div
-                                whileHover={{scale: 1.02, boxShadow: '0 8px 30px rgba(0,0,0,0.15)'}}
-                                whileTap={{scale: 0.98}}
+                                whileHover={{ scale: 1.02, boxShadow: '0 8px 30px rgba(0,0,0,0.15)' }}
+                                whileTap={{ scale: 0.98 }}
                                 style={styles.featureCard}
                                 onClick={() => setActiveTab('essay')}
                             >
@@ -333,8 +439,8 @@ const AILearningAssistant: React.FC = () => {
                             </motion.div>
 
                             <motion.div
-                                whileHover={{scale: 1.02, boxShadow: '0 8px 30px rgba(0,0,0,0.15)'}}
-                                whileTap={{scale: 0.98}}
+                                whileHover={{ scale: 1.02, boxShadow: '0 8px 30px rgba(0,0,0,0.15)' }}
+                                whileTap={{ scale: 0.98 }}
                                 style={styles.featureCard}
                                 onClick={() => setActiveTab('chat')}
                             >
@@ -369,7 +475,7 @@ const AILearningAssistant: React.FC = () => {
                                     <div style={styles.riskCard}>
                                         <h3>
                                             Risk Level: <span style={getRiskStyle(academicAnalysis.risk_level)}>
-                                              {academicAnalysis.risk_level?.toUpperCase()}
+                                                {academicAnalysis.risk_level?.toUpperCase()}
                                             </span>
                                         </h3>
                                         <p>Risk Score: {academicAnalysis.risk_score}/100</p>
@@ -554,7 +660,7 @@ const AILearningAssistant: React.FC = () => {
                                                 <div style={styles.optionsContainer}>
                                                     {q.options?.map((option: string, optIdx: number) => (
                                                         <label key={optIdx} style={selectedQuizAnswers[idx] === option ?
-                                                            {...styles.optionLabel, ...styles.optionSelected} : styles.optionLabel}>
+                                                            { ...styles.optionLabel, ...styles.optionSelected } : styles.optionLabel}>
                                                             <input
                                                                 type="radio"
                                                                 name={`question-${idx}`}
@@ -690,17 +796,17 @@ const AILearningAssistant: React.FC = () => {
                                         <div style={styles.rubricItem}>
                                             <label>Content:</label>
                                             <input type="number" defaultValue={40} min={0} max={100} id="content-points"
-                                                   style={styles.rubricInput}/>
+                                                style={styles.rubricInput} />
                                         </div>
                                         <div style={styles.rubricItem}>
                                             <label>Grammar:</label>
                                             <input type="number" defaultValue={30} min={0} max={100} id="grammar-points"
-                                                   style={styles.rubricInput}/>
+                                                style={styles.rubricInput} />
                                         </div>
                                         <div style={styles.rubricItem}>
                                             <label>Structure:</label>
                                             <input type="number" defaultValue={30} min={0} max={100}
-                                                   id="structure-points" style={styles.rubricInput}/>
+                                                id="structure-points" style={styles.rubricInput} />
                                         </div>
                                     </div>
                                 </div>
@@ -789,8 +895,8 @@ const AILearningAssistant: React.FC = () => {
                                 <div style={styles.chatMessages}>
                                     {chatMessages.length === 0 && (
                                         <motion.div
-                                            initial={{opacity: 0}}
-                                            animate={{opacity: 1}}
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
                                             style={styles.chatWelcome}
                                         >
                                             <div style={styles.welcomeIcon}>👋</div>
@@ -857,8 +963,8 @@ const AILearningAssistant: React.FC = () => {
                                     {chatMessages.map((message, idx) => (
                                         <motion.div
                                             key={idx}
-                                            initial={{opacity: 0, y: 20}}
-                                            animate={{opacity: 1, y: 0}}
+                                            initial={{ opacity: 0, y: 20 }}
+                                            animate={{ opacity: 1, y: 0 }}
                                             style={message.role === 'user' ? styles.userMessage : styles.aiMessage}
                                         >
                                             <div style={styles.messageHeader}>
@@ -888,8 +994,8 @@ const AILearningAssistant: React.FC = () => {
                                         onKeyPress={(e) => e.key === 'Enter' && handleChatMessage()}
                                     />
                                     <motion.button
-                                        whileHover={{scale: 1.05}}
-                                        whileTap={{scale: 0.95}}
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
                                         style={chatInput.trim() ? styles.sendButton : styles.sendButtonDisabled}
                                         onClick={handleChatMessage}
                                         disabled={!chatInput.trim()}
@@ -909,9 +1015,9 @@ const AILearningAssistant: React.FC = () => {
 // Helper function for risk level styling
 const getRiskStyle = (riskLevel: string) => {
     const riskStyles = {
-        low: {color: '#10b981', fontWeight: 'bold' as const},
-        medium: {color: '#f59e0b', fontWeight: 'bold' as const},
-        high: {color: '#ef4444', fontWeight: 'bold' as const},
+        low: { color: '#10b981', fontWeight: 'bold' as const },
+        medium: { color: '#f59e0b', fontWeight: 'bold' as const },
+        high: { color: '#ef4444', fontWeight: 'bold' as const },
     };
     return riskStyles[riskLevel as keyof typeof riskStyles] || riskStyles.medium;
 };

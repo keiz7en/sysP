@@ -1,243 +1,278 @@
-# 🎓 EduAI - AI-Powered Education Platform
+# AI Education & Career Platform
 
-A comprehensive education management system with advanced AI integration for students, teachers, and administrators.
+### Teacher-Course Management System with Strict Approval Chains
 
-## 🚀 Features
+## System Overview
 
-### For Students
+Complete educational platform with AI-powered features controlled by a strict approval chain:
+**Admin → Teacher → Student → AI Features**
 
-- **🏠 Dashboard**: Personal academic overview and progress tracking
-- **🤖 AI Learning Assistant**: 24/7 AI-powered academic support with Gemini AI
-- **📊 Academic Records**: Real-time grades and transcript management
-- **🧠 Adaptive Learning**: Personalized learning paths and content
-- **💼 Career Guidance**: AI-driven career recommendations and job matching
-- **⚡ AI Assessments**: Automated testing and instant feedback
-- **🔬 Learning Insights**: Performance analytics and progress tracking
-- **♿ Accessibility**: Voice recognition and adaptive learning tools
-- **👤 Profile Management**: Personal settings and preferences
+## Core Features
 
-### For Teachers
+### 1. **Approval Chain System**
 
-- **📈 Teaching Analytics**: Comprehensive classroom insights
-- **👥 Student Management**: Add, manage, and track student progress
-- **📚 Course Creation**: Design and manage educational content
-- **🎯 Assessment Tools**: Create and grade assignments with AI assistance
-- **💬 Communication**: Direct messaging with students and administrators
-- **📊 Performance Insights**: Class-wide analytics and reporting
+- **Admin** creates subjects and approves teacher requests
+- **Teachers** request subjects, create courses, approve student enrollments
+- **Students** enroll in courses, get AI features unlocked after approval
+- **AI** features only work for approved teacher-student-course relationships
 
-### For Administrators
+### 2. **Subject & Course Management**
 
-- **🏛️ System Overview**: Platform-wide statistics and management
-- **✅ User Approval**: Manage teacher and student registrations
-- **👥 User Management**: Comprehensive user administration
-- **📊 Analytics Dashboard**: System performance and usage metrics
-- **🔧 System Configuration**: Platform settings and maintenance
+- Subjects organized by category (Math, Science, AI/ML, etc.)
+- Teachers request subjects they want to teach
+- Courses linked to approved teacher-subject relationships
+- No cross-subject AI queries allowed
 
-### AI-Powered Features
+### 3. **AI Features (Gemini-Powered)**
 
-- **🧠 Gemini AI Integration**: Advanced natural language processing
-- **📝 Automated Essay Grading**: Intelligent assessment with detailed feedback
-- **🎯 Personalized Content**: Adaptive learning materials generation
-- **🔍 Performance Analysis**: Dropout risk prediction and academic insights
-- **💼 Career Matching**: Skills assessment and job recommendations
-- **💬 24/7 Chat Assistant**: Instant academic and career support
+All AI features require approval chain completion:
 
-## 🛠️ Technology Stack
+- Academic analysis & dropout prediction
+- Personalized learning content
+- Adaptive quiz generation
+- Essay grading & feedback
+- Career guidance (based on enrolled courses)
+- AI chatbot (strict subject enforcement)
 
-### Frontend
+### 4. **Role-Based Access**
 
-- **React 18** with TypeScript
-- **Vite** for fast development and building
-- **Framer Motion** for smooth animations
-- **Modern CSS** with responsive design
-- **Context API** for state management
+**Admin:**
 
-### Backend
+- Manage subjects and categories
+- Approve/reject teacher subject requests
+- View all courses and enrollments
+- System-wide analytics
 
-- **Django 4.2** with Django REST Framework
-- **SQLite** database (production-ready)
-- **Google Gemini AI** integration
-- **Token Authentication** with secure user management
-- **CORS** enabled for frontend integration
+**Teacher:**
 
-### AI Services
+- Request subjects to teach
+- Create courses for approved subjects
+- Approve/reject student enrollments
+- Access teaching analytics
+- Grade assignments
 
-- **Google Gemini 2.5 Flash** model
-- **Natural Language Processing** for educational content
-- **Machine Learning** for performance prediction
-- **Automated Assessment** and feedback generation
+**Student:**
 
-## 📋 Prerequisites
+- Browse approved courses
+- Request enrollment
+- Access AI features (after teacher approval)
+- Track progress and grades
+- AI assistant limited to enrolled course subjects
 
-- **Node.js** 18+ and npm
-- **Python** 3.9+ and pip
-- **Git** for version control
+## Technology Stack
 
-## 🚀 Quick Start
+**Backend:**
 
-### 1. Clone Repository
-```bash
-git clone <repository-url>
-cd EduAI
-```
+- Django 5.1
+- Django REST Framework
+- SQLite (development)
+- Google Gemini AI (aistudio.google.com)
 
-### 2. Backend Setup
+**Frontend:**
+
+- React 18+ with TypeScript
+- Vite
+- Framer Motion
+- React Hot Toast
+
+## Installation
+
+### Backend Setup
+
 ```bash
 cd backend
+python -m venv venv
+.\venv\Scripts\Activate.ps1  # Windows
 pip install -r requirements.txt
 python manage.py migrate
 python manage.py runserver
 ```
 
-### 3. Frontend Setup
+### Frontend Setup
+
 ```bash
-# In project root
 npm install
 npm run dev
 ```
 
-### 4. Access Application
-- **Frontend**: http://localhost:5173
-- **Backend API**: http://localhost:8000
-- **Admin Panel**: http://localhost:8000/admin
+## Configuration
 
-## 👥 User Accounts
+### Gemini AI Setup
 
-### Account Types
-
-1. **Students**: Access learning materials, AI assistant, and track progress
-2. **Teachers**: Manage classes, create content, and view analytics
-3. **Administrators**: System management and user approval
-
-### Registration Flow
-
-1. Users register with their preferred role
-2. Administrators approve teacher accounts
-3. Students can register directly
-4. All users get access to role-specific features
-
-## 🤖 AI Features
-
-### Gemini AI Integration
-
-- **Model**: gemini-2.5-flash
-- **Features**: Content generation, assessment, career guidance
-- **Availability**: 24/7 with intelligent fallback
-- **Security**: Secure API key management
-
-### AI Capabilities
-
-- **Academic Analysis**: Performance prediction and risk assessment
-- **Content Generation**: Personalized learning materials
-- **Assessment Automation**: Intelligent grading and feedback
-- **Career Guidance**: Skills matching and job recommendations
-- **Chat Assistant**: Natural language academic support
-
-## 📊 Database Structure
-
-### Core Models
-
-- **Users**: Authentication and basic profile information
-- **StudentProfile**: Academic records and learning preferences
-- **TeacherProfile**: Teaching credentials and specializations
-- **Courses**: Educational content and enrollment management
-- **Assessments**: Automated testing and grading
-- **Analytics**: Performance tracking and insights
-
-## 🔧 Configuration
-
-### Environment Variables
-
-```bash
-# Django Settings
-SECRET_KEY=your-secret-key
-DEBUG=False
-ALLOWED_HOSTS=your-domain.com
-
-# AI Integration
-GEMINI_API_KEY=your-gemini-api-key
+1. Get API key from https://aistudio.google.com
+2. Add to `backend/education_system/settings.py`:
+```python
+GEMINI_API_KEY = 'your-api-key-here'
 ```
 
-### Production Deployment
+## API Endpoints
 
-1. Set `DEBUG=False` in Django settings
-2. Configure proper database (PostgreSQL/MySQL)
-3. Set up static file serving
-4. Configure HTTPS and security headers
-5. Set up monitoring and logging
+### Course Management
 
-## 📱 API Endpoints
+- `GET /api/courses/subjects/` - List all subjects
+- `POST /api/courses/subject-requests/` - Request subject (teacher)
+- `GET /api/courses/approved-subjects/my_subjects/` - Teacher's approved subjects
+- `POST /api/courses/courses/` - Create course (requires approved subject)
+- `GET /api/courses/enrollments/pending_enrollments/` - Pending enrollments (teacher)
+- `POST /api/courses/enrollments/{id}/approve/` - Approve enrollment
+- `POST /api/courses/enrollments/{id}/reject/` - Reject enrollment
 
-### Authentication
+### AI Features (Requires Approval Chain)
 
-- `POST /api/users/register/` - User registration
-- `POST /api/users/login/` - User authentication
-- `POST /api/users/logout/` - User logout
+- `POST /api/students/ai/academic-analysis/` - Academic analysis
+- `POST /api/students/ai/personalized-content/` - Personalized learning
+- `POST /api/students/ai/generate-quiz/` - Generate quiz
+- `POST /api/students/ai/grade-essay/` - Grade essay
+- `POST /api/students/ai/career-guidance/` - Career guidance
+- `POST /api/students/ai/chatbot/` - AI chatbot (subject-restricted)
 
-### Student APIs
+## Approval Chain Flow
 
-- `GET /api/students/dashboard/` - Student dashboard
-- `GET /api/students/academic-records/` - Academic history
-- `POST /api/students/ai/academic-analysis/` - AI performance analysis
-- `POST /api/students/ai/personalized-content/` - AI content generation
-- `POST /api/students/ai/chatbot/` - AI chat assistant
+```
+1. Teacher requests Subject
+   ↓
+2. Admin approves Subject Request
+   ↓
+3. Teacher creates Course for approved Subject
+   ↓
+4. Course becomes visible to Students
+   ↓
+5. Student requests Enrollment
+   ↓
+6. Teacher approves Enrollment
+   ↓
+7. AI Features UNLOCKED for Student
+   ↓
+8. Student can use AI (ONLY for this course's subject)
+```
 
-### Teacher APIs
+## AI Access Control
 
-- `GET /api/teachers/dashboard/` - Teacher dashboard
-- `GET /api/teachers/students/` - Student management
-- `POST /api/teachers/courses/` - Course creation
-- `GET /api/teachers/analytics/` - Teaching analytics
+**Strict Rules:**
 
-### Admin APIs
+- AI chatbot can ONLY answer questions about enrolled course subject
+- Questions about other subjects are rejected
+- AI features locked if:
+    - Course not approved
+    - Enrollment not approved
+    - Teacher hasn't unlocked AI features
 
-- `GET /api/users/admin/dashboard/` - System overview
-- `GET /api/users/admin/pending-teachers/` - Approval management
-- `PUT /api/users/admin/users/{id}/` - User management
+**Example:**
 
-## 🔒 Security Features
+- Student enrolled in "Mathematics 101"
+- AI chatbot will ONLY answer math questions
+- Asking about physics → **REJECTED**
 
-- **Token-based Authentication**
-- **Role-based Access Control**
-- **CORS Protection**
-- **SQL Injection Prevention**
-- **XSS Protection**
-- **Secure API Key Management**
+## Database Models
 
-## 📈 Performance
+### Key Models
 
-- **Fast Loading**: Vite-optimized frontend
-- **Efficient APIs**: Django REST Framework
-- **Caching**: Strategic data caching
-- **Database Optimization**: Indexed queries
-- **AI Integration**: Optimized API calls with fallbacks
+- `Subject` - Subject categories
+- `TeacherSubjectRequest` - Teacher requests to teach subjects
+- `TeacherApprovedSubject` - Admin-approved subject assignments
+- `Course` - Courses created by teachers
+- `CourseEnrollment` - Student enrollments (with AI unlock status)
 
-## 🤝 Contributing
+### Approval Tracking
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+Each model tracks:
 
-## 📄 License
+- `status` - pending/approved/rejected
+- `approved_by` - Who approved
+- `approved_at` - Timestamp
+- `ai_features_unlocked` - AI access flag
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+## Security
 
-## 📞 Support
+- Token-based authentication
+- Role-based permissions
+- Course-subject scope enforcement
+- AI access validation middleware
+- Approval chain validation at every step
 
-For support and questions:
+## Scripts
 
-- Check the documentation
-- Review API endpoints
-- Contact system administrators
+**Start Backend:**
 
-## 🎯 Future Roadmap
+```bash
+.\start-backend.ps1
+```
 
-- **Mobile App**: React Native implementation
-- **Advanced AI**: More sophisticated learning algorithms
-- **Integration**: Third-party educational tools
-- **Analytics**: Enhanced reporting and insights
-- **Scalability**: Multi-tenant architecture
+**Start Frontend:**
 
----
+```bash
+.\start-frontend.ps1
+```
+
+**Start Both:**
+```bash
+.\start-all.ps1
+```
+
+**Clear Cache & Restart:**
+```bash
+.\clean-and-restart.ps1
+```
+
+## Development
+
+### Running Migrations
+```bash
+cd backend
+python manage.py makemigrations
+python manage.py migrate
+```
+
+### Create Superuser
+
+```bash
+python manage.py createsuperuser
+```
+
+### Access Admin Panel
+
+http://localhost:8000/admin
+
+## Project Structure
+
+```
+backend/
+├── courses/          # Course management & approval chain
+├── students/         # Student features & AI views
+├── teachers/         # Teacher features
+├── users/            # Authentication & user management
+├── ai_services/      # Gemini AI integration
+├── education_system/ # Django settings
+└── db.sqlite3
+
+src/
+├── components/
+│   ├── admin/        # Admin dashboard
+│   ├── teacher/      # Teacher dashboard
+│   ├── student/      # Student dashboard
+│   └── shared/       # Shared components
+├── contexts/         # React contexts
+└── services/         # API services
+```
+
+## Key Features Implemented
+
+✅ Subject request & approval system
+✅ Course creation with subject validation
+✅ Student enrollment approval workflow
+✅ AI access control with approval chain
+✅ Subject-scoped AI chatbot
+✅ Personalized learning content
+✅ Adaptive quiz generation
+✅ Essay grading with AI
+✅ Career guidance based on enrolled courses
+✅ Real-time notifications
+✅ Comprehensive dashboards for all roles
+
+## License
+
+MIT License
+
+## Support
+
+For issues and questions, contact the development team.
