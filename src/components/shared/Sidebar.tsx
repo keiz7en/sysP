@@ -113,8 +113,9 @@ const Sidebar: React.FC<SidebarProps> = ({isOpen, onToggle, menuItems, userType,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        fontSize: '1.5rem',
-                        flexShrink: 0
+                        fontSize: '1.75rem',
+                        flexShrink: 0,
+                        boxShadow: '0 4px 6px rgba(0,0,0,0.3)'
                     }}>
                         🎓
                     </div>
@@ -209,9 +210,13 @@ const Sidebar: React.FC<SidebarProps> = ({isOpen, onToggle, menuItems, userType,
                                         }}
                                     >
                                         <span style={{
-                                            fontSize: '1.25rem',
+                                            fontSize: '1.75rem',
                                             flexShrink: 0,
-                                            width: '24px',
+                                            width: '32px',
+                                            height: '32px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
                                             textAlign: 'center'
                                         }}>
                                             {item.icon}
@@ -355,7 +360,14 @@ const Sidebar: React.FC<SidebarProps> = ({isOpen, onToggle, menuItems, userType,
                                 }
                             }}
                         >
-                            <span style={{fontSize: '1.1rem'}}>⚙️</span>
+                            <span style={{
+                                fontSize: '1.5rem',
+                                width: '32px',
+                                height: '32px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                            }}>⚙️</span>
                             {isOpen && <span>Settings</span>}
                         </button>
 
@@ -378,7 +390,14 @@ const Sidebar: React.FC<SidebarProps> = ({isOpen, onToggle, menuItems, userType,
                             onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
                             onMouseLeave={(e) => e.currentTarget.style.color = '#9ca3af'}
                         >
-                            <span style={{fontSize: '1.1rem'}}>🚪</span>
+                            <span style={{
+                                fontSize: '1.5rem',
+                                width: '32px',
+                                height: '32px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                            }}>🚪</span>
                             {isOpen && <span>Logout</span>}
                         </button>
                     </div>

@@ -5,8 +5,9 @@ import Sidebar from '../shared/Sidebar'
 import AdminHome from './pages/AdminHome'
 import UserManagement from './pages/UserManagement'
 import TeacherApprovals from './pages/TeacherApprovals'
-import SystemSettings from './pages/SystemSettings'
 import StudentApprovals from './pages/StudentApprovals'
+import SubjectApprovals from './pages/SubjectApprovals'
+import SystemSettings from './pages/SystemSettings'
 import {useAuth} from '../../contexts/AuthContext'
 
 const AdminDashboard: React.FC = () => {
@@ -41,6 +42,13 @@ const AdminDashboard: React.FC = () => {
             icon: '🎓',
             path: '/admin/students',
             description: 'Approve new students'
+        },
+        {
+            id: 'subjects',
+            label: 'Subject Requests',
+            icon: '📚',
+            path: '/admin/subjects',
+            description: 'Approve subject requests'
         },
         {
             id: 'settings',
@@ -83,6 +91,7 @@ const AdminDashboard: React.FC = () => {
                         <Route path="users" element={<UserManagement/>}/>
                         <Route path="teachers" element={<TeacherApprovals/>}/>
                         <Route path="students" element={<StudentApprovals/>}/>
+                        <Route path="subjects" element={<SubjectApprovals/>}/>
                         <Route path="settings" element={<SystemSettings/>}/>
                         <Route path="*" element={<Navigate to="/admin" replace/>}/>
                     </Routes>

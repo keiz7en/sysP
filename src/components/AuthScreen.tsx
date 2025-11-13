@@ -2,6 +2,7 @@ import React, {useState} from 'react'
 import {motion, AnimatePresence} from 'framer-motion'
 import toast from 'react-hot-toast'
 import {useAuth, RegisterData} from '../contexts/AuthContext'
+import {useNavigate} from 'react-router-dom'
 
 const AuthScreen: React.FC = () => {
     const [isLogin, setIsLogin] = useState(true)
@@ -9,6 +10,7 @@ const AuthScreen: React.FC = () => {
     const [showAdminOption, setShowAdminOption] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
     const {login, register} = useAuth()
+    const navigate = useNavigate()
 
     // Login form state
     const [loginForm, setLoginForm] = useState({
@@ -84,7 +86,16 @@ const AuthScreen: React.FC = () => {
         setIsLoading(true)
         try {
             const success = await login(loginForm.username, loginForm.password, userType)
-            if (!success) {
+            if (success) {
+                // Navigate to the appropriate dashboard based on user type
+                if (userType === 'student') {
+                    navigate('/student')
+                } else if (userType === 'teacher') {
+                    navigate('/teacher')
+                } else if (userType === 'admin') {
+                    navigate('/admin')
+                }
+            } else {
                 toast.error('Invalid credentials. Please check your username and password.')
             }
         } catch (error) {
@@ -132,6 +143,7 @@ const AuthScreen: React.FC = () => {
                     phone_number: '',
                     address: ''
                 })
+                navigate('/dashboard')
             }
         } catch (error) {
             toast.error('Registration failed. Please try again.')

@@ -163,10 +163,10 @@ const StudentRecords: React.FC = () => {
         )
     }
 
-    const semesters = [...new Set(transcriptData!.academic_records.map(record => record.semester))]
+    const semesters = [...new Set(transcriptData?.academic_records?.map(record => record.semester) || [])]
     const filteredRecords = selectedSemester === 'all' ?
-        transcriptData!.academic_records :
-        transcriptData!.academic_records.filter(record => record.semester === selectedSemester)
+        (transcriptData?.academic_records || []) :
+        (transcriptData?.academic_records?.filter(record => record.semester === selectedSemester) || [])
 
     return (
         <div style={{padding: '2rem', maxWidth: '1400px', margin: '0 auto'}}>
@@ -211,10 +211,10 @@ const StudentRecords: React.FC = () => {
                             Student Information
                         </h3>
                         <p style={{margin: 0, opacity: 0.9}}>
-                            {transcriptData!.student_info.full_name}
+                            {transcriptData?.student_info?.full_name || 'N/A'}
                         </p>
                         <p style={{margin: 0, opacity: 0.9}}>
-                            ID: {transcriptData!.student_info.student_id}
+                            ID: {transcriptData?.student_info?.student_id || 'N/A'}
                         </p>
                     </div>
                     <div>
@@ -222,10 +222,10 @@ const StudentRecords: React.FC = () => {
                             Academic Standing
                         </h3>
                         <p style={{margin: 0, opacity: 0.9}}>
-                            GPA: {transcriptData!.student_info.current_gpa.toFixed(2)}
+                            GPA: {transcriptData?.student_info?.current_gpa?.toFixed(2) || 'N/A'}
                         </p>
                         <p style={{margin: 0, opacity: 0.9}}>
-                            Status: {transcriptData!.student_info.academic_standing}
+                            Status: {transcriptData?.student_info?.academic_standing || 'N/A'}
                         </p>
                     </div>
                     <div>
@@ -233,10 +233,10 @@ const StudentRecords: React.FC = () => {
                             Credit Summary
                         </h3>
                         <p style={{margin: 0, opacity: 0.9}}>
-                            Total Credits: {transcriptData!.student_info.total_credits}
+                            Total Credits: {transcriptData?.student_info?.total_credits || 'N/A'}
                         </p>
                         <p style={{margin: 0, opacity: 0.9}}>
-                            Enrolled: {new Date(transcriptData!.student_info.enrollment_date).toLocaleDateString()}
+                            Enrolled: {transcriptData?.student_info?.enrollment_date ? new Date(transcriptData?.student_info?.enrollment_date).toLocaleDateString() : 'N/A'}
                         </p>
                     </div>
                 </div>
@@ -471,7 +471,7 @@ const StudentRecords: React.FC = () => {
             </motion.div>
 
             {/* GPA by Semester */}
-            {Object.keys(transcriptData!.gpa_by_semester).length > 0 && (
+            {transcriptData?.gpa_by_semester && Object.keys(transcriptData.gpa_by_semester).length > 0 && (
                 <motion.div
                     initial={{opacity: 0, y: 20}}
                     animate={{opacity: 1, y: 0}}
@@ -501,7 +501,7 @@ const StudentRecords: React.FC = () => {
                             gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
                             gap: '1rem'
                         }}>
-                            {Object.entries(transcriptData!.gpa_by_semester).map(([semester, gpa]) => (
+                            {Object.entries(transcriptData.gpa_by_semester).map(([semester, gpa]) => (
                                 <div
                                     key={semester}
                                     style={{

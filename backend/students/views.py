@@ -109,7 +109,7 @@ class StudentDashboardView(APIView):
                     'course_title': enrollment.course.title,
                     'course_code': enrollment.course.code,
                     'instructor_name': enrollment.course.instructor.user.get_full_name(),
-                    'progress_percentage': float(enrollment.progress_percentage),
+                    'progress_percentage': float(enrollment.completion_percentage),
                     'enrollment_date': enrollment.enrollment_date.strftime('%Y-%m-%d'),
                     'status': enrollment.status,
                     'credits': enrollment.course.credits,
@@ -125,114 +125,83 @@ class AcademicRecordsView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        if request.user.user_type != 'student':
-            return Response({'error': 'Student access only'}, status=status.HTTP_403_FORBIDDEN)
-
         try:
-            student_profile = StudentProfile.objects.get(user=request.user)
+            student = request.user.student_profile
 
-            # Get REAL enrollments only
+            # Get all enrollments for the student
             enrollments = CourseEnrollment.objects.filter(
-                student=student_profile,
-                status='active'
-            ).select_related('course', 'course__instructor__user')
+                student=student
+            ).select_related('course', 'course__instructor__user', 'course__subject')
 
-            if not enrollments.exists():
-                return Response({
-                    'academic_records': [],
-                    'summary': {
-                        'message': 'No courses enrolled yet',
-                        'current_gpa': 0.0,
-                        'total_credits': 0,
-                        'total_courses': 0
-                    }
-                })
-
+            # Build academic records array
             academic_records = []
-            total_credits = 0
-
             for enrollment in enrollments:
-                # Only show grades if teacher has actually submitted them
-                submitted_attempts = StudentAssessmentAttempt.objects.filter(
-                    student=student_profile,
-                    assessment__course=enrollment.course,
-                    status='graded'  # Only graded by teacher
-                )
-
-                if submitted_attempts.exists():
-                    avg_score = submitted_attempts.aggregate(avg=Avg('percentage'))['avg']
-                    grade, gpa_points = self.calculate_grade(avg_score)
-                else:
-                    # No grade yet - show as in progress
-                    grade = 'In Progress'
-                    gpa_points = 0.0
-
-                total_credits += enrollment.course.credits
+                # Determine grade based on final score
+                grade = 'In Progress'
+                if enrollment.status == 'completed':
+                    score = enrollment.final_score or 0
+                    if score >= 90:
+                        grade = 'A'
+                    elif score >= 80:
+                        grade = 'B'
+                    elif score >= 70:
+                        grade = 'C'
+                    elif score >= 60:
+                        grade = 'D'
+                    else:
+                        grade = 'F'
 
                 academic_records.append({
                     'course_title': enrollment.course.title,
                     'course_code': enrollment.course.code,
-                    'instructor': enrollment.course.instructor.user.get_full_name(),
-                    'semester': 'Fall 2024',
+                    'instructor': enrollment.course.instructor.user.get_full_name() if enrollment.course.instructor else 'N/A',
                     'grade': grade,
                     'credits': enrollment.course.credits,
-                    'progress_percentage': float(enrollment.progress_percentage),
-                    'enrollment_date': enrollment.enrollment_date.strftime('%Y-%m-%d'),
-                    'has_submitted_work': submitted_attempts.exists()
+                    'semester': f"{enrollment.course.subject.name if enrollment.course.subject else 'General'} - {enrollment.enrolled_at.strftime('%B %Y')}",
+                    'progress_percentage': float(enrollment.completion_percentage),
+                    'final_score': float(enrollment.final_score) if enrollment.final_score else 0.0,
+                    'status': enrollment.status
                 })
 
-            # Calculate GPA only from graded courses
-            graded_courses = [r for r in academic_records if r['grade'] != 'In Progress']
-            current_gpa = 0.0
-            if graded_courses:
-                total_points = sum(self.calculate_grade_points(r['grade']) * r['credits'] for r in graded_courses)
-                total_graded_credits = sum(r['credits'] for r in graded_courses)
-                current_gpa = total_points / total_graded_credits if total_graded_credits > 0 else 0.0
+            # Calculate GPA
+            completed_enrollments = [e for e in enrollments if e.status == 'completed' and e.final_score]
+            total_grade_points = sum(
+                (e.final_score / 25) * e.course.credits
+                for e in completed_enrollments if e.final_score
+            )
+            total_credits = sum(e.course.credits for e in completed_enrollments)
+            current_gpa = (total_grade_points / total_credits) if total_credits > 0 else 0.0
 
-            return Response({
-                'academic_records': academic_records,
-                'summary': {
-                    'current_gpa': round(current_gpa, 2),
+            # Calculate GPA by semester
+            gpa_by_semester = {}
+            semester_map = {}
+            for enrollment in completed_enrollments:
+                semester = f"{enrollment.course.subject.name if enrollment.course.subject else 'General'} - {enrollment.enrolled_at.strftime('%B %Y')}"
+                if semester not in semester_map:
+                    semester_map[semester] = []
+                semester_map[semester].append(enrollment)
+
+            for semester, enrols in semester_map.items():
+                sem_grade_points = sum((e.final_score / 25) * e.course.credits for e in enrols if e.final_score)
+                sem_credits = sum(e.course.credits for e in enrols)
+                gpa_by_semester[semester] = (sem_grade_points / sem_credits) if sem_credits > 0 else 0.0
+
+            transcript_data = {
+                'student_info': {
+                    'student_id': student.student_id,
+                    'full_name': request.user.get_full_name(),
+                    'current_gpa': float(current_gpa),
                     'total_credits': total_credits,
-                    'total_courses': enrollments.count(),
-                    'graded_courses': len(graded_courses),
-                    'in_progress_courses': len(academic_records) - len(graded_courses)
-                }
-            })
+                    'academic_standing': 'Good Standing' if current_gpa >= 2.0 else 'Probation',
+                    'enrollment_date': student.enrollment_date.isoformat() if student.enrollment_date else None
+                },
+                'academic_records': academic_records,
+                'gpa_by_semester': gpa_by_semester
+            }
 
-        except StudentProfile.DoesNotExist:
-            return Response({'error': 'Student profile not found'}, status=status.HTTP_404_NOT_FOUND)
-
-    def calculate_grade(self, percentage):
-        """Convert percentage to letter grade and GPA points"""
-        if percentage >= 93:
-            return 'A', 4.0
-        elif percentage >= 90:
-            return 'A-', 3.7
-        elif percentage >= 87:
-            return 'B+', 3.3
-        elif percentage >= 83:
-            return 'B', 3.0
-        elif percentage >= 80:
-            return 'B-', 2.7
-        elif percentage >= 77:
-            return 'C+', 2.3
-        elif percentage >= 73:
-            return 'C', 2.0
-        elif percentage >= 70:
-            return 'C-', 1.7
-        elif percentage >= 60:
-            return 'D', 1.0
-        else:
-            return 'F', 0.0
-
-    def calculate_grade_points(self, grade):
-        """Convert letter grade to GPA points"""
-        grade_map = {
-            'A': 4.0, 'A-': 3.7, 'B+': 3.3, 'B': 3.0, 'B-': 2.7,
-            'C+': 2.3, 'C': 2.0, 'C-': 1.7, 'D': 1.0, 'F': 0.0
-        }
-        return grade_map.get(grade, 0.0)
+            return Response(transcript_data)
+        except Exception as e:
+            return Response({'error': str(e)}, status=500)
 
 
 class AdaptiveLearningView(APIView):
@@ -267,7 +236,7 @@ class AdaptiveLearningView(APIView):
                     'course_code': enrollment.course.code,
                     'difficulty_level': enrollment.course.difficulty_level.title() if hasattr(enrollment.course,
                                                                                               'difficulty_level') else 'Intermediate',
-                    'progress_percentage': float(enrollment.progress_percentage),
+                    'progress_percentage': float(enrollment.completion_percentage),
                     'estimated_completion': enrollment.course.end_date.strftime('%Y-%m-%d'),
                     'learning_objectives': enrollment.course.learning_objectives or [],
                     'duration_weeks': enrollment.course.duration_weeks if hasattr(enrollment.course,
@@ -275,7 +244,7 @@ class AdaptiveLearningView(APIView):
                     'credits': enrollment.course.credits
                 })
 
-            overall_progress = enrollments.aggregate(avg_progress=Avg('progress_percentage'))['avg_progress'] or 0
+            overall_progress = enrollments.aggregate(avg_progress=Avg('completion_percentage'))['avg_progress'] or 0
 
             return Response({
                 'learning_paths': learning_paths,
@@ -333,7 +302,7 @@ class CareerGuidanceView(APIView):
             skill_assessment = {}
             for enrollment in enrollments:
                 course_title = enrollment.course.title.lower()
-                progress = float(enrollment.progress_percentage)
+                progress = float(enrollment.completion_percentage)
 
                 if 'python' in course_title:
                     skill_assessment['Python Programming'] = progress
@@ -539,43 +508,77 @@ def get_academic_transcript(request):
     """Generate automated academic transcript"""
     try:
         student = request.user.student_profile
-        academic_records = student.academic_records.all().order_by('-year', '-semester')
+
+        # Get all enrollments for the student
+        enrollments = CourseEnrollment.objects.filter(
+            student=student
+        ).select_related('course', 'course__instructor__user', 'course__subject')
+
+        # Build academic records array
+        academic_records = []
+        for enrollment in enrollments:
+            # Determine grade based on final score
+            grade = 'In Progress'
+            if enrollment.status == 'completed':
+                score = enrollment.final_score or 0
+                if score >= 90:
+                    grade = 'A'
+                elif score >= 80:
+                    grade = 'B'
+                elif score >= 70:
+                    grade = 'C'
+                elif score >= 60:
+                    grade = 'D'
+                else:
+                    grade = 'F'
+
+            academic_records.append({
+                'course_title': enrollment.course.title,
+                'course_code': enrollment.course.code,
+                'instructor': enrollment.course.instructor.user.get_full_name() if enrollment.course.instructor else 'N/A',
+                'grade': grade,
+                'credits': enrollment.course.credits,
+                'semester': f"{enrollment.course.subject.name if enrollment.course.subject else 'General'} - {enrollment.enrolled_at.strftime('%B %Y')}",
+                'progress_percentage': float(enrollment.completion_percentage),
+                'final_score': float(enrollment.final_score) if enrollment.final_score else 0.0,
+                'status': enrollment.status
+            })
+
+        # Calculate GPA
+        completed_enrollments = [e for e in enrollments if e.status == 'completed' and e.final_score]
+        total_grade_points = sum(
+            (e.final_score / 25) * e.course.credits
+            for e in completed_enrollments if e.final_score
+        )
+        total_credits = sum(e.course.credits for e in completed_enrollments)
+        current_gpa = (total_grade_points / total_credits) if total_credits > 0 else 0.0
+
+        # Calculate GPA by semester
+        gpa_by_semester = {}
+        semester_map = {}
+        for enrollment in completed_enrollments:
+            semester = f"{enrollment.course.subject.name if enrollment.course.subject else 'General'} - {enrollment.enrolled_at.strftime('%B %Y')}"
+            if semester not in semester_map:
+                semester_map[semester] = []
+            semester_map[semester].append(enrollment)
+
+        for semester, enrols in semester_map.items():
+            sem_grade_points = sum((e.final_score / 25) * e.course.credits for e in enrols if e.final_score)
+            sem_credits = sum(e.course.credits for e in enrols)
+            gpa_by_semester[semester] = (sem_grade_points / sem_credits) if sem_credits > 0 else 0.0
 
         transcript_data = {
             'student_info': {
-                'name': request.user.get_full_name(),
                 'student_id': student.student_id,
-                'program': 'Computer Science',  # Add program field to model later
-                'current_gpa': float(student.current_gpa),
-                'total_credits': student.total_credits,
-                'academic_status': student.academic_status
+                'full_name': request.user.get_full_name(),
+                'current_gpa': float(current_gpa),
+                'total_credits': total_credits,
+                'academic_standing': 'Good Standing' if current_gpa >= 2.0 else 'Probation',
+                'enrollment_date': student.enrollment_date.isoformat() if student.enrollment_date else None
             },
-            'academic_records': [],
-            'semester_summary': {},
-            'overall_statistics': {
-                'total_courses': 0,
-                'credits_earned': student.total_credits,
-                'cumulative_gpa': float(student.current_gpa),
-                'graduation_progress': min(100, (student.total_credits / 120) * 100)
-            }
+            'academic_records': academic_records,
+            'gpa_by_semester': gpa_by_semester
         }
-
-        # Group by semester/year
-        semester_groups = {}
-        for record in academic_records:
-            key = f"{record.semester} {record.year}"
-            if key not in semester_groups:
-                semester_groups[key] = []
-            semester_groups[key].append({
-                'course': record.course.title,
-                'course_code': record.course.code,
-                'credits': record.credits,
-                'grade': record.grade,
-                'gpa_points': float(record.gpa_points)
-            })
-
-        transcript_data['academic_records'] = semester_groups
-        transcript_data['overall_statistics']['total_courses'] = len(academic_records)
 
         return Response(transcript_data)
     except Exception as e:
@@ -704,7 +707,7 @@ def get_personalized_learning_path(request):
 
             for idx, enrollment in enumerate(enrollments):
                 course = enrollment.course
-                progress = float(enrollment.progress_percentage)
+                progress = float(enrollment.completion_percentage)
                 total_progress += progress
 
                 # Generate AI recommendations based on progress
@@ -956,7 +959,7 @@ def get_ai_learning_insights(request):
                 student_data['courses'].append({
                     'title': enrollment.course.title,
                     'score': float(avg_score),
-                    'progress': float(enrollment.progress_percentage)
+                    'progress': float(enrollment.completion_percentage)
                 })
                 total_score += float(avg_score)
                 scored_courses += 1
@@ -1027,25 +1030,26 @@ def get_ai_learning_insights(request):
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def get_available_courses(request):
-    """Get all available CS courses for students to see"""
+    """Get all available courses for students to browse"""
     try:
         if request.user.user_type != 'student':
             return Response({'error': 'Student access only'}, status=status.HTTP_403_FORBIDDEN)
 
         student_profile = StudentProfile.objects.get(user=request.user)
 
-        # Get ALL active CS courses
-        all_courses = Course.objects.filter(code__startswith='CS', is_active=True)
+        # Get ALL approved and active courses - these are courses ready for enrollment
+        all_courses = Course.objects.filter(
+            status__in=['approved', 'active']
+        ).select_related('instructor__user', 'subject')
 
         # Get courses student is already enrolled in
         enrolled_course_ids = CourseEnrollment.objects.filter(
-            student=student_profile,
-            status='active'
+            student=student_profile
         ).values_list('course_id', flat=True)
 
         available_courses = []
         for course in all_courses:
-            # Count current enrollments
+            # Count current active enrollments
             current_enrollments = CourseEnrollment.objects.filter(
                 course=course,
                 status='active'
@@ -1058,24 +1062,28 @@ def get_available_courses(request):
                 'id': course.id,
                 'title': course.title,
                 'code': course.code,
-                'description': course.description,
+                'description': course.description or 'No description provided',
                 'credits': course.credits,
                 'difficulty_level': course.difficulty_level,
                 'instructor_name': course.instructor.user.get_full_name(),
+                'subject_name': course.subject.name,
+                'subject_code': course.subject.code,
                 'current_enrollments': current_enrollments,
                 'enrollment_limit': course.enrollment_limit,
                 'is_enrolled': is_enrolled,
                 'is_full': is_full,
                 'can_enroll': not is_enrolled and not is_full,
                 'start_date': course.start_date.isoformat() if course.start_date else None,
-                'end_date': course.end_date.isoformat() if course.end_date else None
+                'end_date': course.end_date.isoformat() if course.end_date else None,
+                'status': course.status
             })
 
         return Response({
             'available_courses': available_courses,
             'total_courses': len(available_courses),
             'enrolled_count': len(enrolled_course_ids),
-            'message': 'Note: Teachers will enroll you in courses' if not enrolled_course_ids else None
+            'message': 'Contact your teacher to request enrollment in a course' if len(available_courses) > 0 and len(
+                enrolled_course_ids) == 0 else None
         })
 
     except StudentProfile.DoesNotExist:

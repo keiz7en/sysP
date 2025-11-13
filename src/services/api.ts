@@ -575,6 +575,95 @@ export const adminAPI = {
             throw new Error(error.error || 'Failed to reject student')
         }
         return response.json()
+    },
+
+    // Subject Request Approvals
+    getPendingSubjectRequests: async (token: string) => {
+        const response = await fetch(`${API_BASE_URL}/courses/subject-requests/pending/`, {
+            headers: getAuthHeaders(token)
+        })
+        if (!response.ok) throw new Error('Failed to fetch pending subject requests')
+        return response.json()
+    },
+
+    getAllSubjectRequests: async (token: string) => {
+        const response = await fetch(`${API_BASE_URL}/courses/subject-requests/`, {
+            headers: getAuthHeaders(token)
+        })
+        if (!response.ok) throw new Error('Failed to fetch subject requests')
+        return response.json()
+    },
+
+    approveSubjectRequest: async (token: string, requestId: number) => {
+        const response = await fetch(`${API_BASE_URL}/courses/subject-requests/${requestId}/approve/`, {
+            method: 'POST',
+            headers: getAuthHeaders(token)
+        })
+        if (!response.ok) {
+            const error = await response.json()
+            throw new Error(error.error || 'Failed to approve subject request')
+        }
+        return response.json()
+    },
+
+    rejectSubjectRequest: async (token: string, requestId: number, reason: string) => {
+        const response = await fetch(`${API_BASE_URL}/courses/subject-requests/${requestId}/reject/`, {
+            method: 'POST',
+            headers: getAuthHeaders(token),
+            body: JSON.stringify({reason})
+        })
+        if (!response.ok) {
+            const error = await response.json()
+            throw new Error(error.error || 'Failed to reject subject request')
+        }
+        return response.json()
+    },
+
+    // Subject Management
+    getAllSubjects: async (token: string) => {
+        const response = await fetch(`${API_BASE_URL}/courses/subjects/`, {
+            headers: getAuthHeaders(token)
+        })
+        if (!response.ok) throw new Error('Failed to fetch subjects')
+        return response.json()
+    },
+
+    createSubject: async (token: string, subjectData: any) => {
+        const response = await fetch(`${API_BASE_URL}/courses/subjects/`, {
+            method: 'POST',
+            headers: getAuthHeaders(token),
+            body: JSON.stringify(subjectData)
+        })
+        if (!response.ok) {
+            const error = await response.json()
+            throw new Error(error.error || 'Failed to create subject')
+        }
+        return response.json()
+    },
+
+    updateSubject: async (token: string, subjectId: number, subjectData: any) => {
+        const response = await fetch(`${API_BASE_URL}/courses/subjects/${subjectId}/`, {
+            method: 'PATCH',
+            headers: getAuthHeaders(token),
+            body: JSON.stringify(subjectData)
+        })
+        if (!response.ok) {
+            const error = await response.json()
+            throw new Error(error.error || 'Failed to update subject')
+        }
+        return response.json()
+    },
+
+    deleteSubject: async (token: string, subjectId: number) => {
+        const response = await fetch(`${API_BASE_URL}/courses/subjects/${subjectId}/`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(token)
+        })
+        if (!response.ok) {
+            const error = await response.json()
+            throw new Error(error.error || 'Failed to delete subject')
+        }
+        return response.json()
     }
 }
 
@@ -986,6 +1075,62 @@ export const getAcademicAdvice = async (token: string, data: any) => {
     })
     if (!response.ok) throw new Error('Failed to get academic advice')
     return response.json()
+}
+
+// ========== ENROLLMENT MANAGEMENT ==========
+export const enrollmentAPI = {
+    // Student requests enrollment in a course
+    requestEnrollment: async (token: string, courseId: number) => {
+        const response = await fetch(`${API_BASE_URL}/courses/enrollments/`, {
+            method: 'POST',
+            headers: getAuthHeaders(token),
+            body: JSON.stringify({course: courseId})
+        })
+        if (!response.ok) {
+            const error = await response.json()
+            throw new Error(error.error || 'Failed to request enrollment')
+        }
+        return response.json()
+    },
+
+    // Get student's own enrollments
+    getMyEnrollments: async (token: string) => {
+        const response = await fetch(`${API_BASE_URL}/courses/enrollments/my_enrollments/`, {
+            headers: getAuthHeaders(token)
+        })
+        if (!response.ok) throw new Error('Failed to fetch enrollments')
+        return response.json()
+    },
+
+    // Get teacher's pending enrollment requests
+    getPendingEnrollments: async (token: string) => {
+        const response = await fetch(`${API_BASE_URL}/courses/enrollments/pending_enrollments/`, {
+            headers: getAuthHeaders(token)
+        })
+        if (!response.ok) throw new Error('Failed to fetch pending enrollments')
+        return response.json()
+    },
+
+    // Teacher approves enrollment
+    approveEnrollment: async (token: string, enrollmentId: number) => {
+        const response = await fetch(`${API_BASE_URL}/courses/enrollments/${enrollmentId}/approve/`, {
+            method: 'POST',
+            headers: getAuthHeaders(token)
+        })
+        if (!response.ok) throw new Error('Failed to approve enrollment')
+        return response.json()
+    },
+
+    // Teacher rejects enrollment
+    rejectEnrollment: async (token: string, enrollmentId: number, reason: string) => {
+        const response = await fetch(`${API_BASE_URL}/courses/enrollments/${enrollmentId}/reject/`, {
+            method: 'POST',
+            headers: getAuthHeaders(token),
+            body: JSON.stringify({reason})
+        })
+        if (!response.ok) throw new Error('Failed to reject enrollment')
+        return response.json()
+    }
 }
 
 // ===========================

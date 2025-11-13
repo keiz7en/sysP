@@ -16,12 +16,13 @@ class TeacherSubjectRequestSerializer(serializers.ModelSerializer):
     subject_name = serializers.CharField(source='subject.name', read_only=True)
     subject_code = serializers.CharField(source='subject.code', read_only=True)
     teacher_name = serializers.CharField(source='teacher.user.get_full_name', read_only=True)
+    teacher_email = serializers.CharField(source='teacher.user.email', read_only=True)
     approved_by_name = serializers.CharField(source='approved_by.get_full_name', read_only=True, allow_null=True)
     
     class Meta:
         model = TeacherSubjectRequest
         fields = [
-            'id', 'teacher', 'teacher_name', 'subject', 'subject_name', 'subject_code',
+            'id', 'teacher', 'teacher_name', 'teacher_email', 'subject', 'subject_name', 'subject_code',
             'status', 'request_date', 'approved_by', 'approved_by_name', 'approved_at', 'rejection_reason'
         ]
         read_only_fields = ['request_date', 'approved_at', 'approved_by']

@@ -18,6 +18,7 @@ import TeachingAnalytics from './pages/TeachingAnalytics'
 import AssignmentManagement from './pages/AssignmentManagement'
 import Gradebook from './pages/Gradebook'
 import StudentApprovals from './pages/StudentApprovals'
+import EnrollmentRequests from './pages/EnrollmentRequests'
 
 const TeacherDashboard: React.FC = () => {
     const { user } = useAuth()
@@ -51,6 +52,13 @@ const TeacherDashboard: React.FC = () => {
             icon: '✅',
             path: '/teacher/approvals',
             description: 'Approve student enrollments'
+        },
+        {
+            id: 'enrollments',
+            label: 'Enrollment Requests',
+            icon: '📝',
+            path: '/teacher/enrollments',
+            description: 'Manage enrollment requests'
         },
         {
             id: 'students',
@@ -152,6 +160,7 @@ const TeacherDashboard: React.FC = () => {
                         <Route path="subjects" element={<TeacherSubjectManagement />} />
                         <Route path="courses" element={<CourseManagement />} />
                         <Route path="approvals" element={<StudentApprovals />} />
+                        <Route path="enrollments" element={<EnrollmentRequests/>}/>
                         <Route path="students" element={<StudentManagement />} />
                         <Route path="analytics" element={<TeachingAnalytics />} />
                         <Route path="assignments" element={<AssignmentManagement />} />

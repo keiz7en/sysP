@@ -21,6 +21,7 @@ router.register(r'profiles', views.StudentProfileViewSet, basename='student-prof
 urlpatterns = [
     path('', include(router.urls)),
     path('dashboard/', views.StudentDashboardView.as_view(), name='student-dashboard'),
+    path('courses/available/', views.get_available_courses, name='available-courses'),
     path('academic-records/', views.AcademicRecordsView.as_view(), name='academic-records'),
     path('adaptive-learning/', views.AdaptiveLearningView.as_view(), name='adaptive-learning'),
     path('career-guidance/', views.CareerGuidanceView.as_view(), name='career-guidance'),

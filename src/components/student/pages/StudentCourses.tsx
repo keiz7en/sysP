@@ -1,6 +1,7 @@
 import React, {useState, useEffect} from 'react'
 import {motion, AnimatePresence} from 'framer-motion'
 import {useAuth} from '../../../contexts/AuthContext'
+import {enrollmentAPI} from '../../../services/api'
 import toast from 'react-hot-toast'
 
 interface Course {
@@ -37,6 +38,7 @@ const StudentCourses: React.FC = () => {
     const {token} = useAuth()
     const [activeTab, setActiveTab] = useState<'browse' | 'enrolled'>('enrolled')
     const [loading, setLoading] = useState(false)
+    const [enrolling, setEnrolling] = useState<number | null>(null)
     const [availableCourses, setAvailableCourses] = useState<Course[]>([])
     const [enrolledCourses, setEnrolledCourses] = useState<Enrollment[]>([])
     const [selectedCourse, setSelectedCourse] = useState<Course | null>(null)
@@ -107,6 +109,21 @@ const StudentCourses: React.FC = () => {
         if (filterLevel === 'all') return true
         return course.difficulty_level.toLowerCase() === filterLevel.toLowerCase()
     })
+
+    const handleEnrollRequest = async (courseId: number) => {
+        if (!token) return
+
+        setEnrolling(courseId)
+        try {
+            await enrollmentAPI.requestEnrollment(token, courseId)
+            toast.success('Enrollment request sent! Waiting for teacher approval.')
+            fetchCourses() // Refresh course list
+        } catch (error: any) {
+            toast.error(error.message || 'Failed to request enrollment')
+        } finally {
+            setEnrolling(null)
+        }
+    }
 
     return (
         <div style={{padding: '2rem', maxWidth: '1400px', margin: '0 auto'}}>
@@ -628,40 +645,73 @@ const StudentCourses: React.FC = () => {
                                                     </div>
 
                                                     {/* View Details Button */}
-                                                    <button
-                                                        onClick={() => setSelectedCourse(course)}
-                                                        style={{
-                                                            width: '100%',
-                                                            padding: '0.875rem',
-                                                            backgroundColor: course.is_enrolled
-                                                                ? '#10b981'
-                                                                : course.is_full
-                                                                    ? '#6b7280'
-                                                                    : '#6366f1',
-                                                            color: 'white',
-                                                            border: 'none',
-                                                            borderRadius: '10px',
-                                                            fontWeight: '600',
-                                                            cursor: 'pointer',
-                                                            fontSize: '0.95rem',
-                                                            transition: 'all 0.2s'
-                                                        }}
-                                                        disabled={course.is_full && !course.is_enrolled}
-                                                        onMouseEnter={(e) => {
-                                                            if (!course.is_full || course.is_enrolled) {
-                                                                e.currentTarget.style.opacity = '0.8'
-                                                            }
-                                                        }}
-                                                        onMouseLeave={(e) => {
-                                                            e.currentTarget.style.opacity = '1'
-                                                        }}
-                                                    >
-                                                        {course.is_enrolled
-                                                            ? 'View Course Details'
-                                                            : course.is_full
-                                                                ? '🔒 Course Full'
-                                                                : 'View Details'}
-                                                    </button>
+                                                    {course.is_enrolled ? (
+                                                        <button
+                                                            onClick={() => setSelectedCourse(course)}
+                                                            style={{
+                                                                width: '100%',
+                                                                padding: '0.875rem',
+                                                                backgroundColor: '#10b981',
+                                                                color: 'white',
+                                                                border: 'none',
+                                                                borderRadius: '10px',
+                                                                fontWeight: '600',
+                                                                cursor: 'pointer',
+                                                                fontSize: '0.95rem',
+                                                                transition: 'all 0.2s'
+                                                            }}
+                                                            onMouseEnter={(e) => e.currentTarget.style.opacity = '0.8'}
+                                                            onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+                                                        >
+                                                            View Course Details
+                                                        </button>
+                                                    ) : course.is_full ? (
+                                                        <button
+                                                            style={{
+                                                                width: '100%',
+                                                                padding: '0.875rem',
+                                                                backgroundColor: '#6b7280',
+                                                                color: 'white',
+                                                                border: 'none',
+                                                                borderRadius: '10px',
+                                                                fontWeight: '600',
+                                                                cursor: 'not-allowed',
+                                                                fontSize: '0.95rem'
+                                                            }}
+                                                            disabled
+                                                        >
+                                                            🔒 Course Full
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => handleEnrollRequest(course.id)}
+                                                            disabled={enrolling === course.id}
+                                                            style={{
+                                                                width: '100%',
+                                                                padding: '0.875rem',
+                                                                backgroundColor: enrolling === course.id ? '#9ca3af' : '#6366f1',
+                                                                color: 'white',
+                                                                border: 'none',
+                                                                borderRadius: '10px',
+                                                                fontWeight: '600',
+                                                                cursor: enrolling === course.id ? 'wait' : 'pointer',
+                                                                fontSize: '0.95rem',
+                                                                transition: 'all 0.2s'
+                                                            }}
+                                                            onMouseEnter={(e) => {
+                                                                if (enrolling !== course.id) {
+                                                                    e.currentTarget.style.backgroundColor = '#4f46e5'
+                                                                }
+                                                            }}
+                                                            onMouseLeave={(e) => {
+                                                                if (enrolling !== course.id) {
+                                                                    e.currentTarget.style.backgroundColor = '#6366f1'
+                                                                }
+                                                            }}
+                                                        >
+                                                            {enrolling === course.id ? '⏳ Requesting...' : '📝 Request Enrollment'}
+                                                        </button>
+                                                    )}
 
                                                     {!course.is_enrolled && !course.is_full && (
                                                         <p style={{
@@ -670,7 +720,7 @@ const StudentCourses: React.FC = () => {
                                                             color: '#6b7280',
                                                             textAlign: 'center'
                                                         }}>
-                                                            💡 Contact your teacher to enroll
+                                                            💡 Teacher will review your request
                                                         </p>
                                                     )}
                                                 </div>

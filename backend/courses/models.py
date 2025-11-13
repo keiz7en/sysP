@@ -139,11 +139,12 @@ class Course(models.Model):
 
     @property
     def is_full(self):
-        return self.enrolled_count >= self.enrollment_limit
+        # No enrollment limit - always allow enrollment
+        return False
     
     def is_approved_and_open(self):
-        """Check if course is approved and open for enrollment"""
-        return self.status == 'approved' and self.is_open_for_enrollment
+        """Check if course is approved/active and open for enrollment"""
+        return self.status in ['approved', 'active'] and self.is_open_for_enrollment
     
     def can_enable_ai_features(self):
         """Check if AI features should be enabled for this course"""
