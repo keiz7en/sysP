@@ -10,7 +10,7 @@ interface EnrolledCourse {
     course_title: string;
     subject: string;
     status: string;
-    ai_features_unlocked: boolean;
+    ai_enabled: boolean;
 }
 
 const AILearningAssistant: React.FC = () => {
@@ -279,7 +279,7 @@ const AILearningAssistant: React.FC = () => {
                                 {enrolledCourses.map(course => (
                                     <option key={course.id} value={course.id}>
                                         {course.course_title} ({course.subject})
-                                        {!course.ai_features_unlocked ? ' - Awaiting Approval' : ''}
+                                        {!(course.ai_enabled && course.status === 'active') ? ' - Awaiting Approval' : ''}
                                     </option>
                                 ))}
                             </select>
@@ -292,7 +292,7 @@ const AILearningAssistant: React.FC = () => {
                 </motion.div>
 
                 {/* Warning if no AI unlocked */}
-                {selectedCourse && !selectedCourse.ai_features_unlocked && (
+                {selectedCourse && !(selectedCourse.ai_enabled && selectedCourse.status === 'active') && (
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
@@ -315,11 +315,31 @@ const AILearningAssistant: React.FC = () => {
                     <div style={styles.tabs}>
                         {[
                             { id: 'home', label: '🏠 Home', desc: 'Overview' },
-                            { id: 'academic', label: '📈 Analysis', desc: 'Academic Insights', locked: !selectedCourse?.ai_features_unlocked },
-                            { id: 'learning', label: '📚 Learning', desc: 'Personalized Content', locked: !selectedCourse?.ai_features_unlocked },
-                            { id: 'quiz', label: '✍️ Quiz', desc: 'AI Generated Quizzes', locked: !selectedCourse?.ai_features_unlocked },
+                            {
+                                id: 'academic',
+                                label: '📈 Analysis',
+                                desc: 'Academic Insights',
+                                locked: !(selectedCourse?.ai_enabled && selectedCourse?.status === 'active')
+                            },
+                            {
+                                id: 'learning',
+                                label: '📚 Learning',
+                                desc: 'Personalized Content',
+                                locked: !(selectedCourse?.ai_enabled && selectedCourse?.status === 'active')
+                            },
+                            {
+                                id: 'quiz',
+                                label: '✍️ Quiz',
+                                desc: 'AI Generated Quizzes',
+                                locked: !(selectedCourse?.ai_enabled && selectedCourse?.status === 'active')
+                            },
                             { id: 'career', label: '💼 Career', desc: 'Career Guidance' },
-                            { id: 'essay', label: '📝 Essay', desc: 'Essay Grading', locked: !selectedCourse?.ai_features_unlocked },
+                            {
+                                id: 'essay',
+                                label: '📝 Essay',
+                                desc: 'Essay Grading',
+                                locked: !(selectedCourse?.ai_enabled && selectedCourse?.status === 'active')
+                            },
                             { id: 'chat', label: '💬 Chat', desc: 'AI Assistant' },
                         ].map((tab) => (
                             <motion.button

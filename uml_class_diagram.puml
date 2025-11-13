@@ -1,0 +1,917 @@
+@startuml EduAI_Complete_Class_Diagram
+' Title
+title EduAI - Complete Core Class Diagram
+
+' Skin params for readability
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam linetype ortho
+skinparam groupInheritance 2
+
+' ============================================
+' USER MANAGEMENT
+' ============================================
+
+class User {
+  +UUID id
+  +String username
+  +String email
+  +String password
+  +Enum user_type {student, teacher, admin, parent}
+  +String phone_number
+  +ImageField profile_picture
+  +Date date_of_birth
+  +Text address
+  +Boolean is_verified
+  +String google_id
+  +Enum approval_status {pending, approved, rejected}
+  +ForeignKey approved_by
+  +DateTime approved_at
+  +Text rejection_reason
+  +DateTime created_at
+  +DateTime updated_at
+  --
+  +check_password()
+  +set_password()
+  +get_full_name()
+}
+
+class UserProfile {
+  +UUID id
+  +OneToOne user
+  +Text bio
+  +JSON skills
+  +JSON interests
+  +JSON social_links
+  +String preferred_language
+  +String timezone
+}
+
+class AccessibilityProfile {
+  +UUID id
+  +OneToOne user
+  +JSON settings
+  +DateTime last_updated
+}
+
+class TeacherApproval {
+  +UUID id
+  +OneToOne teacher (User)
+  +JSON qualifications
+  +JSON experience_documents
+  +String department_preference
+  +JSON specialization
+  +Text reason_for_joining
+  +ForeignKey reviewed_by
+  +DateTime reviewed_at
+  +Text admin_notes
+  +DateTime created_at
+}
+
+class SystemSettings {
+  +Boolean auto_approve_students
+  +Boolean auto_approve_teachers
+  +Boolean allow_public_registration
+  +Boolean require_email_verification
+  +Int max_login_attempts
+  +Int session_timeout
+  +Boolean maintenance_mode
+  +Enum backup_frequency
+  +Boolean email_notifications
+  +Boolean sms_notifications
+  +Boolean in_app_notifications
+  +DateTime updated_at
+  +ForeignKey updated_by
+  --
+  +get_settings()
+}
+
+' ============================================
+' TEACHER PROFILE
+' ============================================
+
+class TeacherProfile {
+  +UUID id
+  +OneToOne user
+  +String employee_id
+  +String department
+  +JSON specialization
+  +JSON qualifications
+  +Int experience_years
+  +Date hire_date
+  +Boolean is_approved
+  +Enum approval_status {pending, approved, rejected}
+  +ForeignKey approved_by
+  +DateTime approved_at
+  +Decimal teaching_rating
+  +Decimal average_rating
+  +Int total_ratings
+  +Decimal student_satisfaction
+  +Decimal course_completion_rate
+  +Enum teaching_style
+  +JSON preferred_tools
+  --
+  +get_approved_subjects()
+  +get_pending_subject_requests()
+  +can_teach_subject(subject)
+  +can_create_course_in_subject(subject)
+  +update_average_rating(new_rating)
+}
+
+class TeachingSchedule {
+  +UUID id
+  +ForeignKey teacher
+  +ForeignKey course
+  +Enum day_of_week
+  +Time start_time
+  +Time end_time
+  +String classroom
+}
+
+class TeacherPerformanceMetrics {
+  +UUID id
+  +ForeignKey teacher
+  +Date date
+  +Decimal engagement_score
+  +Decimal content_delivery_score
+  +Int student_interaction_frequency
+  +Duration feedback_response_time
+  +Int innovative_teaching_methods
+}
+
+' ============================================
+' STUDENT PROFILE
+' ============================================
+
+class StudentProfile {
+  +UUID id
+  +OneToOne user
+  +String student_id
+  +String grade_level
+  +Date enrollment_date
+  +String guardian_name
+  +String guardian_phone
+  +String guardian_email
+  +String emergency_contact
+  +String emergency_phone
+  +Text medical_info
+  +Decimal current_gpa
+  +Int total_credits
+  +Enum academic_status {active, probation, suspended, graduated}
+  +Enum learning_style {visual, auditory, kinesthetic, reading}
+  +Enum preferred_difficulty {easy, medium, hard, adaptive}
+}
+
+class AcademicRecord {
+  +UUID id
+  +ForeignKey student
+  +ForeignKey course
+  +String semester
+  +Int year
+  +String grade
+  +Int credits
+  +Decimal gpa_points
+  +DateTime created_at
+}
+
+class AttendanceRecord {
+  +UUID id
+  +ForeignKey student
+  +ForeignKey course
+  +Date date
+  +Enum status {present, absent, late, excused}
+  +Text notes
+  +DateTime created_at
+}
+
+class LearningProgress {
+  +UUID id
+  +ForeignKey student
+  +ForeignKey course
+  +String topic
+  +Decimal mastery_level
+  +Duration time_spent
+  +DateTime last_interaction
+  +JSON difficulty_adjustments
+  +JSON performance_trends
+}
+
+class StudentBehaviorMetrics {
+  +UUID id
+  +ForeignKey student
+  +Date date
+  +Decimal engagement_score
+  +Enum participation_level {low, medium, high}
+  +Int quiz_attempts
+  +Duration average_response_time
+  +Int help_requests
+  +Int collaborative_activities
+}
+
+' ============================================
+' COURSE & SUBJECT MANAGEMENT
+' ============================================
+
+class Subject {
+  +UUID id
+  +String name
+  +String code
+  +Text description
+  +Enum category
+  +DateTime created_at
+  +DateTime updated_at
+}
+
+class TeacherSubjectRequest {
+  +UUID id
+  +ForeignKey teacher (TeacherProfile)
+  +ForeignKey subject
+  +Enum status {pending, approved, rejected}
+  +DateTime request_date
+  +ForeignKey approved_by
+  +DateTime approved_at
+  +Text rejection_reason
+}
+
+class TeacherApprovedSubject {
+  +UUID id
+  +ForeignKey teacher (TeacherProfile)
+  +ForeignKey subject
+  +DateTime approved_date
+  +ForeignKey approved_by
+}
+
+class Course {
+  +UUID id
+  +String title
+  +String code
+  +Text description
+  +ForeignKey subject
+  +ForeignKey instructor (TeacherProfile)
+  +Int credits
+  +Int enrollment_limit
+  +Enum difficulty_level {beginner, intermediate, advanced}
+  +Enum status {draft, pending, approved, rejected, active, archived}
+  +Boolean is_open_for_enrollment
+  +Date start_date
+  +Date end_date
+  +Boolean ai_content_enabled
+  +Boolean syllabus_ai_generated
+  +DateTime created_at
+  +DateTime updated_at
+  --
+  +enrolled_count()
+  +is_full()
+  +is_approved_and_open()
+  +can_enable_ai_features()
+}
+
+class CourseModule {
+  +UUID id
+  +ForeignKey course
+  +String title
+  +Text description
+  +Int order
+  +Duration estimated_duration
+  +Enum content_type {text, video, interactive, quiz, assignment}
+  +JSON content_data
+  +Boolean ai_generated
+}
+
+class CourseEnrollment {
+  +UUID id
+  +ForeignKey student (StudentProfile)
+  +ForeignKey course
+  +DateTime enrollment_date
+  +Enum status {pending, approved, rejected, active, completed, dropped, suspended}
+  +ForeignKey approved_by
+  +DateTime approved_at
+  +Text rejection_reason
+  +Boolean ai_features_unlocked
+  +DateTime ai_unlock_date
+  +String grade
+  +Decimal completion_percentage
+  +Decimal final_score
+  +DateTime created_at
+  +DateTime updated_at
+  --
+  +is_ai_enabled()
+  +approve_enrollment(approved_by_user)
+  +reject_enrollment(reason)
+  +lock_ai_features()
+}
+
+' ============================================
+' ASSIGNMENTS & SUBMISSIONS
+' ============================================
+
+class Assignment {
+  +UUID id
+  +ForeignKey course
+  +String title
+  +Text description
+  +Enum assignment_type {homework, quiz, exam, project, lab, essay}
+  +Decimal max_points
+  +DateTime due_date
+  +Boolean is_published
+  +DateTime created_at
+  +DateTime updated_at
+}
+
+class AssignmentSubmission {
+  +UUID id
+  +ForeignKey assignment
+  +ForeignKey student (StudentProfile)
+  +Text submission_text
+  +FileField file_upload
+  +DateTime submitted_at
+  +Boolean is_late
+  +Decimal points_earned
+  +Text feedback
+  +DateTime graded_at
+  +ForeignKey graded_by (TeacherProfile)
+  --
+  +percentage_score()
+}
+
+' ============================================
+' ASSESSMENTS
+' ============================================
+
+class Assessment {
+  +UUID id
+  +ForeignKey course
+  +String title
+  +Text description
+  +Enum type {quiz, test, assignment, project, essay}
+  +Int total_marks
+  +Int duration_minutes
+  +Int attempts_allowed
+  +Boolean ai_generated
+  +Boolean adaptive_difficulty
+  +Boolean auto_grading
+  +DateTime available_from
+  +DateTime available_until
+  +Boolean randomize_questions
+  +Boolean show_results_immediately
+  +Boolean allow_review
+  +DateTime created_at
+}
+
+class Question {
+  +UUID id
+  +ForeignKey assessment
+  +Text question_text
+  +Enum question_type {mcq, true_false, short_answer, essay, fill_blank, matching}
+  +Int marks
+  +Int order
+  +JSON options
+  +JSON correct_answer
+  +Enum difficulty_level {easy, medium, hard}
+  +Enum bloom_taxonomy_level
+  +Boolean ai_generated
+  +Text source_content
+}
+
+class StudentAssessmentAttempt {
+  +UUID id
+  +ForeignKey student (StudentProfile)
+  +ForeignKey assessment
+  +Int attempt_number
+  +DateTime started_at
+  +DateTime submitted_at
+  +Duration time_taken
+  +Decimal total_score
+  +Decimal percentage
+  +Enum status {in_progress, submitted, graded, reviewed}
+  +JSON performance_analysis
+  +JSON strengths
+  +JSON weaknesses
+  +JSON recommendations
+}
+
+class StudentAnswer {
+  +UUID id
+  +ForeignKey attempt
+  +ForeignKey question
+  +JSON answer
+  +Boolean is_correct
+  +Decimal marks_awarded
+  +Boolean ai_graded
+  +Text ai_feedback
+  +Decimal confidence_score
+  +Boolean manually_reviewed
+  +Text teacher_feedback
+  +DateTime answered_at
+}
+
+class AssessmentAnalytics {
+  +UUID id
+  +OneToOne assessment
+  +Int total_attempts
+  +Decimal average_score
+  +Decimal highest_score
+  +Decimal lowest_score
+  +JSON question_difficulty_analysis
+  +JSON question_discrimination_index
+  +JSON score_distribution
+  +JSON time_analysis
+  +DateTime last_updated
+}
+
+' ============================================
+' GRADING & RATING
+' ============================================
+
+class Grade {
+  +UUID id
+  +OneToOne enrollment
+  +ForeignKey course
+  +ForeignKey student (StudentProfile)
+  +ForeignKey teacher (TeacherProfile)
+  +Decimal final_score
+  +String letter_grade
+  +Decimal grade_points
+  +Decimal assignments_score
+  +Decimal quizzes_score
+  +Decimal exams_score
+  +Decimal projects_score
+  +Decimal participation_score
+  +Text remarks
+  +DateTime published_at
+  +Boolean is_published
+  +DateTime created_at
+  +DateTime updated_at
+  --
+  +calculate_letter_grade()
+  +calculate_grade_points()
+  +publish_grade()
+}
+
+class TeacherRating {
+  +UUID id
+  +ForeignKey student (StudentProfile)
+  +ForeignKey teacher (TeacherProfile)
+  +ForeignKey course
+  +OneToOne enrollment
+  +Int rating [1-5]
+  +Text feedback
+  +DateTime submitted_at
+  +DateTime updated_at
+  +Boolean is_visible_to_teacher
+  +Boolean is_visible_to_admin
+}
+
+' ============================================
+' GAMIFICATION & LEARNING PATHS
+' ============================================
+
+class LearningPath {
+  +UUID id
+  +OneToOne enrollment
+  +JSON path_data
+  +JSON difficulty_adjustments
+  +Duration estimated_completion_time
+  +DateTime last_updated
+}
+
+class GameificationProgress {
+  +UUID id
+  +OneToOne enrollment
+  +Int points
+  +Int level
+  +JSON badges
+  +JSON achievements
+  +Int streak_days
+  +DateTime last_activity
+}
+
+' ============================================
+' ANALYTICS
+' ============================================
+
+class LearningAnalytics {
+  +UUID id
+  +ForeignKey student (StudentProfile)
+  +ForeignKey course
+  +Date date
+  +Duration time_spent
+  +Int content_interactions
+  +Int quiz_attempts
+  +Int discussion_posts
+  +Decimal average_quiz_score
+  +Decimal assignment_completion_rate
+  +Decimal learning_velocity
+  +Enum engagement_level {low, medium, high}
+  +JSON preferred_learning_times
+  +JSON content_preferences
+  +JSON difficulty_adaptation
+}
+
+class DropoutPrediction {
+  +UUID id
+  +ForeignKey student (StudentProfile)
+  +ForeignKey course
+  +Decimal risk_score
+  +Enum risk_level {low, medium, high, critical}
+  +JSON risk_factors
+  +JSON protective_factors
+  +JSON intervention_recommendations
+  +JSON priority_actions
+  +String model_version
+  +Decimal confidence_score
+  +DateTime created_at
+  +DateTime last_updated
+}
+
+class PerformanceTrends {
+  +UUID id
+  +ForeignKey student (StudentProfile)
+  +Date period_start
+  +Date period_end
+  +Enum trend_type {improving, declining, stable, volatile}
+  +Decimal trend_slope
+  +Decimal correlation_coefficient
+  +Decimal variance
+  +JSON subject_trends
+  +JSON skill_trends
+  +JSON projected_performance
+  +JSON confidence_intervals
+}
+
+class InstitutionalAnalytics {
+  +UUID id
+  +String institution_name
+  +Date analysis_date
+  +Int total_students
+  +Int new_enrollments
+  +Int active_students
+  +Decimal dropout_rate
+  +Decimal average_gpa
+  +Decimal pass_rate
+  +Decimal completion_rate
+  +JSON most_popular_courses
+  +JSON highest_rated_courses
+  +JSON courses_needing_improvement
+  +JSON teacher_performance_summary
+  +JSON platform_usage_stats
+  +JSON feature_adoption_rates
+  +JSON key_insights
+  +JSON recommendations
+}
+
+' ============================================
+' CAREER MANAGEMENT
+' ============================================
+
+class SkillCategory {
+  +UUID id
+  +String name
+  +Text description
+  +ForeignKey parent_category
+}
+
+class Skill {
+  +UUID id
+  +String name
+  +ForeignKey category
+  +Text description
+  +Boolean is_technical
+  +Enum market_demand {low, medium, high, critical}
+}
+
+class StudentSkillProfile {
+  +UUID id
+  +OneToOne student (StudentProfile)
+  +ManyToMany skills (through StudentSkillLevel)
+  +JSON skill_gaps
+  +JSON recommended_skills
+  +JSON career_recommendations
+  +DateTime last_assessed
+}
+
+class StudentSkillLevel {
+  +UUID id
+  +ForeignKey student_profile
+  +ForeignKey skill
+  +Enum proficiency_level {beginner, intermediate, advanced, expert}
+  +Decimal confidence_score
+  +Boolean verified
+  +DateTime acquisition_date
+  +DateTime last_practiced
+  +Int practice_hours
+}
+
+class JobMarketData {
+  +UUID id
+  +String job_title
+  +String industry
+  +String location
+  +ManyToMany required_skills
+  +ManyToMany preferred_skills
+  +Enum experience_level
+  +Decimal average_salary
+  +Enum job_demand {low, medium, high, critical}
+  +Decimal growth_projection
+  +Enum automation_risk {low, medium, high}
+  +DateTime last_updated
+}
+
+class Resume {
+  +UUID id
+  +ForeignKey student (StudentProfile)
+  +String title
+  +JSON content
+  +DateTime generated_at
+  +Int ai_score
+  +JSON suggestions
+  +Float version
+  +Boolean ai_optimized
+  +JSON optimization_suggestions
+  +Decimal ats_score
+  +Boolean is_active
+  +DateTime created_at
+}
+
+class JobRecommendation {
+  +UUID id
+  +ForeignKey student (StudentProfile)
+  +ForeignKey job_data
+  +Decimal skill_match_percentage
+  +Boolean experience_match
+  +Boolean location_preference_match
+  +Decimal recommendation_score
+  +Enum confidence_level {low, medium, high}
+  +JSON reasons
+  +JSON skill_gaps
+  +JSON preparation_suggestions
+  +Boolean is_viewed
+  +Boolean is_applied
+  +Boolean is_bookmarked
+  +DateTime created_at
+}
+
+class TrainingProgram {
+  +UUID id
+  +String title
+  +Text description
+  +String provider
+  +ManyToMany target_skills
+  +Int duration_hours
+  +Enum difficulty_level
+  +Decimal cost
+  +Boolean is_free
+  +Boolean is_online
+  +Boolean certification_offered
+  +Decimal rating
+  +Decimal completion_rate
+  +URL url
+  +Boolean is_active
+}
+
+' ============================================
+' CHATBOT
+' ============================================
+
+class ChatSession {
+  +UUID id
+  +ForeignKey user
+  +String title
+  +Enum context_type {general, course, career, technical, admission, academic}
+  +String ai_model_version
+  +Enum personality_mode {friendly, professional, encouraging, tutor}
+  +Boolean is_active
+  +String language
+  +DateTime created_at
+  +DateTime last_activity
+  +DateTime ended_at
+}
+
+class ChatMessage {
+  +UUID id
+  +ForeignKey session
+  +Text message_text
+  +Enum message_type {user, assistant, system}
+  +String intent_detected
+  +Decimal confidence_score
+  +JSON entities_extracted
+  +JSON response_sources
+  +String generated_by_model
+  +Int processing_time_ms
+  +Boolean was_helpful
+  +Int user_rating
+  +DateTime timestamp
+}
+
+class KnowledgeBase {
+  +UUID id
+  +String category
+  +String subcategory
+  +Text question
+  +Text answer
+  +JSON keywords
+  +Enum source_type
+  +Int usage_count
+  +Decimal success_rate
+  +DateTime last_updated
+  +ManyToMany related_courses
+  +JSON related_topics
+  +Boolean is_active
+}
+
+class ChatbotIntent {
+  +UUID id
+  +String name
+  +Text description
+  +JSON training_phrases
+  +JSON parameters
+  +JSON response_templates
+  +Boolean requires_context
+  +JSON context_dependencies
+  +Boolean triggers_action
+  +String action_function
+  +Decimal recognition_accuracy
+  +Int usage_frequency
+  +Boolean is_active
+  +DateTime created_at
+}
+
+class UserInteractionPattern {
+  +UUID id
+  +ForeignKey user
+  +Int total_sessions
+  +Int total_messages
+  +Duration average_session_duration
+  +JSON preferred_topics
+  +JSON common_questions
+  +JSON interaction_times
+  +Decimal query_resolution_rate
+  +Decimal satisfaction_score
+  +Enum help_seeking_behavior
+  +DateTime last_updated
+}
+
+' ============================================
+' RELATIONSHIPS - USER MANAGEMENT
+' ============================================
+
+User "1" -- "1" UserProfile : has >
+User "1" -- "0..1" AccessibilityProfile : has >
+User "1" -- "0..1" TeacherProfile : may be >
+User "1" -- "0..1" StudentProfile : may be >
+User "1" -- "0..1" TeacherApproval : approval request >
+User "1" o-- "0..*" User : approves >
+SystemSettings "1" -- "0..1" User : updated by >
+
+' ============================================
+' RELATIONSHIPS - TEACHER
+' ============================================
+
+TeacherProfile "1" -- "0..*" TeachingSchedule : has schedule >
+TeacherProfile "1" -- "0..*" TeacherPerformanceMetrics : metrics >
+TeacherProfile "1" -- "0..*" TeacherSubjectRequest : requests >
+TeacherProfile "1" -- "0..*" TeacherApprovedSubject : approved for >
+TeacherProfile "1" -- "0..*" Course : teaches >
+TeacherProfile "1" -- "0..*" AssignmentSubmission : grades >
+TeacherProfile "1" -- "0..*" Grade : assigns grades >
+TeacherProfile "1" -- "0..*" TeacherRating : receives ratings >
+
+' ============================================
+' RELATIONSHIPS - STUDENT
+' ============================================
+
+StudentProfile "1" -- "0..*" AcademicRecord : has records >
+StudentProfile "1" -- "0..*" AttendanceRecord : attendance >
+StudentProfile "1" -- "0..*" LearningProgress : progress >
+StudentProfile "1" -- "0..*" StudentBehaviorMetrics : behavior >
+StudentProfile "1" -- "0..*" CourseEnrollment : enrolls in >
+StudentProfile "1" -- "0..*" AssignmentSubmission : submits >
+StudentProfile "1" -- "0..*" StudentAssessmentAttempt : attempts >
+StudentProfile "1" -- "0..*" Grade : receives grades >
+StudentProfile "1" -- "0..*" TeacherRating : rates teachers >
+StudentProfile "1" -- "0..1" StudentSkillProfile : skill profile >
+StudentProfile "1" -- "0..*" Resume : has resumes >
+StudentProfile "1" -- "0..*" JobRecommendation : job recommendations >
+StudentProfile "1" -- "0..*" LearningAnalytics : analytics >
+StudentProfile "1" -- "0..*" DropoutPrediction : dropout risk >
+StudentProfile "1" -- "0..*" PerformanceTrends : trends >
+
+' ============================================
+' RELATIONSHIPS - SUBJECT & COURSE
+' ============================================
+
+Subject "1" -- "0..*" TeacherSubjectRequest : requested by teachers >
+Subject "1" -- "0..*" TeacherApprovedSubject : approved teachers >
+Subject "1" -- "0..*" Course : has courses >
+
+Course "1" -- "0..*" CourseModule : contains modules >
+Course "1" -- "0..*" CourseEnrollment : enrollments >
+Course "1" -- "0..*" Assignment : has assignments >
+Course "1" -- "0..*" Assessment : has assessments >
+Course "1" -- "0..*" TeacherRating : course ratings >
+Course "1" -- "0..*" Grade : final grades >
+Course "1" -- "0..*" AcademicRecord : academic records >
+Course "1" -- "0..*" AttendanceRecord : attendance >
+Course "1" -- "0..*" LearningProgress : learning progress >
+Course "1" -- "0..*" TeachingSchedule : schedule >
+Course "1" -- "0..*" LearningAnalytics : analytics >
+
+' ============================================
+' RELATIONSHIPS - ENROLLMENT
+' ============================================
+
+CourseEnrollment "1" -- "0..1" LearningPath : learning path >
+CourseEnrollment "1" -- "0..1" GameificationProgress : gamification >
+CourseEnrollment "1" -- "0..1" Grade : final grade >
+CourseEnrollment "1" -- "0..1" TeacherRating : rating >
+User "1" -- "0..*" CourseEnrollment : approves >
+
+' ============================================
+' RELATIONSHIPS - ASSIGNMENTS
+' ============================================
+
+Assignment "1" -- "0..*" AssignmentSubmission : submissions >
+
+' ============================================
+' RELATIONSHIPS - ASSESSMENTS
+' ============================================
+
+Assessment "1" -- "0..*" Question : questions >
+Assessment "1" -- "0..*" StudentAssessmentAttempt : attempts >
+Assessment "1" -- "0..1" AssessmentAnalytics : analytics >
+
+StudentAssessmentAttempt "1" -- "0..*" StudentAnswer : answers >
+Question "1" -- "0..*" StudentAnswer : answered >
+
+' ============================================
+' RELATIONSHIPS - CAREER
+' ============================================
+
+SkillCategory "1" -- "0..*" Skill : contains >
+SkillCategory "1" o-- "0..*" SkillCategory : parent >
+
+StudentSkillProfile "1" -- "0..*" StudentSkillLevel : skill levels >
+Skill "1" -- "0..*" StudentSkillLevel : proficiency >
+Skill "0..*" -- "0..*" JobMarketData : required/preferred skills
+Skill "0..*" -- "0..*" TrainingProgram : target skills
+
+JobMarketData "1" -- "0..*" JobRecommendation : recommendations >
+
+' ============================================
+' RELATIONSHIPS - CHATBOT
+' ============================================
+
+User "1" -- "0..*" ChatSession : chat sessions >
+User "1" -- "0..1" UserInteractionPattern : interaction pattern >
+
+ChatSession "1" -- "0..*" ChatMessage : messages >
+
+Course "0..*" -- "0..*" KnowledgeBase : related courses
+
+' ============================================
+' NOTES
+' ============================================
+
+note right of CourseEnrollment
+  CourseEnrollment holds:
+  - enrollment status tracking
+  - AI features unlock control
+  - completion percentage
+  - final grade reference
+  Teacher must approve before
+  AI features are unlocked
+end note
+
+note right of Grade
+  Grade calculation:
+  - Aggregates all assignment scores
+  - Calculates weighted average
+  - Converts to letter grade
+  - Must be published by teacher
+  - Updates enrollment status
+end note
+
+note right of TeacherProfile
+  Teacher workflow:
+  1. User signs up as teacher
+  2. Creates TeacherProfile
+  3. Requests subjects to teach
+  4. Admin approves subjects
+  5. Can create courses
+  6. Approves enrollments
+  7. Grades submissions
+end note
+
+note right of StudentProfile
+  Student workflow:
+  1. User signs up as student
+  2. Creates StudentProfile
+  3. Requests course enrollment
+  4. Teacher approves enrollment
+  5. AI features unlocked
+  6. Submits assignments
+  7. Receives grades
+  8. Rates teacher
+end note
+
+@enduml

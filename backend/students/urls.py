@@ -22,6 +22,7 @@ urlpatterns = [
     path('', include(router.urls)),
     path('dashboard/', views.StudentDashboardView.as_view(), name='student-dashboard'),
     path('courses/available/', views.get_available_courses, name='available-courses'),
+    path('enrollments/my-enrollments/', views.get_my_enrollments, name='my-enrollments'),
     path('academic-records/', views.AcademicRecordsView.as_view(), name='academic-records'),
     path('adaptive-learning/', views.AdaptiveLearningView.as_view(), name='adaptive-learning'),
     path('career-guidance/', views.CareerGuidanceView.as_view(), name='career-guidance'),
@@ -30,6 +31,7 @@ urlpatterns = [
     path('academic-transcript/', views.get_academic_transcript, name='academic-transcript'),
     path('ai-progress-analysis/', views.get_ai_progress_analysis, name='ai-progress-analysis'),
     path('personalized-learning-path/', views.get_personalized_learning_path, name='personalized-learning-path'),
+    path('learning-path/', views.get_personalized_learning_path, name='learning-path'),  # Frontend compatibility
     path('engagement-analytics/', views.get_engagement_analytics, name='engagement-analytics'),
     path('generate-ai-assessment/', views.generate_ai_assessment, name='generate-ai-assessment'),
     path('ai-learning-insights/', views.get_ai_learning_insights, name='ai-learning-insights'),

@@ -28,6 +28,9 @@ class TeacherProfile(models.Model):
 
     # Performance Metrics
     teaching_rating = models.DecimalField(max_digits=3, decimal_places=2, default=0.00)
+    average_rating = models.DecimalField(max_digits=3, decimal_places=2, default=0.00,
+                                         help_text="Average rating from students")
+    total_ratings = models.IntegerField(default=0, help_text="Total number of ratings received")
     student_satisfaction = models.DecimalField(max_digits=3, decimal_places=2, default=0.00)
     course_completion_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
 
@@ -65,6 +68,12 @@ class TeacherProfile(models.Model):
     def can_create_course_in_subject(self, subject):
         """Check if teacher can create a course in a specific subject"""
         return self.is_approved and self.can_teach_subject(subject)
+
+    def update_average_rating(self, new_rating):
+        """Update average rating based on new rating"""
+        self.total_ratings += 1
+        self.average_rating = ((self.average_rating * (self.total_ratings - 1)) + new_rating) / self.total_ratings
+        self.save()
 
 
 class TeachingSchedule(models.Model):

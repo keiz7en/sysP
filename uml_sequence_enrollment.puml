@@ -1,0 +1,274 @@
+@startuml EnrollmentApprovalSequence
+title Enrollment Approval & AI Feature Unlock - EduAI Platform
+
+' Actors and Participants
+actor Student as student
+participant "Student UI\n(React Frontend)" as studentUI
+participant "API Server\n(Django REST)" as api
+participant "CourseEnrollment\nService" as enrollmentSvc
+participant "Course Model" as courseModel
+participant "Database" as db
+participant "Notification\nService" as notifySvc
+participant "WebSocket\nServer" as ws
+participant "Teacher Dashboard\n(React Frontend)" as teacherUI
+actor Teacher as teacher
+participant "AI Service" as aiSvc
+
+' ====================================
+' PHASE 1: STUDENT REQUESTS ENROLLMENT
+' ====================================
+
+group Student Requests Course Enrollment
+    student -> studentUI : Browse courses & click\n"Request Enrollment"
+    activate studentUI
+    
+    studentUI -> api : POST /api/students/enrollments/request/\n{course_id, student_id}
+    activate api
+    
+    api -> courseModel : Validate course status
+    activate courseModel
+    courseModel -> courseModel : Check is_open_for_enrollment
+    courseModel -> courseModel : Check status in [approved, active]
+    courseModel --> api : Course validation result
+    deactivate courseModel
+    
+    alt Course is NOT open or NOT approved
+        api --> studentUI : 400 Bad Request\n"Course not accepting enrollments"
+        studentUI --> student : Display error message
+    else Course is open and approved
+        api -> enrollmentSvc : create_enrollment(student, course)
+        activate enrollmentSvc
+        
+        enrollmentSvc -> db : INSERT CourseEnrollment\n- status = 'pending'\n- ai_features_unlocked = False\n- enrollment_date = now()
+        activate db
+        db --> enrollmentSvc : enrollment_record(id)
+        deactivate db
+        
+        enrollmentSvc --> api : enrollment_created(enrollment_id, status='pending')
+        deactivate enrollmentSvc
+        
+        ' Notify teacher about pending request
+        api -> notifySvc : notify_teacher_pending_enrollment(\nteacher_id, enrollment_id, student_name)
+        activate notifySvc
+        notifySvc -> ws : push notification to teacher channel
+        activate ws
+        ws -> teacherUI : WS message: "New enrollment request"
+        deactivate ws
+        notifySvc -> teacher : Send email: "Enrollment request pending"
+        deactivate notifySvc
+        
+        api --> studentUI : 201 Created\n{enrollment_id, status: 'pending'}
+        deactivate api
+        studentUI --> student : "Enrollment request submitted.\nWaiting for teacher approval."
+    end
+    deactivate studentUI
+end
+
+note over student, db
+Student cannot access course content or AI features
+while enrollment status is 'pending'
+end note
+
+' ====================================
+' PHASE 2: TEACHER REVIEWS & APPROVES
+' ====================================
+
+group Teacher Reviews and Approves Enrollment
+
+    teacher -> teacherUI : Open "Enrollment Requests" page
+    activate teacherUI
+    
+    teacherUI -> api : GET /api/teachers/enrollments/pending/
+    activate api
+    api -> db : SELECT * FROM course_enrollments\nWHERE status='pending' AND\ncourse.instructor_id = teacher_id
+    activate db
+    db --> api : List of pending enrollments
+    deactivate db
+    api --> teacherUI : pending_enrollment_list[]
+    deactivate api
+    teacherUI --> teacher : Display pending requests
+    
+    teacher -> teacherUI : Select enrollment & click "Approve"
+    teacherUI -> api : POST /api/teachers/enrollments/{enrollment_id}/approve/\n{teacher_id}
+    activate api
+    
+    ' Verify teacher permission
+    api -> db : Verify teacher is course instructor
+    activate db
+    db --> api : teacher_verified
+    deactivate db
+    
+    api -> enrollmentSvc : approve_enrollment(enrollment_id, teacher)
+    activate enrollmentSvc
+    
+    ' Update enrollment status
+    enrollmentSvc -> db : BEGIN TRANSACTION
+    activate db
+    
+    enrollmentSvc -> db : UPDATE course_enrollments SET\n- status = 'active'\n- approved_by = teacher_id\n- approved_at = now()\n- ai_features_unlocked = True\n- ai_unlock_date = now()
+    db --> enrollmentSvc : OK (1 row updated)
+    
+    ' Check if course has AI features enabled
+    enrollmentSvc -> db : SELECT ai_content_enabled\nFROM courses WHERE id = course_id
+    db --> enrollmentSvc : ai_content_enabled = True
+    
+    enrollmentSvc -> db : COMMIT TRANSACTION
+    deactivate db
+    
+    enrollmentSvc --> api : enrollment_approved\n{status: 'active', ai_unlocked: true}
+    deactivate enrollmentSvc
+    
+    ' Create initial learning path
+    api -> aiSvc : initialize_learning_path(enrollment_id, student_id)
+    activate aiSvc
+    aiSvc -> db : INSERT learning_path\n{enrollment_id, path_data, difficulty_adjustments}
+    activate db
+    db --> aiSvc : learning_path_created
+    deactivate db
+    
+    ' Initialize gamification
+    aiSvc -> db : INSERT gamification_progress\n{enrollment_id, points=0, level=1}
+    activate db
+    db --> aiSvc : gamification_initialized
+    deactivate db
+    aiSvc --> api : AI features initialized
+    deactivate aiSvc
+    
+    ' Notify student
+    api -> notifySvc : notify_student_enrollment_approved(\nstudent_id, enrollment_id, course_title)
+    activate notifySvc
+    
+    notifySvc -> ws : push notification to student channel
+    activate ws
+    ws -> studentUI : WS: "Enrollment approved!\nAI features unlocked"
+    deactivate ws
+    
+    notifySvc -> student : Email: "Enrollment approved\nYou can now access course content"
+    deactivate notifySvc
+    
+    api --> teacherUI : 200 OK\n{enrollment_status: 'active'}
+    deactivate api
+    teacherUI --> teacher : "Enrollment approved successfully"
+    deactivate teacherUI
+end
+
+' ====================================
+' PHASE 3: STUDENT ACCESSES COURSE WITH AI
+' ====================================
+
+group Student Accesses Course with AI Features
+
+    student -> studentUI : Click on enrolled course
+    activate studentUI
+    
+    studentUI -> api : GET /api/students/courses/{course_id}/
+    activate api
+    
+    ' Verify enrollment and AI access
+    api -> db : SELECT * FROM course_enrollments\nWHERE student_id = ? AND course_id = ?\nAND status = 'active'
+    activate db
+    db --> api : enrollment_data\n{ai_features_unlocked: True}
+    deactivate db
+    
+    api -> db : SELECT * FROM courses WHERE id = ?
+    activate db
+    db --> api : course_data\n{ai_content_enabled: True}
+    deactivate db
+    
+    api -> enrollmentSvc : check_ai_access(enrollment_id)
+    activate enrollmentSvc
+    enrollmentSvc -> enrollmentSvc : is_ai_enabled()\n= status=='active' AND\nai_features_unlocked AND\ncourse.ai_content_enabled
+    enrollmentSvc --> api : ai_access_granted = True
+    deactivate enrollmentSvc
+    
+    ' Load AI-enhanced content
+    api -> aiSvc : get_personalized_content(\nstudent_id, course_id)
+    activate aiSvc
+    aiSvc -> db : SELECT learning_path, gamification\nFROM enrollment
+    activate db
+    db --> aiSvc : personalization_data
+    deactivate db
+    aiSvc --> api : personalized_content
+    deactivate aiSvc
+    
+    api --> studentUI : 200 OK\n{course_data, modules, ai_enabled: true,\npersonalized_content, learning_path}
+    deactivate api
+    
+    studentUI --> student : Display course with:\n- AI-generated content\n- Personalized learning path\n- Adaptive quizzes\n- AI chatbot access
+    deactivate studentUI
+end
+
+' ====================================
+' REJECTION FLOW (ALTERNATIVE)
+' ====================================
+
+group Alternative: Teacher Rejects Enrollment
+
+    teacher -> teacherUI : Select enrollment & click "Reject"
+    activate teacherUI
+    teacherUI -> teacherUI : Teacher enters rejection reason
+    
+    teacherUI -> api : POST /api/teachers/enrollments/{enrollment_id}/reject/\n{teacher_id, rejection_reason}
+    activate api
+    
+    api -> enrollmentSvc : reject_enrollment(enrollment_id, reason)
+    activate enrollmentSvc
+    
+    enrollmentSvc -> db : UPDATE course_enrollments SET\n- status = 'rejected'\n- rejection_reason = reason\n- ai_features_unlocked = False
+    activate db
+    db --> enrollmentSvc : OK
+    deactivate db
+    
+    enrollmentSvc --> api : enrollment_rejected
+    deactivate enrollmentSvc
+    
+    ' Notify student
+    api -> notifySvc : notify_student_enrollment_rejected(\nstudent_id, course_title, reason)
+    activate notifySvc
+    notifySvc -> ws : push notification
+    activate ws
+    ws -> studentUI : WS: "Enrollment request rejected"
+    deactivate ws
+    notifySvc -> student : Email with rejection reason
+    deactivate notifySvc
+    
+    api --> teacherUI : 200 OK
+    deactivate api
+    teacherUI --> teacher : "Enrollment rejected"
+    deactivate teacherUI
+end
+
+' ====================================
+' NOTES
+' ====================================
+
+note over db, enrollmentSvc
+**Database Constraints:**
+- unique_together: (student, course)
+- status: pending → active/rejected
+- AI unlock only when:
+  1. Teacher approves
+  2. Course has ai_content_enabled=True
+  3. Enrollment status = 'active'
+end note
+
+note over api, aiSvc
+**Access Control Rules:**
+CourseEnrollment.is_ai_enabled():
+  return (
+    self.status in ['active', 'approved'] AND
+    self.ai_features_unlocked AND
+    self.course.can_enable_ai_features()
+  )
+end note
+
+note over notifySvc, ws
+**Notifications Sent:**
+1. Student → Teacher: Enrollment requested
+2. Teacher → Student: Approved/Rejected
+3. Real-time via WebSocket
+4. Email notifications
+5. In-app notifications
+end note
+
+@enduml

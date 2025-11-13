@@ -1,5 +1,5 @@
 from rest_framework import viewsets, status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from django.utils import timezone
@@ -47,15 +47,17 @@ class TeacherSubjectRequestViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         user = self.request.user
-        
+
         if user.is_staff:
             return TeacherSubjectRequest.objects.all()
-        
-        try:
-            teacher = TeacherProfile.objects.get(user=user)
-            return TeacherSubjectRequest.objects.filter(teacher=teacher)
-        except TeacherProfile.DoesNotExist:
-            return TeacherSubjectRequest.objects.none()
+
+        if hasattr(user, "user_type") and user.user_type == "teacher":
+            try:
+                teacher = TeacherProfile.objects.get(user=user)
+                return TeacherSubjectRequest.objects.filter(teacher=teacher)
+            except TeacherProfile.DoesNotExist:
+                return TeacherSubjectRequest.objects.none()
+        return TeacherSubjectRequest.objects.none()
     
     def create(self, request, *args, **kwargs):
         """Teacher requests a subject"""
@@ -126,20 +128,6 @@ class TeacherSubjectRequestViewSet(viewsets.ModelViewSet):
         
         serializer = self.get_serializer(subject_request)
         return Response(serializer.data)
-    
-    @action(detail=False, methods=['get'])
-    def my_requests(self, request):
-        """Get current user's subject requests"""
-        try:
-            teacher = TeacherProfile.objects.get(user=request.user)
-            requests = TeacherSubjectRequest.objects.filter(teacher=teacher)
-            serializer = self.get_serializer(requests, many=True)
-            return Response(serializer.data)
-        except TeacherProfile.DoesNotExist:
-            return Response(
-                {'error': 'Teacher profile not found'},
-                status=status.HTTP_404_NOT_FOUND
-            )
 
 
 class TeacherApprovedSubjectViewSet(viewsets.ReadOnlyModelViewSet):
@@ -150,29 +138,17 @@ class TeacherApprovedSubjectViewSet(viewsets.ReadOnlyModelViewSet):
     
     def get_queryset(self):
         user = self.request.user
-        
+
         if user.is_staff:
             return TeacherApprovedSubject.objects.all()
-        
-        try:
-            teacher = TeacherProfile.objects.get(user=user)
-            return TeacherApprovedSubject.objects.filter(teacher=teacher)
-        except TeacherProfile.DoesNotExist:
-            return TeacherApprovedSubject.objects.none()
-    
-    @action(detail=False, methods=['get'])
-    def my_subjects(self, request):
-        """Get current teacher's approved subjects"""
-        try:
-            teacher = TeacherProfile.objects.get(user=request.user)
-            approved = TeacherApprovedSubject.objects.filter(teacher=teacher)
-            serializer = self.get_serializer(approved, many=True)
-            return Response(serializer.data)
-        except TeacherProfile.DoesNotExist:
-            return Response(
-                {'error': 'Teacher profile not found'},
-                status=status.HTTP_404_NOT_FOUND
-            )
+
+        if hasattr(user, "user_type") and user.user_type == "teacher":
+            try:
+                teacher = TeacherProfile.objects.get(user=user)
+                return TeacherApprovedSubject.objects.filter(teacher=teacher)
+            except TeacherProfile.DoesNotExist:
+                return TeacherApprovedSubject.objects.none()
+        return TeacherApprovedSubject.objects.none()
 
 
 class CourseViewSet(viewsets.ModelViewSet):
@@ -188,40 +164,45 @@ class CourseViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         user = self.request.user
-        
+
         if user.is_staff:
             return Course.objects.all()
-        
-        try:
-            teacher = TeacherProfile.objects.get(user=user)
-            if self.action == 'list':
+
+        # Teacher views
+        if hasattr(user, "user_type") and user.user_type == "teacher":
+            try:
+                teacher = TeacherProfile.objects.get(user=user)
                 return Course.objects.filter(instructor=teacher)
-            return Course.objects.filter(instructor=teacher)
-        except TeacherProfile.DoesNotExist:
+            except TeacherProfile.DoesNotExist:
+                return Course.objects.none()
+
+        # Student views
+        if hasattr(user, "user_type") and user.user_type == "student":
             try:
                 StudentProfile.objects.get(user=user)
                 return Course.objects.filter(status='approved', is_open_for_enrollment=True)
             except StudentProfile.DoesNotExist:
-                return Course.objects.filter(status='approved')
+                return Course.objects.filter(status='approved', is_open_for_enrollment=True)
+
+        # Fallback: only show approved courses for users who are neither teacher nor student
+        return Course.objects.filter(status='approved')
     
     def perform_create(self, serializer):
         """Only teachers can create courses in their approved subjects"""
         try:
             teacher = TeacherProfile.objects.get(user=self.request.user)
-            subject_id = serializer.validated_data.get('subject')
-            
-            if not teacher.can_create_course_in_subject(subject_id):
-                return Response(
-                    {'error': 'You are not approved to teach this subject'},
-                    status=status.HTTP_403_FORBIDDEN
-                )
-            
+            subject_obj = serializer.validated_data.get('subject')
+            subject_id = subject_obj.id if subject_obj else None
+
+            # Ensure teacher is approved for the subject
+            if not TeacherApprovedSubject.objects.filter(teacher=teacher, subject_id=subject_id).exists():
+                raise PermissionError("You are not approved to teach this subject")
+
             serializer.save(instructor=teacher)
         except TeacherProfile.DoesNotExist:
-            return Response(
-                {'error': 'Teacher profile not found'},
-                status=status.HTTP_404_NOT_FOUND
-            )
+            raise PermissionError("Teacher profile not found")
+        except PermissionError as e:
+            raise PermissionError(str(e))
     
     @action(detail=False, methods=['get'])
     def available_for_enrollment(self, request):
@@ -326,139 +307,145 @@ class CourseViewSet(viewsets.ModelViewSet):
 
 
 class CourseEnrollmentViewSet(viewsets.ModelViewSet):
-    """ViewSet for course enrollment and approval"""
-    queryset = CourseEnrollment.objects.all()
+    """ViewSet for course enrollment management"""
     serializer_class = CourseEnrollmentSerializer
     permission_classes = [IsAuthenticated]
-    
+
     def get_queryset(self):
         user = self.request.user
-        
-        if user.is_staff:
-            return CourseEnrollment.objects.all()
-        
-        try:
-            teacher = TeacherProfile.objects.get(user=user)
-            return CourseEnrollment.objects.filter(course__instructor=teacher)
-        except TeacherProfile.DoesNotExist:
+
+        # Students see their enrollments
+        if hasattr(user, "user_type") and user.user_type == 'student':
             try:
-                student = StudentProfile.objects.get(user=user)
-                return CourseEnrollment.objects.filter(student=student)
+                student_profile = StudentProfile.objects.get(user=user)
+                return CourseEnrollment.objects.filter(student=student_profile)
             except StudentProfile.DoesNotExist:
                 return CourseEnrollment.objects.none()
-    
-    def create(self, request, *args, **kwargs):
-        """Student requests enrollment in a course"""
-        try:
-            student = StudentProfile.objects.get(user=request.user)
-        except StudentProfile.DoesNotExist:
-            return Response(
-                {'error': 'Student profile not found'},
-                status=status.HTTP_404_NOT_FOUND
-            )
-        
-        course_id = request.data.get('course')
-        course = get_object_or_404(Course, id=course_id)
-        
-        if not course.is_approved_and_open():
-            return Response(
-                {'error': 'This course is not available for enrollment'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        if course.is_full:
-            return Response(
-                {'error': 'Course is full'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        enrollment, created = CourseEnrollment.objects.get_or_create(
-            student=student,
-            course=course,
-            defaults={'status': 'pending'}
-        )
-        
-        if not created:
-            return Response(
-                {'error': 'You are already enrolled in this course'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        serializer = self.get_serializer(enrollment)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-    
-    @action(detail=False, methods=['get'])
-    def my_enrollments(self, request):
-        """Get current student's enrollments"""
-        try:
-            student = StudentProfile.objects.get(user=request.user)
-            enrollments = CourseEnrollment.objects.filter(student=student)
-            serializer = self.get_serializer(enrollments, many=True)
-            return Response(serializer.data)
-        except StudentProfile.DoesNotExist:
-            return Response(
-                {'error': 'Student profile not found'},
-                status=status.HTTP_404_NOT_FOUND
-            )
-    
+
+        # Teachers see enrollments for their courses
+        if hasattr(user, "user_type") and user.user_type == 'teacher':
+            try:
+                teacher_profile = TeacherProfile.objects.get(user=user)
+                return CourseEnrollment.objects.filter(course__instructor=teacher_profile)
+            except TeacherProfile.DoesNotExist:
+                return CourseEnrollment.objects.none()
+
+        # Admins see everything
+        if hasattr(user, "user_type") and user.user_type == 'admin':
+            return CourseEnrollment.objects.all()
+
+        # Fallback: nobody sees anything
+        return CourseEnrollment.objects.none()
+
     @action(detail=False, methods=['get'])
     def pending_enrollments(self, request):
-        """Get teacher's pending enrollment requests"""
+        """Get pending enrollments for teacher"""
+        user = request.user
+        if not hasattr(user, "user_type") or user.user_type != 'teacher':
+            return Response(
+                {'error': 'Only teachers can view pending enrollments'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
         try:
-            teacher = TeacherProfile.objects.get(user=request.user)
-            enrollments = CourseEnrollment.objects.filter(
-                course__instructor=teacher,
+            teacher_profile = TeacherProfile.objects.get(user=user)
+            pending = CourseEnrollment.objects.filter(
+                course__instructor=teacher_profile,
                 status='pending'
-            )
-            serializer = self.get_serializer(enrollments, many=True)
-            return Response(serializer.data)
+            ).select_related('student__user', 'course')
+
+            data = CourseEnrollmentSerializer(pending, many=True).data
+            return Response({'pending_enrollments': data})
         except TeacherProfile.DoesNotExist:
-            return Response(
-                {'error': 'Teacher profile not found'},
-                status=status.HTTP_404_NOT_FOUND
-            )
-    
-    @action(detail=True, methods=['post'])
-    def approve(self, request, pk=None):
-        """Teacher approves student enrollment"""
-        enrollment = self.get_object()
-        
-        if enrollment.course.instructor.user != request.user:
-            return Response(
-                {'error': 'You do not have permission to approve this enrollment'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
-        enrollment.approve_enrollment(request.user)
-        serializer = self.get_serializer(enrollment)
-        return Response(serializer.data)
-    
-    @action(detail=True, methods=['post'])
-    def reject(self, request, pk=None):
-        """Teacher rejects student enrollment"""
-        enrollment = self.get_object()
-        
-        if enrollment.course.instructor.user != request.user:
-            return Response(
-                {'error': 'You do not have permission to reject this enrollment'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
-        reason = request.data.get('reason', '')
-        enrollment.reject_enrollment(reason)
-        serializer = self.get_serializer(enrollment)
-        return Response(serializer.data)
-    
-    @action(detail=False, methods=['post'])
-    def bulk_approve(self, request):
-        """Admin or teacher bulk approves enrollments"""
-        enrollment_ids = request.data.get('enrollment_ids', [])
-        enrollments = CourseEnrollment.objects.filter(id__in=enrollment_ids)
-        
-        for enrollment in enrollments:
-            if enrollment.course.instructor.user != request.user and not request.user.is_staff:
-                continue
-            enrollment.approve_enrollment(request.user)
-        
-        serializer = self.get_serializer(enrollments, many=True)
-        return Response(serializer.data)
+            return Response({'error': 'Teacher profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+# Standalone view functions for frontend compatibility
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_my_subject_requests(request):
+    """
+    Get all subject requests for the logged-in teacher
+    Returns array directly for frontend compatibility
+    """
+    user = request.user
+    if not hasattr(user, "user_type") or user.user_type != 'teacher':
+        return Response({
+            'error': 'Only teachers can view subject requests'
+        }, status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        teacher_profile = TeacherProfile.objects.get(user=user)
+        requests = TeacherSubjectRequest.objects.filter(
+            teacher=teacher_profile
+        ).select_related('subject', 'approved_by').order_by('-request_date')
+
+        requests_data = []
+        for req in requests:
+            requests_data.append({
+                'id': req.id,
+                'subject': {
+                    'id': req.subject.id,
+                    'name': req.subject.name,
+                    'code': req.subject.code,
+                    'category': req.subject.category
+                },
+                'status': req.status,
+                'request_date': req.request_date.isoformat(),
+                'approved_by': req.approved_by.get_full_name() if req.approved_by else None,
+                'approved_at': req.approved_at.isoformat() if req.approved_at else None,
+                'rejection_reason': req.rejection_reason
+            })
+
+        # Return array directly for frontend .map() compatibility
+        return Response(requests_data)
+
+    except Exception as e:
+        return Response({
+            'error': f'Failed to fetch subject requests: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_my_approved_subjects(request):
+    """
+    Get all approved subjects for the logged-in teacher
+    Returns array directly for frontend compatibility
+    """
+    user = request.user
+    if not hasattr(user, "user_type") or user.user_type != 'teacher':
+        return Response({
+            'error': 'Only teachers can view approved subjects'
+        }, status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        teacher_profile = TeacherProfile.objects.get(user=user)
+        approved = TeacherApprovedSubject.objects.filter(
+            teacher=teacher_profile
+        ).select_related('subject', 'approved_by').order_by('-approved_date')
+
+        approved_data = []
+        for app in approved:
+            approved_data.append({
+                'id': app.id,
+                'subject': {
+                    'id': app.subject.id,
+                    'name': app.subject.name,
+                    'code': app.subject.code,
+                    'category': app.subject.category,
+                    'description': app.subject.description
+                },
+                'approved_date': app.approved_date.isoformat(),
+                'approved_by': app.approved_by.get_full_name() if app.approved_by else None
+            })
+
+        # Return array directly for frontend .map() compatibility
+        return Response(approved_data)
+
+    except Exception as e:
+        return Response({
+            'error': f'Failed to fetch approved subjects: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

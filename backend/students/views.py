@@ -79,7 +79,7 @@ class StudentDashboardView(APIView):
         enrollments = CourseEnrollment.objects.filter(
             student=student_profile,
             status='active'
-        ).select_related('course', 'course__instructor__user')
+        ).select_related('course', 'course__instructor__user', 'course__subject')
 
         # Return comprehensive student dashboard data
         dashboard_data = {
@@ -113,7 +113,9 @@ class StudentDashboardView(APIView):
                     'enrollment_date': enrollment.enrollment_date.strftime('%Y-%m-%d'),
                     'status': enrollment.status,
                     'credits': enrollment.course.credits,
-                    'difficulty_level': enrollment.course.difficulty_level
+                    'difficulty_level': enrollment.course.difficulty_level,
+                    'ai_enabled': enrollment.course.ai_enabled,
+                    'subject': enrollment.course.subject.name if enrollment.course.subject else 'General'
                 })
             dashboard_data['current_enrollments'] = enrollments_data
 
@@ -1030,35 +1032,45 @@ def get_ai_learning_insights(request):
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def get_available_courses(request):
-    """Get all available courses for students to browse"""
+    """
+    Get all courses available for student enrollment
+    Filtered by: approved status, open for enrollment, and teacher has approved subject
+    """
+    if not hasattr(request.user, 'user_type') or request.user.user_type != 'student':
+        return Response({
+            'error': 'Only students can view available courses'
+        }, status=status.HTTP_403_FORBIDDEN)
+
     try:
-        if request.user.user_type != 'student':
-            return Response({'error': 'Student access only'}, status=status.HTTP_403_FORBIDDEN)
+        from courses.models import Course, CourseEnrollment
+        from students.models import StudentProfile
 
-        student_profile = StudentProfile.objects.get(user=request.user)
+        student = StudentProfile.objects.get(user=request.user)
 
-        # Get ALL approved and active courses - these are courses ready for enrollment
-        all_courses = Course.objects.filter(
+        # Get all approved courses that are open for enrollment
+        available_courses = Course.objects.filter(
             status__in=['approved', 'active']
-        ).select_related('instructor__user', 'subject')
+        ).select_related(
+            'instructor__user',
+            'subject'
+        ).prefetch_related('enrollments')
 
-        # Get courses student is already enrolled in
-        enrolled_course_ids = CourseEnrollment.objects.filter(
-            student=student_profile
+        # Get student's current enrollments to mark already enrolled courses
+        student_enrollments = CourseEnrollment.objects.filter(
+            student=student
         ).values_list('course_id', flat=True)
 
-        available_courses = []
-        for course in all_courses:
-            # Count current active enrollments
-            current_enrollments = CourseEnrollment.objects.filter(
-                course=course,
-                status='active'
-            ).count()
+        courses_data = []
+        for course in available_courses:
+            # Check if already enrolled
+            is_enrolled = course.id in student_enrollments
+            enrollment_status = None
 
-            is_enrolled = course.id in enrolled_course_ids
-            is_full = current_enrollments >= course.enrollment_limit
+            if is_enrolled:
+                enrollment = CourseEnrollment.objects.get(student=student, course=course)
+                enrollment_status = enrollment.status
 
-            available_courses.append({
+            courses_data.append({
                 'id': course.id,
                 'title': course.title,
                 'code': course.code,
@@ -1068,27 +1080,110 @@ def get_available_courses(request):
                 'instructor_name': course.instructor.user.get_full_name(),
                 'subject_name': course.subject.name,
                 'subject_code': course.subject.code,
-                'current_enrollments': current_enrollments,
+                'current_enrollments': course.enrolled_count,
                 'enrollment_limit': course.enrollment_limit,
                 'is_enrolled': is_enrolled,
-                'is_full': is_full,
-                'can_enroll': not is_enrolled and not is_full,
+                'enrollment_status': enrollment_status,
+                'can_enroll': not is_enrolled and course.enrolled_count < course.enrollment_limit,
                 'start_date': course.start_date.isoformat() if course.start_date else None,
                 'end_date': course.end_date.isoformat() if course.end_date else None,
                 'status': course.status
             })
 
         return Response({
-            'available_courses': available_courses,
-            'total_courses': len(available_courses),
-            'enrolled_count': len(enrolled_course_ids),
-            'message': 'Contact your teacher to request enrollment in a course' if len(available_courses) > 0 and len(
-                enrolled_course_ids) == 0 else None
+            'available_courses': courses_data,
+            'total_courses': len(courses_data),
+            'enrolled_count': len(student_enrollments),
+            'message': 'Contact your teacher to request enrollment in a course' if len(courses_data) > 0 and len(
+                student_enrollments) == 0 else None
         })
 
     except StudentProfile.DoesNotExist:
-        return Response({'error': 'Student profile not found'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({
+            'error': 'Student profile not found'
+        }, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
         import traceback
         print(f"Error getting available courses: {traceback.format_exc()}")
-        return Response({'error': f'Server error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({
+            'error': f'Server error: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_my_enrollments(request):
+    """
+    Get all enrollments for the logged-in student
+    Shows current, pending, and completed courses
+    """
+    if not hasattr(request.user, 'user_type') or request.user.user_type != 'student':
+        return Response({
+            'error': 'Only students can view enrollments'
+        }, status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        from courses.models import CourseEnrollment
+        from students.models import StudentProfile
+
+        student = StudentProfile.objects.get(user=request.user)
+
+        enrollments = CourseEnrollment.objects.filter(
+            student=student
+        ).select_related(
+            'course__instructor__user',
+            'course__subject'
+        ).order_by('-enrollment_date')
+
+        enrollments_data = []
+        for enrollment in enrollments:
+            enrollments_data.append({
+                'id': enrollment.id,
+                'course': {
+                    'id': enrollment.course.id,
+                    'title': enrollment.course.title,
+                    'code': enrollment.course.code,
+                    'subject': enrollment.course.subject.name,
+                    'instructor': enrollment.course.instructor.user.get_full_name()
+                },
+                'status': enrollment.status,
+                'enrollment_date': enrollment.enrollment_date.isoformat(),
+                'completion_percentage': float(enrollment.completion_percentage),
+                'grade': enrollment.grade,
+                'ai_features_unlocked': enrollment.ai_features_unlocked,
+                'approved_by': enrollment.approved_by.get_full_name() if enrollment.approved_by else None,
+                'approved_at': enrollment.approved_at.isoformat() if enrollment.approved_at else None,
+                'rejection_reason': enrollment.rejection_reason
+            })
+
+        # Categorize enrollments
+        pending = [e for e in enrollments_data if e['status'] == 'pending']
+        active = [e for e in enrollments_data if e['status'] == 'active']
+        completed = [e for e in enrollments_data if e['status'] == 'completed']
+        rejected = [e for e in enrollments_data if e['status'] == 'rejected']
+
+        return Response({
+            'all_enrollments': enrollments_data,
+            'by_status': {
+                'pending': pending,
+                'active': active,
+                'completed': completed,
+                'rejected': rejected
+            },
+            'counts': {
+                'total': len(enrollments_data),
+                'pending': len(pending),
+                'active': len(active),
+                'completed': len(completed),
+                'rejected': len(rejected)
+            }
+        })
+
+    except StudentProfile.DoesNotExist:
+        return Response({
+            'error': 'Student profile not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({
+            'error': f'Failed to fetch enrollments: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

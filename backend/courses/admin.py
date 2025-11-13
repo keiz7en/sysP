@@ -1,7 +1,8 @@
 from django.contrib import admin
 from .models import (
     Subject, TeacherSubjectRequest, TeacherApprovedSubject,
-    Course, CourseEnrollment, CourseModule, Assignment, AssignmentSubmission
+    Course, CourseModule, CourseEnrollment, Assignment, AssignmentSubmission,
+    Notification, ActivityLog, Certificate, StudentFeedback
 )
 
 
@@ -108,3 +109,39 @@ class AssignmentSubmissionAdmin(admin.ModelAdmin):
     list_display = ['student', 'assignment', 'submitted_at', 'points_earned', 'is_late']
     list_filter = ['is_late', 'submitted_at', 'graded_at']
     search_fields = ['student__student_id', 'assignment__title']
+
+
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+    list_display = ('id', 'user', 'notification_type', 'title', 'is_read', 'created_at')
+    list_filter = ('notification_type', 'is_read', 'created_at')
+    search_fields = ('user__username', 'user__email', 'title', 'message')
+    readonly_fields = ('created_at',)
+    ordering = ('-created_at',)
+
+
+@admin.register(ActivityLog)
+class ActivityLogAdmin(admin.ModelAdmin):
+    list_display = ('id', 'user', 'action_type', 'target_model', 'timestamp', 'ip_address')
+    list_filter = ('action_type', 'timestamp')
+    search_fields = ('user__username', 'description', 'target_model')
+    readonly_fields = ('timestamp',)
+    ordering = ('-timestamp',)
+
+
+@admin.register(Certificate)
+class CertificateAdmin(admin.ModelAdmin):
+    list_display = ('certificate_id', 'student', 'course', 'final_grade', 'issue_date', 'is_verified')
+    list_filter = ('issue_date', 'is_verified', 'final_grade')
+    search_fields = ('certificate_id', 'verification_code', 'student__user__username', 'course__title')
+    readonly_fields = ('certificate_id', 'verification_code', 'issue_date', 'created_at')
+    ordering = ('-issue_date',)
+
+
+@admin.register(StudentFeedback)
+class StudentFeedbackAdmin(admin.ModelAdmin):
+    list_display = ('id', 'student', 'risk_level', 'predicted_next_score', 'confidence_score', 'generated_at')
+    list_filter = ('risk_level', 'generated_at', 'ai_model_version')
+    search_fields = ('student__user__username', 'feedback_text')
+    readonly_fields = ('generated_at', 'updated_at')
+    ordering = ('-generated_at',)
