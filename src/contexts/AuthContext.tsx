@@ -114,21 +114,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({children}) => {
                         setUser(processedUser)
                         setToken(storedToken)
                     } else {
+                        // Token is invalid, clear it
                         localStorage.removeItem('auth_token')
                         setToken(null)
+                        setUser(null)
                     }
                 } catch (error) {
                     console.error('Token verification failed:', error)
+                    // Clear invalid token
                     localStorage.removeItem('auth_token')
                     setToken(null)
-                    // Show demo mode fallback for development
-                    if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
-                        console.log('Backend not available, demo mode available')
-                    }
+                    setUser(null)
                 }
             }
         } catch (error) {
             console.error('Auth check failed:', error)
+            setToken(null)
+            setUser(null)
         } finally {
             setIsLoading(false)
         }

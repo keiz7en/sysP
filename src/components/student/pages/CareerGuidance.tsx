@@ -3,16 +3,30 @@ import {motion, AnimatePresence} from 'framer-motion'
 import {useAuth} from '../../../contexts/AuthContext'
 
 // Career data interfaces
+interface LearningResource {
+    title: string
+    type: 'video' | 'course' | 'article' | 'tutorial'
+    provider: string
+    url: string
+    duration?: string
+    rating?: number
+    free: boolean
+    description?: string
+    ai_generated?: boolean
+}
+
 interface CareerRecommendation {
     title: string
     match_percentage: number
-    salary_range: { min: number; max: number }
+    salary_range: { min: number; max: number } | string
     job_growth: string
     required_skills: string[]
     student_skill_match: string[]
     missing_skills: string[]
     preparation_timeline: string
     industry_sectors: string[]
+    learning_resources?: LearningResource[]
+    relevant_courses?: string[]
 }
 
 interface SkillGap {
@@ -22,6 +36,7 @@ interface SkillGap {
     average_salary_boost: string
     student_proficiency: number
     gap_severity: string
+    learning_resources?: LearningResource[]
 }
 
 interface TrainingProgram {
@@ -59,6 +74,167 @@ const CareerGuidance: React.FC = () => {
     const [marketInsights, setMarketInsights] = useState<MarketInsight[]>([])
     const [selectedCareer, setSelectedCareer] = useState<CareerRecommendation | null>(null)
 
+    // Generate learning resources for a career using Gemini AI
+    const generateLearningResources = async (careerTitle: string, skills: string[]): Promise<LearningResource[]> => {
+        if (!token) return generateFallbackResources(careerTitle, skills)
+
+        try {
+            const response = await fetch('http://localhost:8000/api/students/ai/chatbot/', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Token ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    message: `You are a career guidance AI. For someone pursuing a career as "${careerTitle}", recommend EXACTLY 5 high-quality learning resources.
+
+For each resource, provide:
+1. A SPECIFIC course/video/article title (not generic)
+2. The type: video, course, article, or tutorial
+3. The actual provider name (YouTube channel, Coursera, Udemy, freeCodeCamp, etc.)
+4. A real, working URL (specific course/video link, not just search page)
+5. Estimated duration
+6. Whether it's free or paid
+7. A brief description (one sentence)
+
+Focus on these skills: ${skills.join(', ')}
+
+Return ONLY a valid JSON array in this exact format, nothing else:
+[
+  {
+    "title": "Specific Course Name",
+    "type": "course",
+    "provider": "Coursera",
+    "url": "https://www.coursera.org/learn/actual-course-name",
+    "duration": "4 weeks",
+    "rating": 4.7,
+    "free": false,
+    "description": "Brief description"
+  }
+]
+
+Make sure URLs are real and specific, not search pages. Provide actual course/video names.`,
+                    context: 'Career learning resource recommendation - must return valid JSON'
+                })
+            })
+
+            if (!response.ok) {
+                console.warn('AI API failed, using fallback resources')
+                return generateFallbackResources(careerTitle, skills)
+            }
+
+            const data = await response.json()
+
+            // Try to extract JSON array from AI response
+            if (data.response) {
+                try {
+                    // Remove any markdown code blocks
+                    let jsonText = data.response.trim()
+                    jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '')
+
+                    // Find JSON array
+                    const jsonMatch = jsonText.match(/\[[\s\S]*\]/)
+                    if (jsonMatch) {
+                        const resources = JSON.parse(jsonMatch[0])
+
+                        // Validate the resources
+                        if (Array.isArray(resources) && resources.length > 0) {
+                            const validResources = resources.filter(r =>
+                                r.title && r.type && r.provider && r.url &&
+                                ['video', 'course', 'article', 'tutorial'].includes(r.type)
+                            ).map(r => ({
+                                title: r.title,
+                                type: r.type,
+                                provider: r.provider,
+                                url: r.url,
+                                duration: r.duration || 'Self-paced',
+                                rating: r.rating || undefined,
+                                free: typeof r.free === 'boolean' ? r.free : true,
+                                description: r.description
+                            }))
+
+                            if (validResources.length > 0) {
+                                console.log('✅ Gemini AI generated', validResources.length, 'resources for', careerTitle)
+                                return validResources
+                            }
+                        }
+                    }
+                } catch (parseError) {
+                    console.error('Failed to parse AI response:', parseError)
+                    console.log('AI Response:', data.response.substring(0, 500))
+                }
+            }
+
+            console.warn('AI did not return valid resources, using fallback')
+            return generateFallbackResources(careerTitle, skills)
+
+        } catch (error) {
+            console.error('Error calling AI for learning resources:', error)
+            return generateFallbackResources(careerTitle, skills)
+        }
+    }
+
+    // Fallback learning resources based on career - improved with better URLs
+    const generateFallbackResources = (careerTitle: string, skills: string[]): LearningResource[] => {
+        const encodedCareer = encodeURIComponent(careerTitle)
+        const primarySkill = skills[0] || careerTitle
+        const encodedSkill = encodeURIComponent(primarySkill)
+
+        return [
+            {
+                title: `${careerTitle} Professional Certificate`,
+                type: 'course',
+                provider: 'Coursera',
+                url: `https://www.coursera.org/search?query=${encodedCareer}`,
+                duration: '3-6 months',
+                rating: 4.7,
+                free: false,
+                description: 'Professional certification program',
+                ai_generated: false
+            },
+            {
+                title: `${primarySkill} Full Course - 2024`,
+                type: 'video',
+                provider: 'YouTube',
+                url: `https://www.youtube.com/results?search_query=${encodedSkill}+full+course+2024`,
+                duration: '3-5 hours',
+                free: true,
+                description: 'Complete tutorial on YouTube',
+                ai_generated: false
+            },
+            {
+                title: `${careerTitle} Bootcamp`,
+                type: 'course',
+                provider: 'Udemy',
+                url: `https://www.udemy.com/courses/search/?q=${encodedCareer}`,
+                duration: 'Self-paced',
+                rating: 4.5,
+                free: false,
+                description: 'Comprehensive hands-on bootcamp',
+                ai_generated: false
+            },
+            {
+                title: `${primarySkill} Interactive Tutorial`,
+                type: 'tutorial',
+                provider: 'freeCodeCamp',
+                url: `https://www.freecodecamp.org/news/search?query=${encodedSkill}`,
+                duration: '2-4 hours',
+                free: true,
+                description: 'Step-by-step interactive learning',
+                ai_generated: false
+            },
+            {
+                title: `${careerTitle} Career Guide 2024`,
+                type: 'article',
+                provider: 'Medium',
+                url: `https://medium.com/search?q=${encodedCareer}+guide`,
+                free: true,
+                description: 'Comprehensive career roadmap article',
+                ai_generated: false
+            }
+        ]
+    }
+
     // Fetch career recommendations
     const fetchCareerRecommendations = async () => {
         try {
@@ -78,7 +254,16 @@ const CareerGuidance: React.FC = () => {
 
             // Parse the response to match our interface
             const careers = data.guidance?.recommended_careers || []
-            setCareerRecommendations(careers)
+
+            // Generate learning resources for each career
+            const careersWithResources = await Promise.all(
+                careers.map(async (career: CareerRecommendation) => {
+                    const resources = await generateLearningResources(career.title, career.missing_skills)
+                    return {...career, learning_resources: resources}
+                })
+            )
+
+            setCareerRecommendations(careersWithResources)
         } catch (err: any) {
             setError(err.message)
             console.error('Error fetching career recommendations:', err)
@@ -102,7 +287,7 @@ const CareerGuidance: React.FC = () => {
             if (!response.ok) {
                 // If this endpoint doesn't exist, provide mock data for now
                 console.warn('Skill gap endpoint not available, using sample data')
-                setSkillGaps([
+                const mockSkills = [
                     {
                         skill: 'Python Programming',
                         demand_level: 'Very High',
@@ -127,25 +312,46 @@ const CareerGuidance: React.FC = () => {
                         student_proficiency: 0,
                         gap_severity: 'high'
                     }
-                ])
+                ]
+
+                // Generate learning resources for each skill
+                const skillsWithResources = await Promise.all(
+                    mockSkills.map(async (skill) => {
+                        const resources = await Promise.resolve(generateFallbackResources(skill.skill, [skill.skill]))
+                        return {...skill, learning_resources: resources.slice(0, 3)}
+                    })
+                )
+
+                setSkillGaps(skillsWithResources)
                 setLoading(false)
                 return
             }
             const data = await response.json()
-            setSkillGaps(data.market_demand_skills || [])
+            const skills = data.market_demand_skills || []
+
+            // Generate learning resources for each skill
+            const skillsWithResources = await Promise.all(
+                skills.map(async (skill: SkillGap) => {
+                    const resources = await Promise.resolve(generateFallbackResources(skill.skill, [skill.skill]))
+                    return {...skill, learning_resources: resources.slice(0, 3)}
+                })
+            )
+
+            setSkillGaps(skillsWithResources)
         } catch (err: any) {
             console.error('Error fetching skill gaps:', err)
             // Provide fallback data
-            setSkillGaps([
-                {
-                    skill: 'Python Programming',
-                    demand_level: 'Very High',
-                    growth_rate: '+25%',
-                    average_salary_boost: '$15,000',
-                    student_proficiency: 0,
-                    gap_severity: 'critical'
-                }
-            ])
+            const fallbackSkillResources = await Promise.resolve(generateFallbackResources('Python Programming', ['Python Programming']))
+            const fallbackSkill = {
+                skill: 'Python Programming',
+                demand_level: 'Very High',
+                growth_rate: '+25%',
+                average_salary_boost: '$15,000',
+                student_proficiency: 0,
+                gap_severity: 'critical',
+                learning_resources: fallbackSkillResources.slice(0, 3)
+            }
+            setSkillGaps([fallbackSkill])
         } finally {
             setLoading(false)
         }
@@ -556,6 +762,106 @@ const CareerGuidance: React.FC = () => {
                                                 ⏱️ <strong>Preparation Timeline:</strong> {career.preparation_timeline}
                                             </p>
 
+                                            {/* Relevant Courses */}
+                                            {career.relevant_courses && career.relevant_courses.length > 0 && (
+                                                <div style={{
+                                                    marginBottom: '1rem'
+                                                }}>
+                                                    <h4 style={{
+                                                        fontSize: '0.95rem',
+                                                        color: '#6b7280',
+                                                        marginBottom: '0.5rem',
+                                                        fontWeight: '600'
+                                                    }}>✅ Relevant Courses You've Taken:</h4>
+                                                    <div style={{display: 'flex', gap: '0.6rem', flexWrap: 'wrap'}}>
+                                                        {(career.relevant_courses || []).map((course, rcidx) => (
+                                                            <span key={rcidx}
+                                                                  style={{
+                                                                      backgroundColor: '#cffafe',
+                                                                      color: '#075985',
+                                                                      padding: '0.4rem 0.8rem',
+                                                                      borderRadius: '10px',
+                                                                      fontSize: '0.85rem',
+                                                                      fontWeight: '600'
+                                                                  }}>
+                                                                {course}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Gemini AI generated learning resources */}
+                                            {career.learning_resources && career.learning_resources.length > 0 && (
+                                                <div style={{marginBottom: '1.5rem'}}>
+                                                    <h4 style={{
+                                                        fontSize: '0.95rem',
+                                                        color: '#6b7280',
+                                                        marginBottom: '0.5rem',
+                                                        fontWeight: '600'
+                                                    }}>📚 Recommended Learning Resources (Gemini AI):</h4>
+                                                    <div style={{
+                                                        display: 'grid',
+                                                        gap: '0.7rem',
+                                                        gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))'
+                                                    }}>
+                                                        {career.learning_resources.map((res, lridx) => (
+                                                            <a
+                                                                key={lridx}
+                                                                href={res.url}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                style={{
+                                                                    backgroundColor: '#f3f4f6',
+                                                                    padding: '0.9rem',
+                                                                    borderRadius: '10px',
+                                                                    textDecoration: 'none',
+                                                                    color: '#22223b',
+                                                                    transition: 'background 0.2s, box-shadow 0.2s',
+                                                                    boxShadow: '0 2px 4px rgba(99,102,241,0.04)',
+                                                                    border: '1px solid #e5e7eb',
+                                                                    display: 'block'
+                                                                }}
+                                                                onMouseEnter={e => {
+                                                                    e.currentTarget.style.backgroundColor = '#e0e7ff'
+                                                                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(99,102,241,0.13)'
+                                                                }}
+                                                                onMouseLeave={e => {
+                                                                    e.currentTarget.style.backgroundColor = '#f3f4f6'
+                                                                    e.currentTarget.style.boxShadow = '0 2px 4px rgba(99,102,241,0.05)'
+                                                                }}
+                                                            >
+                                                                <div style={{
+                                                                    fontWeight: 700,
+                                                                    fontSize: '1.01rem',
+                                                                    marginBottom: '0.25rem'
+                                                                }}>
+                                                                    {res.title}
+                                                                </div>
+                                                                <div style={{fontSize: '0.87rem', color: '#64748b'}}>
+                                                                    {res.type === 'course' && '🧑‍🏫 Course '}
+                                                                    {res.type === 'video' && '🎬 Video '}
+                                                                    {res.type === 'article' && '📑 Article '}
+                                                                    {res.type === 'tutorial' && '🔍 Tutorial '}
+                                                                    {res.provider && `· ${res.provider} `}
+                                                                    {res.duration && `· ${res.duration} `}
+                                                                    {typeof res.free === 'boolean' && (res.free
+                                                                            ? '· Free'
+                                                                            : '· Paid'
+                                                                    )}
+                                                                </div>
+                                                                {res.rating && (<div style={{
+                                                                    marginTop: '0.25rem',
+                                                                    fontSize: '0.93rem',
+                                                                    color: '#f59e0b',
+                                                                    fontWeight: 600
+                                                                }}>⭐ {res.rating}</div>)}
+                                                            </a>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
                                             <button
                                                 onClick={() => setSelectedCareer(career)}
                                                 style={{
@@ -724,6 +1030,64 @@ const CareerGuidance: React.FC = () => {
                                                         />
                                                     </div>
                                                 </div>
+                                                {/* Learning resources for this skill */}
+                                                {skill.learning_resources && skill.learning_resources.length > 0 && (
+                                                    <div style={{marginTop: '1rem'}}>
+                                                        <h4 style={{
+                                                            fontSize: '0.85rem',
+                                                            color: '#6b7280',
+                                                            marginBottom: '0.5rem',
+                                                            fontWeight: '600'
+                                                        }}>📚 Learn This Skill:</h4>
+                                                        <div style={{
+                                                            display: 'flex',
+                                                            flexDirection: 'column',
+                                                            gap: '0.5rem'
+                                                        }}>
+                                                            {skill.learning_resources.map((res: LearningResource, resIdx: number) => (
+                                                                <a
+                                                                    key={resIdx}
+                                                                    href={res.url}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    style={{
+                                                                        backgroundColor: '#f9fafb',
+                                                                        padding: '0.75rem',
+                                                                        borderRadius: '8px',
+                                                                        textDecoration: 'none',
+                                                                        color: '#1f2937',
+                                                                        fontSize: '0.85rem',
+                                                                        border: '1px solid #e5e7eb',
+                                                                        transition: 'all 0.2s',
+                                                                        display: 'block'
+                                                                    }}
+                                                                    onMouseEnter={e => {
+                                                                        e.currentTarget.style.backgroundColor = '#e0e7ff'
+                                                                        e.currentTarget.style.borderColor = '#6366f1'
+                                                                    }}
+                                                                    onMouseLeave={e => {
+                                                                        e.currentTarget.style.backgroundColor = '#f9fafb'
+                                                                        e.currentTarget.style.borderColor = '#e5e7eb'
+                                                                    }}
+                                                                >
+                                                                    <div style={{
+                                                                        fontWeight: '600',
+                                                                        marginBottom: '0.25rem'
+                                                                    }}>
+                                                                        {res.type === 'video' && '🎥 '}
+                                                                        {res.type === 'course' && '🎓 '}
+                                                                        {res.type === 'article' && '📄 '}
+                                                                        {res.type === 'tutorial' && '💻 '}
+                                                                        {res.title}
+                                                                    </div>
+                                                                    <div style={{color: '#6b7280', fontSize: '0.8rem'}}>
+                                                                        {res.provider} {res.duration && `· ${res.duration}`} {res.free && '· Free'}
+                                                                    </div>
+                                                                </a>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </motion.div>
                                         ))
                                     )}
@@ -1131,6 +1495,101 @@ const CareerGuidance: React.FC = () => {
                                     ))}
                                 </div>
                             </div>
+                            {/* Relevant courses for selected career */}
+                            {selectedCareer.relevant_courses && selectedCareer.relevant_courses.length > 0 && (
+                                <div style={{marginBottom: '1.5rem'}}>
+                                    <h3 style={{
+                                        fontSize: '1.1rem',
+                                        marginBottom: '0.75rem',
+                                        color: '#374151'
+                                    }}>✅ Your Relevant Courses</h3>
+                                    <div style={{display: 'flex', gap: '0.5rem', flexWrap: 'wrap'}}>
+                                        {(selectedCareer.relevant_courses || []).map((rcourse, rci) => (
+                                            <span key={rci}
+                                                  style={{
+                                                      backgroundColor: '#cffafe',
+                                                      color: '#075985',
+                                                      padding: '0.5rem 1.1rem',
+                                                      borderRadius: '10px',
+                                                      fontSize: '0.97rem',
+                                                      fontWeight: '600'
+                                                  }}
+                                            >
+                                                {rcourse}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {/* Gemini AI generated learning resources for selected career */}
+                            {selectedCareer.learning_resources && selectedCareer.learning_resources.length > 0 && (
+                                <div style={{marginBottom: '1.5rem'}}>
+                                    <h3 style={{
+                                        fontSize: '1.1rem',
+                                        marginBottom: '0.75rem',
+                                        color: '#374151'
+                                    }}>📚 Gemini AI Learning Resources</h3>
+                                    <div style={{
+                                        display: 'grid',
+                                        gap: '0.7rem',
+                                        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))'
+                                    }}>
+                                        {selectedCareer.learning_resources.map((res, lidx) => (
+                                            <a
+                                                key={lidx}
+                                                href={res.url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                style={{
+                                                    backgroundColor: '#f3f4f6',
+                                                    padding: '1rem',
+                                                    borderRadius: '10px',
+                                                    textDecoration: 'none',
+                                                    color: '#22223b',
+                                                    transition: 'background 0.2s, box-shadow 0.2s',
+                                                    boxShadow: '0 2px 4px rgba(99,102,241,0.04)',
+                                                    border: '1px solid #e5e7eb',
+                                                    display: 'block'
+                                                }}
+                                                onMouseEnter={e => {
+                                                    e.currentTarget.style.backgroundColor = '#e0e7ff'
+                                                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(99,102,241,0.13)'
+                                                }}
+                                                onMouseLeave={e => {
+                                                    e.currentTarget.style.backgroundColor = '#f3f4f6'
+                                                    e.currentTarget.style.boxShadow = '0 2px 4px rgba(99,102,241,0.05)'
+                                                }}
+                                            >
+                                                <div style={{
+                                                    fontWeight: 700,
+                                                    fontSize: '1.08rem',
+                                                    marginBottom: '0.25rem'
+                                                }}>
+                                                    {res.title}
+                                                </div>
+                                                <div style={{fontSize: '0.94rem', color: '#64748b'}}>
+                                                    {res.type === 'course' && '🧑‍🏫 Course '}
+                                                    {res.type === 'video' && '🎬 Video '}
+                                                    {res.type === 'article' && '📑 Article '}
+                                                    {res.type === 'tutorial' && '🔍 Tutorial '}
+                                                    {res.provider && `· ${res.provider} `}
+                                                    {res.duration && `· ${res.duration} `}
+                                                    {typeof res.free === 'boolean' && (res.free
+                                                            ? '· Free'
+                                                            : '· Paid'
+                                                    )}
+                                                </div>
+                                                {res.rating && (<div style={{
+                                                    marginTop: '0.25rem',
+                                                    fontSize: '0.97rem',
+                                                    color: '#f59e0b',
+                                                    fontWeight: 600
+                                                }}>⭐ {res.rating}</div>)}
+                                            </a>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
                             <div style={{marginBottom: '1.5rem'}}>
                                 <h3 style={{

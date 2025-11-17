@@ -211,12 +211,148 @@ const AILearningAssistant: React.FC = () => {
                 topic: `${selectedCourse.course_title} - ${chapter}`,
                 difficulty
             });
-            setPersonalizedContent(response.content);
+
+            // Also generate learning resources for this topic
+            const learningResources = await generateLearningResourcesForTopic(
+                selectedCourse.course_title,
+                chapter,
+                difficulty
+            );
+
+            setPersonalizedContent({
+                ...response.content,
+                learning_resources: learningResources
+            });
             setActiveTab('learning');
         } catch (error: any) {
             toast.error(error.message || 'Failed to generate personalized content');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const generateLearningResourcesForTopic = async (
+        courseTitle: string,
+        chapter: string,
+        difficulty: string
+    ): Promise<any[]> => {
+        if (!token) return [];
+
+        try {
+            const response = await aiStudentAPI.sendChatMessage(token, {
+                message: `You are an educational AI assistant. A student is learning "${courseTitle}" and specifically the chapter "${chapter}" at ${difficulty} level.
+
+Recommend EXACTLY 5 high-quality, SPECIFIC learning resources to help them master this topic.
+
+For each resource, provide:
+1. A SPECIFIC title (actual course/video name, not generic)
+2. Type: video, course, article, or tutorial
+3. The actual provider/creator (specific YouTube channel, platform name, author)
+4. A REAL, working URL (actual course/video link, NOT a search page)
+5. Estimated duration
+6. Whether it's free or paid
+7. A one-sentence description of what they'll learn
+
+Return ONLY a valid JSON array, nothing else:
+[
+  {
+    "title": "Exact Course/Video Name",
+    "type": "video",
+    "provider": "Specific Provider/Channel",
+    "url": "https://actual-specific-url.com/course",
+    "duration": "2 hours",
+    "free": true,
+    "description": "Learn X by doing Y"
+  }
+]
+
+IMPORTANT: Provide REAL course/video names and specific URLs, not search URLs. Think like you're recommending actual resources you know about.`,
+                context: 'Learning resource finder - must return valid JSON array'
+            });
+
+            // Try to parse JSON from AI response
+            if (response.response) {
+                try {
+                    // Remove markdown code blocks
+                    let jsonText = response.response.trim();
+                    jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+
+                    // Find and parse JSON array
+                    const jsonMatch = jsonText.match(/\[[\s\S]*\]/);
+                    if (jsonMatch) {
+                        const resources = JSON.parse(jsonMatch[0]);
+
+                        // Validate resources
+                        if (Array.isArray(resources) && resources.length > 0) {
+                            const validResources = resources.filter(r =>
+                                r.title && r.type && r.provider && r.url &&
+                                ['video', 'course', 'article', 'tutorial'].includes(r.type)
+                            );
+
+                            if (validResources.length > 0) {
+                                console.log('✅ Gemini AI generated', validResources.length, 'learning resources for', chapter);
+                                return validResources;
+                            }
+                        }
+                    }
+                } catch (parseError) {
+                    console.error('Failed to parse AI learning resources:', parseError);
+                    console.log('AI Response preview:', response.response.substring(0, 300));
+                }
+            }
+
+            // Fallback to curated resources
+            console.warn('AI did not return valid resources, using curated fallback');
+            const encodedTopic = encodeURIComponent(`${courseTitle} ${chapter}`);
+            return [
+                {
+                    title: `${chapter} - Complete Tutorial 2024`,
+                    type: 'video',
+                    provider: 'YouTube',
+                    url: `https://www.youtube.com/results?search_query=${encodedTopic}+tutorial+2024`,
+                    duration: '30-60 min',
+                    free: true,
+                    description: 'Comprehensive video tutorial covering all concepts'
+                },
+                {
+                    title: `${chapter} Specialization`,
+                    type: 'course',
+                    provider: 'Coursera',
+                    url: `https://www.coursera.org/search?query=${encodedTopic}`,
+                    duration: '2-4 weeks',
+                    free: false,
+                    description: 'Professional course with certificate'
+                },
+                {
+                    title: `Learn ${chapter} Interactively`,
+                    type: 'tutorial',
+                    provider: 'freeCodeCamp',
+                    url: `https://www.freecodecamp.org/news/search?query=${encodeURIComponent(chapter)}`,
+                    duration: '1-3 hours',
+                    free: true,
+                    description: 'Hands-on coding exercises and projects'
+                },
+                {
+                    title: `${chapter} Documentation & Guide`,
+                    type: 'article',
+                    provider: 'Official Docs',
+                    url: `https://www.google.com/search?q=${encodedTopic}+documentation+guide`,
+                    free: true,
+                    description: 'Official documentation and best practices'
+                },
+                {
+                    title: `${chapter} Masterclass`,
+                    type: 'course',
+                    provider: 'Udemy',
+                    url: `https://www.udemy.com/courses/search/?q=${encodedTopic}`,
+                    duration: 'Self-paced',
+                    free: false,
+                    description: 'In-depth course with practical examples'
+                }
+            ];
+        } catch (error) {
+            console.error('Error generating learning resources:', error);
+            return [];
         }
     };
 
@@ -760,6 +896,88 @@ const AILearningAssistant: React.FC = () => {
                                             ))}
                                         </div>
                                     </div>
+
+                                    {Array.isArray(personalizedContent.learning_resources) && personalizedContent.learning_resources.length > 0 && (
+                                        <div style={styles.contentSection}>
+                                            <h3>🌐 Learning Resources</h3>
+                                            <div style={{
+                                                display: 'grid',
+                                                gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
+                                                gap: '1rem'
+                                            }}>
+                                                {personalizedContent.learning_resources.map((resource: any, idx: number) => (
+                                                    <a
+                                                        key={idx}
+                                                        href={resource.url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        style={{
+                                                            display: 'block',
+                                                            padding: '1.5rem',
+                                                            background: resource.free
+                                                                ? 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)'
+                                                                : 'linear-gradient(135deg, #ede9fe 0%, #c4b5fd 100%)',
+                                                            borderRadius: '14px',
+                                                            border: '1px solid #e2e8f0',
+                                                            color: '#1e293b',
+                                                            textDecoration: 'none',
+                                                            boxShadow: '0 2px 8px rgba(102,126,234,0.08)',
+                                                            transition: 'all 0.2s ease'
+                                                        }}
+                                                    >
+                                                        <div style={{
+                                                            fontSize: '1.1rem',
+                                                            fontWeight: 700,
+                                                            marginBottom: '0.5rem'
+                                                        }}>
+                                                            {resource.title}
+                                                        </div>
+                                                        <div style={{marginBottom: '0.5rem'}}>
+                                                            <span style={{
+                                                                background: '#667eea',
+                                                                color: 'white',
+                                                                borderRadius: '8px',
+                                                                padding: '2px 10px',
+                                                                fontSize: '12px',
+                                                                marginRight: '8px'
+                                                            }}>{resource.type}</span>
+                                                            <span style={{
+                                                                background: '#cffafe',
+                                                                color: '#0891b2',
+                                                                borderRadius: '8px',
+                                                                padding: '2px 10px',
+                                                                fontSize: '12px'
+                                                            }}>{resource.provider}</span>
+                                                            {resource.free && <span style={{
+                                                                background: '#bbf7d0',
+                                                                color: '#065f46',
+                                                                borderRadius: '8px',
+                                                                padding: '2px 10px',
+                                                                fontSize: '12px',
+                                                                marginLeft: '8px'
+                                                            }}>Free</span>}
+                                                        </div>
+                                                        {resource.duration && <div style={{
+                                                            fontSize: '13px',
+                                                            color: '#64748b',
+                                                            marginBottom: '0.5rem'
+                                                        }}>⏱️ {resource.duration}</div>}
+                                                        <div style={{
+                                                            color: '#334155',
+                                                            fontSize: '14px',
+                                                            marginBottom: '0.35rem'
+                                                        }}>
+                                                            {resource.description}
+                                                        </div>
+                                                        <div style={{
+                                                            fontSize: '12px',
+                                                            color: '#6366f1'
+                                                        }}>🔗 {resource.url}</div>
+                                                    </a>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
 
                                     <div style={styles.aiTag}>
                                         ✨ Powered by {personalizedContent.model || 'Gemini AI'}
