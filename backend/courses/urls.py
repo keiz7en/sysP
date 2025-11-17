@@ -6,12 +6,13 @@ app_name = 'courses'
 
 router = DefaultRouter()
 router.register(r'subjects', management_views.SubjectViewSet, basename='subject')
-router.register(r'teacher-subject-requests', management_views.TeacherSubjectRequestViewSet,
+router.register(r'subject-requests', management_views.TeacherSubjectRequestViewSet,
                 basename='teacher-subject-request')
 router.register(r'teacher-approved-subjects', management_views.TeacherApprovedSubjectViewSet,
                 basename='teacher-approved-subject')
 router.register(r'courses', management_views.CourseViewSet, basename='course')
 router.register(r'course-enrollments', management_views.CourseEnrollmentViewSet, basename='course-enrollment')
+router.register(r'modules', views.CourseModuleViewSet, basename='module')
 
 urlpatterns = [
     path('', include(router.urls)),
@@ -52,4 +53,8 @@ urlpatterns = [
     path('analytics/activity-logs/', admin_analytics_views.get_activity_logs, name='activity-logs'),
     path('analytics/course/<uuid:course_id>/', admin_analytics_views.get_course_analytics, name='course-analytics'),
     path('analytics/risk-analysis/', admin_analytics_views.get_student_risk_analysis, name='student-risk-analysis'),
+
+    # Course Modules - Nested route for specific course
+    path('<int:course_id>/modules/', views.CourseModuleViewSet.as_view({'get': 'list'}), name='course-modules'),
+    path('<int:course_id>/syllabus/', views.course_syllabus, name='course-syllabus'),
 ]

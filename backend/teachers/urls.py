@@ -1,6 +1,13 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from . import views
+from .assignment_views import (
+    teacher_assignments,
+    assignment_detail,
+    generate_ai_assignment,
+    assignment_submissions,
+    grade_submission
+)
 
 router = DefaultRouter()
 router.register(r'profiles', views.TeacherProfileViewSet, basename='teacher-profile')
@@ -21,7 +28,14 @@ urlpatterns = [
     path('students/reject/<int:student_id>/', views.reject_student, name='reject-student'),
     path('students/remove/<int:student_id>/', views.remove_student_from_course, name='remove-student-from-course'),
 
-    # New comprehensive teacher endpoints
+    # Assignment Management URLs (NEW)
+    path('assignments/', teacher_assignments, name='teacher-assignments'),
+    path('assignments/<int:assignment_id>/', assignment_detail, name='assignment-detail'),
+    path('assignments/<int:assignment_id>/submissions/', assignment_submissions, name='assignment-submissions'),
+    path('assignments/generate-ai/', generate_ai_assignment, name='generate-ai-assignment'),
+    path('assignments/grade/<int:submission_id>/', grade_submission, name='grade-submission'),
+
+    # Existing comprehensive teacher endpoints
     path('teaching-analytics/', views.get_teaching_analytics, name='teaching-analytics'),
     path('ai-content/', views.ai_content_digitization, name='ai-content-digitization'),
     path('performance-insights/', views.get_student_performance_insights, name='performance-insights'),

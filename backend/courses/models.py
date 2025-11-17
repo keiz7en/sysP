@@ -116,7 +116,7 @@ class Course(models.Model):
     end_date = models.DateField(null=True, blank=True)
     
     # AI Content tracking
-    ai_content_enabled = models.BooleanField(default=False)
+    ai_content_enabled = models.BooleanField(default=True)
     syllabus_ai_generated = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -227,9 +227,8 @@ class CourseEnrollment(models.Model):
     def is_ai_enabled(self):
         """Check if AI features should be enabled for this enrollment"""
         return (
-            self.status in ['active', 'approved'] and
-            self.ai_features_unlocked and
-            self.course.can_enable_ai_features()
+                self.status == 'active' and
+                self.ai_features_unlocked
         )
     
     def approve_enrollment(self, approved_by_user):

@@ -386,6 +386,10 @@ def get_my_subject_requests(request):
         for req in requests:
             requests_data.append({
                 'id': req.id,
+                'subject_id': req.subject.id,
+                'subject_name': req.subject.name,
+                'subject_code': req.subject.code,
+                'subject_category': req.subject.category,
                 'subject': {
                     'id': req.subject.id,
                     'name': req.subject.name,

@@ -379,7 +379,10 @@ export const teacherAPI = {
         const response = await fetch(`${API_BASE_URL}/courses/subject-requests/my_requests/`, {
             headers: getAuthHeaders(token)
         })
-        if (!response.ok) throw new Error('Failed to fetch subject requests')
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}))
+            throw new Error(error.error || `Failed to fetch subject requests (${response.status})`)
+        }
         return response.json()
     },
 
@@ -1081,7 +1084,7 @@ export const getAcademicAdvice = async (token: string, data: any) => {
 export const enrollmentAPI = {
     // Student requests enrollment in a course
     requestEnrollment: async (token: string, courseId: number) => {
-        const response = await fetch(`${API_BASE_URL}/courses/enrollments/`, {
+        const response = await fetch(`${API_BASE_URL}/courses/enrollments/request/`, {
             method: 'POST',
             headers: getAuthHeaders(token),
             body: JSON.stringify({course: courseId})

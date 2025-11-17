@@ -34,6 +34,13 @@ interface Enrollment {
     difficulty_level: string
 }
 
+interface CourseSyllabus {
+    course_title: string
+    course_id: number
+    chapters: string[]
+    description: string
+}
+
 const StudentCourses: React.FC = () => {
     const {token} = useAuth()
     const [activeTab, setActiveTab] = useState<'browse' | 'enrolled'>('enrolled')
@@ -42,6 +49,8 @@ const StudentCourses: React.FC = () => {
     const [availableCourses, setAvailableCourses] = useState<Course[]>([])
     const [enrolledCourses, setEnrolledCourses] = useState<Enrollment[]>([])
     const [selectedCourse, setSelectedCourse] = useState<Course | null>(null)
+    const [selectedSyllabus, setSelectedSyllabus] = useState<CourseSyllabus | null>(null)
+    const [loadingSyllabus, setLoadingSyllabus] = useState(false)
     const [filterLevel, setFilterLevel] = useState<string>('all')
 
     useEffect(() => {
@@ -122,6 +131,29 @@ const StudentCourses: React.FC = () => {
             toast.error(error.message || 'Failed to request enrollment')
         } finally {
             setEnrolling(null)
+        }
+    }
+
+    const fetchSyllabus = async (courseId: number) => {
+        try {
+            setLoadingSyllabus(true)
+            const response = await fetch(`http://localhost:8000/api/courses/${courseId}/syllabus/`, {
+                headers: {
+                    'Authorization': `Token ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            })
+
+            if (response.ok) {
+                const data = await response.json()
+                setSelectedSyllabus(data)
+            } else {
+                console.error('Failed to fetch syllabus')
+            }
+        } catch (error) {
+            console.error('Error fetching syllabus:', error)
+        } finally {
+            setLoadingSyllabus(false)
         }
     }
 
@@ -479,22 +511,32 @@ const StudentCourses: React.FC = () => {
 
                                                     {/* Action Button */}
                                                     <button
+                                                        onClick={() => fetchSyllabus(enrollment.course_id)}
+                                                        disabled={loadingSyllabus}
                                                         style={{
                                                             width: '100%',
                                                             padding: '0.875rem',
-                                                            backgroundColor: '#6366f1',
+                                                            backgroundColor: loadingSyllabus ? '#9ca3af' : '#6366f1',
                                                             color: 'white',
                                                             border: 'none',
                                                             borderRadius: '10px',
                                                             fontWeight: '600',
-                                                            cursor: 'pointer',
+                                                            cursor: loadingSyllabus ? 'wait' : 'pointer',
                                                             fontSize: '0.95rem',
                                                             transition: 'all 0.2s'
                                                         }}
-                                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#4f46e5'}
-                                                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#6366f1'}
+                                                        onMouseEnter={(e) => {
+                                                            if (!loadingSyllabus) {
+                                                                e.currentTarget.style.backgroundColor = '#4f46e5'
+                                                            }
+                                                        }}
+                                                        onMouseLeave={(e) => {
+                                                            if (!loadingSyllabus) {
+                                                                e.currentTarget.style.backgroundColor = '#6366f1'
+                                                            }
+                                                        }}
                                                     >
-                                                        Continue Learning →
+                                                        {loadingSyllabus ? '⏳ Loading Syllabus...' : '📚 View Course Syllabus →'}
                                                     </button>
                                                 </div>
                                             </motion.div>
@@ -932,6 +974,159 @@ const StudentCourses: React.FC = () => {
                                     </p>
                                 </div>
                             )}
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Course Syllabus Modal */}
+            <AnimatePresence>
+                {selectedSyllabus && (
+                    <motion.div
+                        initial={{opacity: 0}}
+                        animate={{opacity: 1}}
+                        exit={{opacity: 0}}
+                        onClick={() => setSelectedSyllabus(null)}
+                        style={{
+                            position: 'fixed',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            backgroundColor: 'rgba(0,0,0,0.5)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 1000,
+                            padding: '2rem'
+                        }}
+                    >
+                        <motion.div
+                            initial={{scale: 0.9, y: 20}}
+                            animate={{scale: 1, y: 0}}
+                            exit={{scale: 0.9, y: 20}}
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                                backgroundColor: 'white',
+                                borderRadius: '20px',
+                                padding: '2.5rem',
+                                maxWidth: '600px',
+                                width: '100%',
+                                maxHeight: '90vh',
+                                overflow: 'auto',
+                                boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)'
+                            }}
+                        >
+                            <div style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'flex-start',
+                                marginBottom: '1.5rem'
+                            }}>
+                                <div>
+                                    <h2 style={{
+                                        margin: '0 0 0.5rem 0',
+                                        fontSize: '1.8rem',
+                                        color: '#1f2937'
+                                    }}>
+                                        {selectedSyllabus.course_title}
+                                    </h2>
+                                </div>
+                                <button
+                                    onClick={() => setSelectedSyllabus(null)}
+                                    style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        fontSize: '1.5rem',
+                                        cursor: 'pointer',
+                                        color: '#6b7280',
+                                        padding: '0.5rem'
+                                    }}
+                                >
+                                    ✕
+                                </button>
+                            </div>
+
+                            <div style={{marginBottom: '1.5rem'}}>
+                                <h3 style={{
+                                    fontSize: '1.1rem',
+                                    marginBottom: '0.75rem',
+                                    color: '#374151'
+                                }}>
+                                    Course Syllabus
+                                </h3>
+                                <p style={{
+                                    color: '#6b7280',
+                                    lineHeight: 1.7,
+                                    fontSize: '0.95rem'
+                                }}>
+                                    {selectedSyllabus.description}
+                                </p>
+                            </div>
+
+                            <div style={{marginBottom: '1.5rem'}}>
+                                <h3 style={{
+                                    fontSize: '1.1rem',
+                                    marginBottom: '0.75rem',
+                                    color: '#374151',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem'
+                                }}>
+                                    🤖 AI-Generated Course Syllabus
+                                </h3>
+                                <div style={{display: 'grid', gap: '0.75rem'}}>
+                                    {selectedSyllabus.chapters.map((chapter, index) => (
+                                        <div key={index} style={{
+                                            display: 'flex',
+                                            alignItems: 'flex-start',
+                                            padding: '1rem',
+                                            backgroundColor: '#f9fafb',
+                                            borderRadius: '10px',
+                                            border: '1px solid #e5e7eb'
+                                        }}>
+                                            <div style={{
+                                                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                                color: 'white',
+                                                borderRadius: '50%',
+                                                width: '30px',
+                                                height: '30px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                fontSize: '0.9rem',
+                                                fontWeight: '700',
+                                                flexShrink: 0,
+                                                marginRight: '1rem'
+                                            }}>
+                                                {index + 1}
+                                            </div>
+                                            <div style={{flex: 1}}>
+                                                <div style={{
+                                                    color: '#374151',
+                                                    fontWeight: '600',
+                                                    fontSize: '0.95rem',
+                                                    lineHeight: 1.5
+                                                }}>
+                                                    {chapter}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div style={{
+                                padding: '1rem',
+                                backgroundColor: '#eff6ff',
+                                borderRadius: '10px',
+                                border: '1px solid #bfdbfe',
+                                color: '#1e40af',
+                                fontSize: '0.85rem',
+                                textAlign: 'center'
+                            }}>
+                                💡 This syllabus is AI-generated and may be updated by your instructor
+                            </div>
                         </motion.div>
                     </motion.div>
                 )}

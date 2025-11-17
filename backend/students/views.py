@@ -75,11 +75,15 @@ class StudentDashboardView(APIView):
                 'error': 'Student profile not found'
             }, status=status.HTTP_404_NOT_FOUND)
 
-        # Get REAL enrollments only
+        # Get REAL enrollments - include ALL statuses so students see everything
         enrollments = CourseEnrollment.objects.filter(
-            student=student_profile,
-            status='active'
-        ).select_related('course', 'course__instructor__user', 'course__subject')
+            student=student_profile
+        ).select_related('course', 'course__instructor__user', 'course__subject').order_by('-enrollment_date')
+
+        # Separate by status
+        active_enrollments = enrollments.filter(status='active')
+        pending_enrollments = enrollments.filter(status='pending')
+        all_enrollments = enrollments
 
         # Return comprehensive student dashboard data
         dashboard_data = {
@@ -91,18 +95,20 @@ class StudentDashboardView(APIView):
                 'total_credits': student_profile.total_credits,
                 'academic_status': student_profile.academic_status,
                 'learning_style': student_profile.learning_style,
-                'enrollment_date': student_profile.enrollment_date.strftime('%Y-%m-%d')
+                'enrollment_date': student_profile.enrollment_date.strftime(
+                    '%Y-%m-%d') if student_profile.enrollment_date else 'N/A'
             },
-            'enrollments_count': enrollments.count(),
-            'has_courses': enrollments.exists(),
-            'is_new_student': not enrollments.exists(),
-            'message': 'No courses enrolled yet. Teachers will add you to courses.' if not enrollments.exists() else None
+            'enrollments_count': active_enrollments.count(),
+            'pending_count': pending_enrollments.count(),
+            'has_courses': active_enrollments.exists(),
+            'is_new_student': not all_enrollments.exists(),
+            'message': 'No courses enrolled yet. Teachers will add you to courses.' if not all_enrollments.exists() else None
         }
 
-        # If student has courses, add enrollment details
-        if enrollments.exists():
+        # Add ALL enrollment details (active, pending, etc.)
+        if all_enrollments.exists():
             enrollments_data = []
-            for enrollment in enrollments:
+            for enrollment in all_enrollments:
                 enrollments_data.append({
                     'id': enrollment.id,
                     'course_id': enrollment.course.id,
@@ -114,7 +120,8 @@ class StudentDashboardView(APIView):
                     'status': enrollment.status,
                     'credits': enrollment.course.credits,
                     'difficulty_level': enrollment.course.difficulty_level,
-                    'ai_enabled': enrollment.course.ai_enabled,
+                    'ai_enabled': enrollment.ai_features_unlocked,  # FIXED: Use enrollment's ai_features_unlocked
+                    'ai_features_unlocked': enrollment.ai_features_unlocked,  # Explicit field
                     'subject': enrollment.course.subject.name if enrollment.course.subject else 'General'
                 })
             dashboard_data['current_enrollments'] = enrollments_data

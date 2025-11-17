@@ -4,6 +4,13 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { aiStudentAPI } from '../../../services/api';
 import toast from 'react-hot-toast';
 
+interface CourseModule {
+    id: number;
+    title: string;
+    description: string;
+    order: number;
+}
+
 interface EnrolledCourse {
     id: number;
     course_id: number;
@@ -11,6 +18,7 @@ interface EnrolledCourse {
     subject: string;
     status: string;
     ai_enabled: boolean;
+    modules?: CourseModule[];
 }
 
 const AILearningAssistant: React.FC = () => {
@@ -19,6 +27,9 @@ const AILearningAssistant: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [enrolledCourses, setEnrolledCourses] = useState<EnrolledCourse[]>([]);
     const [selectedCourse, setSelectedCourse] = useState<EnrolledCourse | null>(null);
+    const [courseModules, setCourseModules] = useState<CourseModule[]>([]);
+    const [selectedChapter, setSelectedChapter] = useState<string>('');
+    const [syllabusInfo, setSyllabusInfo] = useState<{ aiGenerated: boolean, description: string } | null>(null);
 
     // State for different AI features
     const [academicAnalysis, setAcademicAnalysis] = useState<any>(null);
@@ -36,6 +47,17 @@ const AILearningAssistant: React.FC = () => {
     useEffect(() => {
         loadEnrolledCourses();
     }, [token]);
+
+    // Load course modules when selectedCourse changes
+    useEffect(() => {
+        if (selectedCourse) {
+            loadCourseModules(selectedCourse.course_id);
+        } else {
+            setCourseModules([]);
+            setSelectedChapter('');
+            setSyllabusInfo(null);
+        }
+    }, [selectedCourse]);
 
     // Auto-scroll chat to bottom
     useEffect(() => {
@@ -55,9 +77,13 @@ const AILearningAssistant: React.FC = () => {
             if (response.ok) {
                 const data = await response.json();
                 if (data.current_enrollments) {
-                    setEnrolledCourses(data.current_enrollments);
-                    if (data.current_enrollments.length > 0) {
-                        setSelectedCourse(data.current_enrollments[0]);
+                    // Only keep enrolled (status=active) courses the user is truly enrolled in
+                    const enrolledActive = data.current_enrollments.filter((course: EnrolledCourse) => course.status === 'active');
+                    setEnrolledCourses(enrolledActive);
+                    if (enrolledActive.length > 0) {
+                        setSelectedCourse(enrolledActive[0]);
+                    } else {
+                        setSelectedCourse(null);
                     }
                 }
             }
@@ -66,6 +92,87 @@ const AILearningAssistant: React.FC = () => {
             toast.error('Failed to load your courses');
         } finally {
             setLoading(false);
+        }
+    };
+
+    // Load course modules for the selected course using syllabus endpoint
+    const loadCourseModules = async (courseId: number) => {
+        if (!token) return;
+        try {
+            const response = await fetch(`http://localhost:8000/api/courses/${courseId}/syllabus/`, {
+                headers: {
+                    'Authorization': `Token ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                // The syllabus endpoint returns: {chapters: string[], ai_generated: boolean, description: string, ...}
+                if (Array.isArray(data.chapters) && data.chapters.length > 0) {
+                    // Chapters come as strings like "1. Introduction to Python"
+                    // Parse them to extract order and title
+                    const modulesArray: CourseModule[] = data.chapters.map((chapterStr: string, idx: number) => {
+                        // If chapter already has a number prefix (e.g., "1. Title"), parse it
+                        const match = chapterStr.match(/^(\d+)\.\s*(.+)$/);
+                        if (match) {
+                            return {
+                                id: idx + 1,
+                                title: match[2].trim(), // Just the title without number
+                                description: '',
+                                order: parseInt(match[1]),
+                            };
+                        } else {
+                            // If no number prefix, add one
+                            return {
+                                id: idx + 1,
+                                title: chapterStr,
+                                description: '',
+                                order: idx + 1,
+                            };
+                        }
+                    });
+                    setCourseModules(modulesArray);
+                    setSelectedChapter(modulesArray[0].title);
+                    setSyllabusInfo({aiGenerated: !!data.ai_generated, description: data.description || ''});
+                } else {
+                    // Fallback: No chapters
+                    const fallbackChapters = [
+                        {id: 1, title: 'Introduction & Fundamentals', description: '', order: 1},
+                        {id: 2, title: 'Core Concepts', description: '', order: 2},
+                        {id: 3, title: 'Advanced Topics', description: '', order: 3},
+                        {id: 4, title: 'Practical Applications', description: '', order: 4},
+                        {id: 5, title: 'Final Review', description: '', order: 5}
+                    ];
+                    setCourseModules(fallbackChapters);
+                    setSelectedChapter('Introduction & Fundamentals');
+                    setSyllabusInfo({aiGenerated: false, description: ''});
+                }
+            } else {
+                // If request fails, set fallback chapters
+                const fallbackChapters = [
+                    {id: 1, title: 'Introduction & Fundamentals', description: '', order: 1},
+                    {id: 2, title: 'Core Concepts', description: '', order: 2},
+                    {id: 3, title: 'Advanced Topics', description: '', order: 3},
+                    {id: 4, title: 'Practical Applications', description: '', order: 4},
+                    {id: 5, title: 'Final Review', description: '', order: 5}
+                ];
+                setCourseModules(fallbackChapters);
+                setSelectedChapter('Introduction & Fundamentals');
+                setSyllabusInfo({aiGenerated: false, description: ''});
+            }
+        } catch (error) {
+            console.error('Error loading course syllabus:', error);
+            // Set default chapters if API fails
+            const fallbackChapters = [
+                {id: 1, title: 'Introduction & Fundamentals', description: '', order: 1},
+                {id: 2, title: 'Core Concepts', description: '', order: 2},
+                {id: 3, title: 'Advanced Topics', description: '', order: 3},
+                {id: 4, title: 'Practical Applications', description: '', order: 4},
+                {id: 5, title: 'Final Review', description: '', order: 5}
+            ];
+            setCourseModules(fallbackChapters);
+            setSelectedChapter('Introduction & Fundamentals');
+            setSyllabusInfo({aiGenerated: false, description: ''});
         }
     };
 
@@ -88,16 +195,20 @@ const AILearningAssistant: React.FC = () => {
         }
     };
 
-    const handlePersonalizedContent = async (topic: string, difficulty: string) => {
+    const handlePersonalizedContent = async (chapter: string, difficulty: string) => {
         if (!token || !selectedCourse) {
             toast.error('Please select a course first');
+            return;
+        }
+        if (!chapter || chapter.trim() === '') {
+            toast.error('Please select a chapter from the syllabus');
             return;
         }
         setLoading(true);
         try {
             const response = await aiStudentAPI.generatePersonalizedContent(token, {
                 course_id: selectedCourse.course_id,
-                topic,
+                topic: `${selectedCourse.course_title} - ${chapter}`,
                 difficulty
             });
             setPersonalizedContent(response.content);
@@ -109,16 +220,20 @@ const AILearningAssistant: React.FC = () => {
         }
     };
 
-    const handleQuizGeneration = async (topic: string, difficulty: string, numQuestions: number) => {
+    const handleQuizGeneration = async (chapter: string, difficulty: string, numQuestions: number) => {
         if (!token || !selectedCourse) {
             toast.error('Please select a course first');
+            return;
+        }
+        if (!chapter || chapter.trim() === '') {
+            toast.error('Please select a chapter from the syllabus');
             return;
         }
         setLoading(true);
         try {
             const response = await aiStudentAPI.generateQuiz(token, {
                 course_id: selectedCourse.course_id,
-                topic,
+                topic: `${selectedCourse.course_title} - ${chapter}`,
                 difficulty,
                 num_questions: numQuestions
             });
@@ -546,12 +661,22 @@ const AILearningAssistant: React.FC = () => {
 
                             <div style={styles.inputSection}>
                                 <div style={styles.inputGroup}>
-                                    <input
-                                        type="text"
-                                        placeholder="Enter topic (e.g., Machine Learning, Python, Mathematics)"
-                                        style={styles.input}
-                                        id="learning-topic"
-                                    />
+                                    <select
+                                        style={styles.select}
+                                        id="learning-chapter"
+                                        value={selectedChapter}
+                                        onChange={(e) => setSelectedChapter(e.target.value)}
+                                        disabled={!Array.isArray(courseModules) || courseModules.length === 0}
+                                    >
+                                        {(!Array.isArray(courseModules) || courseModules.length === 0) && (
+                                            <option value="">No chapters available. Select a course.</option>
+                                        )}
+                                        {Array.isArray(courseModules) && courseModules.map(module => (
+                                            <option key={module.id} value={module.title}>
+                                                {module.order}. {module.title}
+                                            </option>
+                                        ))}
+                                    </select>
                                     <select style={styles.select} id="learning-difficulty">
                                         <option value="beginner">Beginner</option>
                                         <option value="intermediate">Intermediate</option>
@@ -560,16 +685,40 @@ const AILearningAssistant: React.FC = () => {
                                     <button
                                         style={styles.primaryButton}
                                         onClick={() => {
-                                            const topic = (document.getElementById('learning-topic') as HTMLInputElement).value;
+                                            const chapter = (document.getElementById('learning-chapter') as HTMLSelectElement).value;
                                             const difficulty = (document.getElementById('learning-difficulty') as HTMLSelectElement).value;
-                                            if (topic.trim()) {
-                                                handlePersonalizedContent(topic, difficulty);
+                                            if (chapter && chapter.trim()) {
+                                                handlePersonalizedContent(chapter, difficulty);
+                                            } else {
+                                                toast.error('Please select a chapter from the syllabus');
                                             }
                                         }}
+                                        disabled={courseModules.length === 0}
                                     >
                                         Generate Content
                                     </button>
                                 </div>
+                                {syllabusInfo && (
+                                    <div style={{marginTop: '1rem', fontSize: '14px', color: '#64748b'}}>
+                                        Syllabus Type:&nbsp;
+                                        <span
+                                            style={{
+                                                color: syllabusInfo.aiGenerated ? '#7c3aed' : '#0369a1',
+                                                fontWeight: 600
+                                            }}
+                                        >
+                                            {syllabusInfo.aiGenerated ? 'AI-generated Chapters' : 'Manual Chapters'}
+                                        </span>
+                                        {syllabusInfo.description && (
+                                            <>
+                                                <br/>
+                                                <span style={{fontStyle: 'italic'}}>
+                                                    {syllabusInfo.description}
+                                                </span>
+                                            </>
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
                             {personalizedContent && (
@@ -627,12 +776,22 @@ const AILearningAssistant: React.FC = () => {
 
                             <div style={styles.inputSection}>
                                 <div style={styles.inputGroup}>
-                                    <input
-                                        type="text"
-                                        placeholder="Quiz topic (e.g., Data Structures, History, Science)"
-                                        style={styles.input}
-                                        id="quiz-topic"
-                                    />
+                                    <select
+                                        style={styles.select}
+                                        id="quiz-chapter"
+                                        value={selectedChapter}
+                                        onChange={(e) => setSelectedChapter(e.target.value)}
+                                        disabled={!Array.isArray(courseModules) || courseModules.length === 0}
+                                    >
+                                        {(!Array.isArray(courseModules) || courseModules.length === 0) && (
+                                            <option value="">No chapters available. Select a course.</option>
+                                        )}
+                                        {Array.isArray(courseModules) && courseModules.map(module => (
+                                            <option key={module.id} value={module.title}>
+                                                {module.order}. {module.title}
+                                            </option>
+                                        ))}
+                                    </select>
                                     <select style={styles.select} id="quiz-difficulty">
                                         <option value="beginner">Beginner</option>
                                         <option value="intermediate">Intermediate</option>
@@ -650,17 +809,41 @@ const AILearningAssistant: React.FC = () => {
                                     <button
                                         style={styles.primaryButton}
                                         onClick={() => {
-                                            const topic = (document.getElementById('quiz-topic') as HTMLInputElement).value;
+                                            const chapter = (document.getElementById('quiz-chapter') as HTMLSelectElement).value;
                                             const difficulty = (document.getElementById('quiz-difficulty') as HTMLSelectElement).value;
                                             const num = parseInt((document.getElementById('quiz-num') as HTMLInputElement).value);
-                                            if (topic.trim()) {
-                                                handleQuizGeneration(topic, difficulty, num);
+                                            if (chapter && chapter.trim()) {
+                                                handleQuizGeneration(chapter, difficulty, num);
+                                            } else {
+                                                toast.error('Please select a chapter from the syllabus');
                                             }
                                         }}
+                                        disabled={courseModules.length === 0}
                                     >
                                         Generate Quiz
                                     </button>
                                 </div>
+                                {syllabusInfo && (
+                                    <div style={{marginTop: '1rem', fontSize: '14px', color: '#64748b'}}>
+                                        Syllabus Type:&nbsp;
+                                        <span
+                                            style={{
+                                                color: syllabusInfo.aiGenerated ? '#7c3aed' : '#0369a1',
+                                                fontWeight: 600
+                                            }}
+                                        >
+                                            {syllabusInfo.aiGenerated ? 'AI-generated Chapters' : 'Manual Chapters'}
+                                        </span>
+                                        {syllabusInfo.description && (
+                                            <>
+                                                <br/>
+                                                <span style={{fontStyle: 'italic'}}>
+                                                    {syllabusInfo.description}
+                                                </span>
+                                            </>
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
                             {aiQuiz && (

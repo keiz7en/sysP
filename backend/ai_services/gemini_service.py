@@ -33,23 +33,69 @@ class GeminiAIService:
         self.available = AI_AVAILABLE
 
     def generate_personalized_content(self, topic: str, difficulty: str, learning_style: str) -> Dict[str, Any]:
-        """Generate personalized learning content"""
+        """Generate personalized learning content with COMPREHENSIVE details and real-world examples"""
         if not self.available:
             return self._mock_content(topic, difficulty)
 
         try:
             prompt = f"""
-            You are an expert educational AI. Create personalized learning content for:
+            You are an expert educational AI creating COMPREHENSIVE, DETAILED learning content.
             
             Topic: {topic}
             Difficulty Level: {difficulty}
             Learning Style: {learning_style}
             
-            Provide a JSON response with:
-            1. "explanation": A clear, {learning_style}-friendly explanation (2-3 paragraphs)
-            2. "practice_questions": Array of 3 practice questions
-            3. "examples": Array of 2 real-world examples
-            4. "next_topics": Array of 3 recommended next topics
+            CRITICAL REQUIREMENTS - This content must be EXTENSIVE and DETAILED:
+            
+            1. "explanation": Write a COMPREHENSIVE explanation (800-1000 words minimum) that includes:
+               - Clear introduction to the topic (2-3 paragraphs)
+               - Core concepts explained in detail with definitions (3-4 paragraphs)
+               - Historical context or background (1-2 paragraphs)
+               - Why this topic matters in the real world (2 paragraphs)
+               - Common applications and use cases (2-3 paragraphs)
+               - Current trends and future outlook (1-2 paragraphs)
+               - Common challenges and how to overcome them (2 paragraphs)
+               - Best practices and expert tips (1-2 paragraphs)
+               
+               Make it {learning_style}-friendly with:
+               - Visual learners: Include descriptions of diagrams, charts, visual patterns
+               - Auditory learners: Use conversational tone, analogies, storytelling
+               - Kinesthetic learners: Include hands-on activities, practical exercises
+               - Reading/Writing learners: Use structured text, bullet points, summaries
+            
+            2. "practice_questions": Create 5-7 thought-provoking questions that:
+               - Test different cognitive levels (remember, understand, apply, analyze, evaluate, create)
+               - Are specific and detailed
+               - Include real-world scenarios
+               - Progress from easy to challenging
+            
+            3. "examples": Provide 4-5 DETAILED real-world examples, each with:
+               - The context/scenario (2-3 sentences)
+               - How the topic is applied (3-4 sentences)
+               - The outcome/impact (2 sentences)
+               - Real company names, statistics, or data when possible
+               
+            4. "key_takeaways": 6-8 important points students must remember
+            
+            5. "real_world_applications": Array of 5-6 specific industries/fields where this is used with examples
+            
+            6. "common_misconceptions": Array of 3-4 common mistakes or misunderstandings with corrections
+            
+            7. "further_resources": Array of 3-4 recommended resources (books, courses, websites, tools)
+            
+            8. "case_studies": 2-3 brief case studies (3-4 sentences each) showing real applications
+            
+            9. "industry_insights": 2-3 paragraphs about how professionals use this in their work
+            
+            10. "next_topics": Array of 4-5 recommended next topics to study
+            
+            Make this content:
+            - Extremely detailed and comprehensive (aim for 1000+ words total)
+            - Include specific numbers, statistics, dates when relevant
+            - Use real company names and real-world examples
+            - Be engaging and informative
+            - At {difficulty} difficulty level
+            - Optimized for {learning_style} learning style
             
             Format as valid JSON only, no markdown.
             """
@@ -67,12 +113,13 @@ class GeminiAIService:
 
             result = json.loads(result_text.strip())
             result['ai_powered'] = True
-            result['model'] = 'Gemini Pro'
+            result['model'] = 'Gemini 2.5 Flash'
+            result['content_length'] = len(result.get('explanation', ''))
             return result
 
         except Exception as e:
             print(f"Gemini error: {e}")
-            return self._mock_content(topic, difficulty)
+            return self._mock_content_detailed(topic, difficulty, learning_style)
 
     def generate_quiz(self, topic: str, difficulty: str, num_questions: int = 5) -> List[Dict[str, Any]]:
         """Generate AI-powered quiz questions"""
@@ -414,63 +461,6 @@ class GeminiAIService:
             print(f"Gemini learning paths error: {e}")
             return self._mock_learning_paths(student_profile, enrollments)
 
-    def _mock_learning_paths(self, student_profile, enrollments) -> list:
-        """Fallback learning paths when AI is not available"""
-        learning_paths = []
-        for idx, enrollment in enumerate(enrollments):
-            course = enrollment.course
-            progress = float(enrollment.progress_percentage)
-
-            # Determine difficulty level
-            difficulty_map = {
-                'beginner': 'Beginner',
-                'intermediate': 'Intermediate',
-                'advanced': 'Advanced',
-                'expert': 'Expert'
-            }
-            difficulty = difficulty_map.get(
-                getattr(course, 'difficulty_level', 'intermediate').lower(),
-                'Intermediate'
-            )
-
-            # Generate next milestone based on progress
-            if progress < 25:
-                next_milestone = f"Complete foundational modules of {course.title}"
-            elif progress < 50:
-                next_milestone = f"Finish mid-course projects in {course.title}"
-            elif progress < 75:
-                next_milestone = f"Prepare for final assessments in {course.title}"
-            else:
-                next_milestone = f"Complete {course.title} successfully"
-
-            learning_path = {
-                'id': idx + 1,
-                'course_title': course.title,
-                'current_module': f"Module {int(progress / 25) + 1}: {course.title} Content",
-                'progress_percentage': progress,
-                'difficulty_level': difficulty,
-                'learning_style': student_profile.learning_style or 'adaptive',
-                'estimated_completion': course.end_date.strftime('%B %Y') if hasattr(course,
-                                                                                     'end_date') and course.end_date else '4 months',
-                'next_milestone': next_milestone,
-                'ai_recommendations': [
-                    'Focus on understanding fundamental concepts',
-                    'Practice regularly with exercises',
-                    'Review previous materials when needed'
-                ],
-                'strengths': [
-                    'Consistent study habits',
-                    'Good progress pace' if progress > 50 else 'Building foundation'
-                ],
-                'areas_for_improvement': [
-                    'Time management' if progress < 30 else 'Advanced concepts',
-                    'Practical application' if progress < 60 else 'Exam preparation'
-                ]
-            }
-            learning_paths.append(learning_path)
-
-        return learning_paths
-
     def generate_ai_assessment(self, topic: str, difficulty: str, num_questions: int, assessment_type: str) -> Dict[
         str, Any]:
         """Generate AI-powered assessment with questions"""
@@ -592,22 +582,80 @@ class GeminiAIService:
             print(f"Gemini learning insights error: {e}")
             return self._mock_learning_insights(student_data)
 
-    def _mock_assessment(self, topic: str, num_questions: int, assessment_type: str) -> Dict[str, Any]:
+    def _mock_learning_paths(self, student_profile, enrollments) -> list:
+        """Fallback learning paths when AI is not available"""
+        learning_paths = []
+        for idx, enrollment in enumerate(enrollments):
+            course = enrollment.course
+            progress = float(enrollment.progress_percentage)
+
+            # Determine difficulty level
+            difficulty_map = {
+                'beginner': 'Beginner',
+                'intermediate': 'Intermediate',
+                'advanced': 'Advanced',
+                'expert': 'Expert'
+            }
+            difficulty = difficulty_map.get(
+                getattr(course, 'difficulty_level', 'intermediate').lower(),
+                'Intermediate'
+            )
+
+            # Generate next milestone based on progress
+            if progress < 25:
+                next_milestone = f"Complete foundational modules of {course.title}"
+            elif progress < 50:
+                next_milestone = f"Finish mid-course projects in {course.title}"
+            elif progress < 75:
+                next_milestone = f"Prepare for final assessments in {course.title}"
+            else:
+                next_milestone = f"Complete {course.title} successfully"
+
+            learning_path = {
+                'id': idx + 1,
+                'course_title': course.title,
+                'current_module': f"Module {int(progress / 25) + 1}: {course.title} Content",
+                'progress_percentage': progress,
+                'difficulty_level': difficulty,
+                'learning_style': student_profile.learning_style or 'adaptive',
+                'estimated_completion': course.end_date.strftime('%B %Y') if hasattr(course,
+                                                                                     'end_date') and course.end_date else '4 months',
+                'next_milestone': next_milestone,
+                'ai_recommendations': [
+                    'Focus on understanding fundamental concepts',
+                    'Practice regularly with exercises',
+                    'Review previous materials when needed'
+                ],
+                'strengths': [
+                    'Consistent study habits',
+                    'Good progress pace' if progress > 50 else 'Building foundation'
+                ],
+                'areas_for_improvement': [
+                    'Time management' if progress < 30 else 'Advanced concepts',
+                    'Practical application' if progress < 60 else 'Exam preparation'
+                ]
+            }
+            learning_paths.append(learning_path)
+
+        return learning_paths
+
+    def _mock_assessment(self, topic: str, num: int, assessment_type: str) -> Dict[str, Any]:
         """Fallback assessment when AI is not available"""
         questions = []
-        for i in range(num_questions):
+        for i in range(num):
             questions.append({
-                'question': f"Question {i + 1}: What is an important concept in {topic}?",
+                'question_id': i + 1,
+                'question_text': f"Question {i + 1}: What is an important concept in {topic}?",
                 'options': ['Option A', 'Option B', 'Option C', 'Option D'] if assessment_type != 'essay' else [],
                 'correct_answer': 'A',
-                'explanation': f"This is the correct answer because it demonstrates understanding of {topic}.",
+                'explanation': f"Option A correctly describes a key aspect of {topic}.",
                 'points': 10 if assessment_type != 'essay' else 20,
                 'type': 'multiple_choice' if assessment_type != 'essay' else 'essay'
             })
 
         return {
             'assessment_title': f"{topic} {assessment_type.title()}",
-            'total_duration': num_questions * 2,
+            'total_duration': num * 2,
             'questions': questions,
             'passing_score': 60,
             'ai_generated': False,
@@ -734,6 +782,29 @@ class GeminiAIService:
             'skill_gaps': ['Advanced programming', 'Project management'],
             'learning_path': ['Complete CS fundamentals', 'Build portfolio projects', 'Get certified'],
             'market_outlook': 'Strong demand for tech professionals continues to grow.',
+            'ai_powered': False,
+            'model': 'Mock (Configure Gemini API)'
+        }
+
+    def _mock_content_detailed(self, topic: str, difficulty: str, learning_style: str) -> Dict[str, Any]:
+        return {
+            'explanation': f"This is {difficulty}-level content about {topic}. Understanding this topic requires attention to key concepts and practical application.",
+            'practice_questions': [
+                f"What are the fundamental principles of {topic}?",
+                f"How would you apply {topic} in a real-world scenario?",
+                f"What challenges might arise when working with {topic}?"
+            ],
+            'examples': [
+                f"Example 1: Practical application of {topic} in industry",
+                f"Example 2: Case study demonstrating {topic} concepts"
+            ],
+            'next_topics': [f"Advanced {topic}", "Related Concepts", "Practical Projects"],
+            'key_takeaways': ['Key Takeaway 1', 'Key Takeaway 2', 'Key Takeaway 3'],
+            'real_world_applications': ['Application 1', 'Application 2', 'Application 3'],
+            'common_misconceptions': ['Misconception 1', 'Misconception 2', 'Misconception 3'],
+            'further_resources': ['Resource 1', 'Resource 2', 'Resource 3'],
+            'case_studies': ['Case Study 1', 'Case Study 2', 'Case Study 3'],
+            'industry_insights': ['Insight 1', 'Insight 2', 'Insight 3'],
             'ai_powered': False,
             'model': 'Mock (Configure Gemini API)'
         }

@@ -37,14 +37,22 @@ def check_ai_access(student, course=None):
     
     try:
         enrollment = CourseEnrollment.objects.get(student=student, course=course)
-        
-        # Check entire approval chain
-        if not course.can_enable_ai_features():
-            return False, "Course is not approved or AI features are disabled", enrollment
-        
-        if not enrollment.is_ai_enabled():
-            return False, "Your enrollment is not approved yet. Teacher approval required.", enrollment
-        
+
+        # Check if course AI features are enabled
+        if not course.ai_content_enabled:
+            return False, "AI features are disabled for this course", enrollment
+
+        # Check if course is approved or active
+        if course.status not in ['approved', 'active']:
+            return False, "Course is not yet approved", enrollment
+
+        # Check if enrollment is active and AI features are unlocked
+        if enrollment.status != 'active':
+            return False, "Your enrollment is pending teacher approval", enrollment
+
+        if not enrollment.ai_features_unlocked:
+            return False, "AI features are not unlocked for your enrollment. Teacher approval required.", enrollment
+
         return True, "AI access granted", enrollment
     except CourseEnrollment.DoesNotExist:
         return False, "You are not enrolled in this course", None
