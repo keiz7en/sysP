@@ -457,8 +457,11 @@ const CareerGuidance: React.FC = () => {
                                                         fontWeight: '700',
                                                         fontSize: '1.1rem'
                                                     }}>
-                                                        💰 ${career.salary_range.min.toLocaleString()} -
-                                                        ${career.salary_range.max.toLocaleString()}
+                                                        💰 {typeof career.salary_range === 'string'
+                                                        ? career.salary_range
+                                                        : career.salary_range && career.salary_range.min && career.salary_range.max
+                                                            ? `${career.salary_range.min.toLocaleString()} - ${career.salary_range.max.toLocaleString()}`
+                                                            : 'Salary info not available'}
                                                     </p>
                                                     <p style={{margin: 0, color: '#6b7280', fontSize: '0.95rem'}}>
                                                         📈 Growth: {career.job_growth}
@@ -491,8 +494,8 @@ const CareerGuidance: React.FC = () => {
                                                     fontWeight: '600'
                                                 }}>Required Skills:</h4>
                                                 <div style={{display: 'flex', gap: '0.5rem', flexWrap: 'wrap'}}>
-                                                    {career.required_skills.map((skill, skillIndex) => {
-                                                        const hasSkill = career.student_skill_match.includes(skill)
+                                                    {(career.required_skills || []).map((skill, skillIndex) => {
+                                                        const hasSkill = (career.student_skill_match || []).includes(skill)
                                                         return (
                                                             <span
                                                                 key={skillIndex}
@@ -522,7 +525,7 @@ const CareerGuidance: React.FC = () => {
                                                     fontWeight: '600'
                                                 }}>Industry Sectors:</h4>
                                                 <div style={{display: 'flex', gap: '0.5rem', flexWrap: 'wrap'}}>
-                                                    {career.industry_sectors.map((sector, idx) => (
+                                                    {(career.industry_sectors || []).map((sector, idx) => (
                                                         <span
                                                             key={idx}
                                                             style={{
@@ -850,7 +853,7 @@ const CareerGuidance: React.FC = () => {
                                                         marginBottom: '0.5rem'
                                                     }}>Skills You'll Learn:</h4>
                                                     <div style={{display: 'flex', gap: '0.5rem', flexWrap: 'wrap'}}>
-                                                        {program.skills_covered.map((skill, idx) => (
+                                                        {(program.skills_covered || []).map((skill, idx) => (
                                                             <span
                                                                 key={idx}
                                                                 style={{
@@ -876,7 +879,7 @@ const CareerGuidance: React.FC = () => {
                                                         marginBottom: '0.5rem'
                                                     }}>Career Outcomes:</h4>
                                                     <div style={{display: 'flex', gap: '0.5rem', flexWrap: 'wrap'}}>
-                                                        {program.career_outcomes.map((outcome, idx) => (
+                                                        {(program.career_outcomes || []).map((outcome, idx) => (
                                                             <span
                                                                 key={idx}
                                                                 style={{
@@ -1049,8 +1052,11 @@ const CareerGuidance: React.FC = () => {
                                         fontWeight: '700',
                                         fontSize: '1.2rem'
                                     }}>
-                                        💰 ${selectedCareer.salary_range.min.toLocaleString()} -
-                                        ${selectedCareer.salary_range.max.toLocaleString()}
+                                        💰 {typeof selectedCareer.salary_range === 'string'
+                                        ? selectedCareer.salary_range
+                                        : selectedCareer.salary_range && selectedCareer.salary_range.min && selectedCareer.salary_range.max
+                                            ? `${selectedCareer.salary_range.min.toLocaleString()} - ${selectedCareer.salary_range.max.toLocaleString()}`
+                                            : 'Salary info not available'}
                                     </p>
                                 </div>
                                 <button
@@ -1083,7 +1089,7 @@ const CareerGuidance: React.FC = () => {
                                     color: '#374151'
                                 }}>✅ Skills You Have</h3>
                                 <div style={{display: 'flex', gap: '0.5rem', flexWrap: 'wrap'}}>
-                                    {selectedCareer.student_skill_match.map((skill, idx) => (
+                                    {(selectedCareer.student_skill_match || []).map((skill, idx) => (
                                         <span
                                             key={idx}
                                             style={{
@@ -1108,7 +1114,7 @@ const CareerGuidance: React.FC = () => {
                                     color: '#374151'
                                 }}>📚 Skills to Learn</h3>
                                 <div style={{display: 'flex', gap: '0.5rem', flexWrap: 'wrap'}}>
-                                    {selectedCareer.missing_skills.map((skill, idx) => (
+                                    {(selectedCareer.missing_skills || []).map((skill, idx) => (
                                         <span
                                             key={idx}
                                             style={{
@@ -1133,7 +1139,7 @@ const CareerGuidance: React.FC = () => {
                                     color: '#374151'
                                 }}>🏢 Industry Sectors</h3>
                                 <div style={{display: 'flex', gap: '0.5rem', flexWrap: 'wrap'}}>
-                                    {selectedCareer.industry_sectors.map((sector, idx) => (
+                                    {(selectedCareer.industry_sectors || []).map((sector, idx) => (
                                         <span
                                             key={idx}
                                             style={{
