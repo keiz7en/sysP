@@ -1087,7 +1087,7 @@ export const enrollmentAPI = {
         const response = await fetch(`${API_BASE_URL}/courses/enrollments/request/`, {
             method: 'POST',
             headers: getAuthHeaders(token),
-            body: JSON.stringify({course: courseId})
+            body: JSON.stringify({course_id: courseId})
         })
         if (!response.ok) {
             const error = await response.json()
