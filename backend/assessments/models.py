@@ -42,6 +42,11 @@ class Assessment(models.Model):
     show_results_immediately = models.BooleanField(default=True)
     allow_review = models.BooleanField(default=True)
 
+    # File attachments for exam questions/materials
+    questions_file = models.FileField(upload_to='exam_questions/', blank=True, null=True,
+                                      help_text='Questions file (PDF, DOC, DOCX, TXT)')
+    questions_filename = models.CharField(max_length=255, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -148,6 +153,12 @@ class StudentAnswer(models.Model):
     question = models.ForeignKey(Question, on_delete=models.CASCADE)
     answer = models.JSONField()  # Flexible structure for different answer types
 
+    # File upload support for answers
+    answer_file = models.FileField(upload_to='student_answers/', blank=True, null=True,
+                                   help_text='Answer file (PDF, DOC, DOCX, TXT)')
+    answer_filename = models.CharField(max_length=255, blank=True)
+    answer_file_size = models.IntegerField(default=0, help_text='File size in bytes')
+
     # Grading
     is_correct = models.BooleanField(null=True, blank=True)  # Null for ungraded
     marks_awarded = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
@@ -156,6 +167,17 @@ class StudentAnswer(models.Model):
     ai_graded = models.BooleanField(default=False)
     ai_feedback = models.TextField(blank=True)
     confidence_score = models.DecimalField(max_digits=3, decimal_places=2, null=True, blank=True)
+
+    # AI Detection for answer content
+    ai_detection_score = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True,
+                                             help_text='AI detection confidence (0-100)')
+    ai_detection_result = models.JSONField(default=dict, blank=True, help_text='Detailed AI detection analysis')
+    ai_detection_performed = models.BooleanField(default=False)
+    ai_detection_timestamp = models.DateTimeField(null=True, blank=True)
+
+    # Flags for suspicious content
+    is_flagged_ai = models.BooleanField(default=False, help_text='Flagged as potentially AI-generated')
+    flag_reason = models.TextField(blank=True)
 
     # Manual Review
     manually_reviewed = models.BooleanField(default=False)

@@ -7,6 +7,7 @@ from django.utils import timezone
 from django.db.models import Avg, Count
 from datetime import datetime
 import json
+import os
 
 # Import AI service for generation
 try:
@@ -24,7 +25,7 @@ from students.models import StudentProfile
 def teacher_assignments(request):
     """
     GET: List all assignments for teacher's courses
-    POST: Create new assignment
+    POST: Create new assignment with optional file attachment
     """
     if request.user.user_type != 'teacher':
         return Response({'error': 'Teacher access only'}, status=status.HTTP_403_FORBIDDEN)
@@ -48,7 +49,7 @@ def teacher_assignments(request):
                 avg=Avg('points_earned')
             )['avg'] or 0
 
-            assignments_data.append({
+            assignment_data = {
                 'id': assignment.id,
                 'title': assignment.title,
                 'description': assignment.description,
@@ -61,7 +62,17 @@ def teacher_assignments(request):
                 'created_date': assignment.created_at.isoformat(),
                 'submissions_count': submissions_count,
                 'avg_score': round(float(avg_score), 1) if avg_score else 0
-            })
+            }
+
+            # Add attachment info if exists
+            if assignment.attachment_file:
+                assignment_data['attachment'] = {
+                    'url': assignment.attachment_file.url,
+                    'filename': assignment.attachment_filename or os.path.basename(assignment.attachment_file.name),
+                    'size': assignment.attachment_file.size if hasattr(assignment.attachment_file, 'size') else 0
+                }
+
+            assignments_data.append(assignment_data)
 
         return Response({
             'assignments': assignments_data,
@@ -69,7 +80,7 @@ def teacher_assignments(request):
         }, status=status.HTTP_200_OK)
 
     elif request.method == 'POST':
-        # Create new assignment
+        # Create new assignment with optional file upload
         data = request.data
 
         # Validate required fields
@@ -99,13 +110,21 @@ def teacher_assignments(request):
             is_published=data.get('is_published', True)
         )
 
+        # Handle file upload if present
+        if 'attachment' in request.FILES:
+            file = request.FILES['attachment']
+            assignment.attachment_file = file
+            assignment.attachment_filename = file.name
+            assignment.save()
+
         return Response({
             'success': True,
             'message': 'Assignment created successfully',
             'assignment': {
                 'id': assignment.id,
                 'title': assignment.title,
-                'course_title': course.title
+                'course_title': course.title,
+                'has_attachment': bool(assignment.attachment_file)
             }
         }, status=status.HTTP_201_CREATED)
 
@@ -219,7 +238,7 @@ def generate_ai_assignment(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def assignment_submissions(request, assignment_id):
-    """Get all submissions for an assignment"""
+    """Get all submissions for an assignment with AI detection results"""
     if request.user.user_type != 'teacher':
         return Response({'error': 'Teacher access only'}, status=status.HTTP_403_FORBIDDEN)
 
@@ -236,7 +255,7 @@ def assignment_submissions(request, assignment_id):
 
     submissions_data = []
     for submission in submissions:
-        submissions_data.append({
+        submission_data = {
             'id': submission.id,
             'student_name': submission.student.user.get_full_name(),
             'student_id': submission.student.student_id,
@@ -248,7 +267,27 @@ def assignment_submissions(request, assignment_id):
             'graded_at': submission.graded_at.isoformat() if submission.graded_at else None,
             'graded_by': submission.graded_by.user.get_full_name() if submission.graded_by else None,
             'percentage_score': submission.percentage_score if submission.points_earned else 0
-        })
+        }
+
+        # Add file info if exists
+        if submission.file_upload:
+            submission_data['file'] = {
+                'url': submission.file_upload.url,
+                'filename': submission.file_name or os.path.basename(submission.file_upload.name),
+                'size': submission.file_size
+            }
+
+        # Add AI detection results
+        if submission.ai_detection_performed:
+            submission_data['ai_detection'] = {
+                'score': float(submission.ai_detection_score) if submission.ai_detection_score else 0,
+                'is_flagged': submission.is_flagged_ai,
+                'flag_reason': submission.flag_reason,
+                'result': submission.ai_detection_result,
+                'timestamp': submission.ai_detection_timestamp.isoformat() if submission.ai_detection_timestamp else None
+            }
+
+        submissions_data.append(submission_data)
 
     return Response({
         'assignment': {
@@ -289,8 +328,20 @@ def grade_submission(request, submission_id):
     if points_earned is None:
         return Response({'error': 'points_earned is required'}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Check for AI-generated content (humanization detection)
-    ai_detection_result = detect_ai_content(submission.submission_text)
+    # Check for AI-generated content (humanization detection) if not already done
+    if not submission.ai_detection_performed and submission.submission_text:
+        ai_detection_result = detect_ai_content(submission.submission_text)
+
+        # Save AI detection results
+        submission.ai_detection_performed = True
+        submission.ai_detection_timestamp = timezone.now()
+        submission.ai_detection_score = ai_detection_result['confidence']
+        submission.ai_detection_result = ai_detection_result
+        submission.is_flagged_ai = ai_detection_result['is_ai_generated']
+        if submission.is_flagged_ai:
+            submission.flag_reason = ai_detection_result['warning']
+    else:
+        ai_detection_result = submission.ai_detection_result if submission.ai_detection_result else {}
 
     # Update submission
     submission.points_earned = points_earned
@@ -317,58 +368,120 @@ def detect_ai_content(text):
     """
     Detect if content is AI-generated or humanized
     Uses pattern analysis and linguistic markers
+    Enhanced with more sophisticated checks
     """
     if not text or len(text) < 50:
         return {
             'is_ai_generated': False,
             'confidence': 0,
-            'reason': 'Text too short to analyze'
+            'reason': 'Text too short to analyze',
+            'indicators_found': 0,
+            'total_checks': 0,
+            'warning': 'Text too short for reliable analysis',
+            'recommendation': 'Manual review recommended for short texts'
         }
 
-    # Simple heuristics (in production, use more sophisticated NLP)
+    # Enhanced heuristics for AI detection
     ai_indicators = 0
-    total_checks = 5
+    total_checks = 10
+    details = []
 
     # Check 1: Overly formal language
-    formal_words = ['furthermore', 'moreover', 'consequently', 'henceforth', 'thereby']
+    formal_words = ['furthermore', 'moreover', 'consequently', 'henceforth', 'thereby',
+                    'nonetheless', 'notwithstanding', 'pursuant', 'heretofore']
     formal_count = sum(1 for word in formal_words if word in text.lower())
     if formal_count >= 2:
         ai_indicators += 1
+        details.append(f'Formal language overuse ({formal_count} formal words)')
 
     # Check 2: Perfect grammar (no common typos)
-    common_typos = ['teh', 'recieve', 'occured', 'seperate', 'definately']
+    common_typos = ['teh', 'recieve', 'occured', 'seperate', 'definately',
+                    'accomodate', 'wierd', 'beleive', 'untill', 'wich']
     has_typos = any(typo in text.lower() for typo in common_typos)
     if not has_typos and len(text) > 200:
         ai_indicators += 0.5
+        details.append('No common typos found')
 
     # Check 3: Repetitive sentence structure
-    sentences = text.split('.')
+    sentences = [s.strip() for s in text.split('.') if s.strip()]
     if len(sentences) > 3:
-        avg_length = sum(len(s.split()) for s in sentences) / len(sentences)
-        std_dev = sum((len(s.split()) - avg_length) ** 2 for s in sentences) / len(sentences)
-        if std_dev < 5:  # Very consistent sentence length
+        sentence_lengths = [len(s.split()) for s in sentences]
+        avg_length = sum(sentence_lengths) / len(sentence_lengths)
+        variance = sum((l - avg_length) ** 2 for l in sentence_lengths) / len(sentence_lengths)
+        if variance < 10:  # Very consistent sentence length
             ai_indicators += 1
+            details.append(f'Uniform sentence structure (variance: {variance:.2f})')
 
     # Check 4: Lack of contractions
-    contractions = ["don't", "can't", "won't", "it's", "i'm", "you're"]
+    contractions = ["don't", "can't", "won't", "it's", "i'm", "you're", "isn't", "aren't", "wasn't", "weren't"]
     has_contractions = any(contraction in text.lower() for contraction in contractions)
     if not has_contractions and len(text) > 150:
-        ai_indicators += 1
+        ai_indicators += 1.5
+        details.append('No contractions used')
 
     # Check 5: Generic phrasing
-    generic_phrases = ['it is important to note', 'in conclusion', 'to summarize', 'as previously mentioned']
+    generic_phrases = ['it is important to note', 'in conclusion', 'to summarize',
+                       'as previously mentioned', 'it should be noted', 'first and foremost',
+                       'last but not least', 'in today\'s world', 'in modern society']
     generic_count = sum(1 for phrase in generic_phrases if phrase in text.lower())
     if generic_count >= 2:
+        ai_indicators += 1.5
+        details.append(f'Generic phrases detected ({generic_count})')
+
+    # Check 6: Perfect transitions
+    transition_words = ['however', 'therefore', 'additionally', 'furthermore',
+                        'nevertheless', 'consequently', 'accordingly']
+    transition_count = sum(1 for word in transition_words if word in text.lower())
+    if transition_count >= 3:
         ai_indicators += 1
+        details.append(f'Frequent transitions ({transition_count})')
+
+    # Check 7: Overly balanced structure
+    if len(text.split('\n\n')) >= 3:  # Multiple paragraphs
+        paragraphs = [p.strip() for p in text.split('\n\n') if p.strip()]
+        para_lengths = [len(p.split()) for p in paragraphs]
+        if len(para_lengths) > 2:
+            avg_para_length = sum(para_lengths) / len(para_lengths)
+            para_variance = sum((l - avg_para_length) ** 2 for l in para_lengths) / len(para_lengths)
+            if para_variance < 50:
+                ai_indicators += 1
+                details.append('Uniform paragraph structure')
+
+    # Check 8: Excessive vocabulary sophistication
+    sophisticated_words = ['utilize', 'implement', 'facilitate', 'optimize', 'leverage',
+                           'synergize', 'paradigm', 'comprehensive', 'fundamental', 'paramount']
+    sophisticated_count = sum(1 for word in sophisticated_words if word in text.lower())
+    if sophisticated_count >= 3:
+        ai_indicators += 1
+        details.append(f'Advanced vocabulary ({sophisticated_count} words)')
+
+    # Check 9: Lack of personal pronouns in personal writing
+    personal_pronouns = ['i ', 'my ', 'me ', 'mine ', 'myself ']
+    has_personal = any(pronoun in text.lower() for pronoun in personal_pronouns)
+    # Only check if assignment seems personal (heuristic)
+    if 'opinion' in text.lower() or 'experience' in text.lower() or 'think' in text.lower():
+        if not has_personal and len(text) > 200:
+            ai_indicators += 1
+            details.append('Lack of personal pronouns in personal content')
+
+    # Check 10: Unnatural perfection in structure
+    if len(sentences) > 5:
+        # Check if every sentence starts with capital and ends with punctuation
+        perfect_structure = all(s[0].isupper() and s[-1] in '.!?' for s in sentences if s)
+        if perfect_structure and len(text) > 300:
+            ai_indicators += 0.5
+            details.append('Perfect structural consistency')
 
     confidence = (ai_indicators / total_checks) * 100
+    confidence = min(confidence, 100)  # Cap at 100%
     is_ai_generated = confidence >= 60
 
     return {
         'is_ai_generated': is_ai_generated,
         'confidence': round(confidence, 1),
-        'indicators_found': int(ai_indicators),
+        'indicators_found': round(ai_indicators, 1),
         'total_checks': total_checks,
+        'details': details,
         'warning': 'High likelihood of AI-generated content' if is_ai_generated else 'Content appears to be human-written',
-        'recommendation': 'Review submission manually' if is_ai_generated else 'No concerns detected'
+        'recommendation': 'Review submission manually and discuss with student' if is_ai_generated else 'No concerns detected'
     }

@@ -126,7 +126,7 @@ const ResearchInsights: React.FC = () => {
                     model: 'Getting Started Mode'
                 })
 
-                toast.info('📚 Enroll in courses to see personalized insights!')
+                toast('📚 Enroll in courses to see personalized insights!')
             }
         } catch (error) {
             console.error('Error fetching learning insights:', error)

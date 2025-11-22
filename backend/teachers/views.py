@@ -1284,3 +1284,349 @@ def reject_student(request, student_id):
         return Response({'error': 'Student not found'}, status=404)
     except Exception as e:
         return Response({'error': str(e)}, status=500)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_gradebook(request):
+    """Get gradebook data for all courses (allow teacher to view/grade any student in any course)"""
+    if request.user.user_type != 'teacher':
+        return Response({'error': 'Teacher access only'}, status=403)
+
+    try:
+        from courses.models import Course, CourseEnrollment, Assignment, AssignmentSubmission, Exam, ExamAttempt
+        from students.models import StudentProfile
+        from datetime import datetime
+
+        def calculate_grade_letter(percentage):
+            """Calculate grade letter based on percentage using new scale"""
+            if percentage >= 80:
+                return 'A'
+            elif percentage >= 75:
+                return 'A-'
+            elif percentage >= 70:
+                return 'B'
+            elif percentage >= 65:
+                return 'B-'
+            elif percentage >= 50:
+                return 'C'
+            elif percentage >= 40:
+                return 'D'
+            else:
+                return 'F'
+
+        # Require teacher profile; show error if missing
+        try:
+            teacher_profile = TeacherProfile.objects.get(user=request.user)
+        except TeacherProfile.DoesNotExist:
+            return Response({'error': 'Teacher profile not found'}, status=404)
+
+        # Get course filter
+        course_id = request.GET.get('course')
+
+        # Get ALL courses (allow teachers to grade any course)
+        # Teachers can grade students from any course they have access to
+        if course_id and course_id != 'all':
+            courses = Course.objects.filter(id=course_id)
+        else:
+            # Show all active and approved courses
+            courses = Course.objects.filter(status__in=['active', 'approved'])
+
+        if not courses.exists():
+            return Response({
+                'students': [],
+                'assignments': [],
+                'message': 'No courses found'
+            })
+
+        # Get all enrollments in these courses (all students, all courses)
+        enrollments = CourseEnrollment.objects.filter(
+            course__in=courses,
+            status='active'
+        ).select_related('student__user', 'course')
+
+        if not enrollments.exists():
+            return Response({
+                'students': [],
+                'assignments': [],
+                'message': 'No students enrolled in selected courses'
+            })
+
+        # Get all assignments
+        assignments = Assignment.objects.filter(
+            course__in=courses,
+            is_published=True
+        ).order_by('due_date')
+
+        # Get all exams
+        exams = Exam.objects.filter(
+            course__in=courses,
+            status='published'
+        ).order_by('due_date')
+
+        # Build student gradebook data - GROUP BY STUDENT to avoid duplicates
+        students_dict = {}  # Use dict to group by student_id
+
+        for enrollment in enrollments:
+            student = enrollment.student
+            student_key = student.student_id
+
+            # Initialize student entry if not exists
+            if student_key not in students_dict:
+                students_dict[student_key] = {
+                    'student_id': student.student_id,
+                    'student_name': student.user.get_full_name(),
+                    'email': student.user.email,
+                    'course_name': enrollment.course.title,  # First course enrolled
+                    'grades': {},
+                    'attendance_rate': 90.0,
+                    'participation_score': 85.0
+                }
+
+            # Get all graded submissions for this student across ALL their courses
+            assignment_submissions = AssignmentSubmission.objects.filter(
+                student=student,
+                assignment__course__in=courses
+            ).select_related('assignment')
+
+            for submission in assignment_submissions:
+                # Only include if graded (has points_earned)
+                if submission.points_earned is not None:
+                    assignment_key = str(submission.assignment.id)
+                    # Only add if not already added (avoid duplicates)
+                    if assignment_key not in students_dict[student_key]['grades']:
+                        students_dict[student_key]['grades'][assignment_key] = {
+                            'score': float(submission.points_earned),
+                            'max_points': float(submission.assignment.max_points),
+                            'percentage': submission.percentage_score,
+                            'submitted_at': submission.submitted_at.isoformat(),
+                            'assignment_name': submission.assignment.title,
+                            'assignment_type': submission.assignment.assignment_type
+                        }
+
+            # Get exam grades
+            exam_attempts = ExamAttempt.objects.filter(
+                student=student,
+                exam__course__in=courses,
+                submitted_at__isnull=False
+            ).select_related('exam')
+
+            for attempt in exam_attempts:
+                # Only include if graded (has score and graded_at)
+                if attempt.graded_at is not None and attempt.score is not None:
+                    exam_key = f'exam_{attempt.exam.id}'
+                    # Only add if not already added (avoid duplicates)
+                    if exam_key not in students_dict[student_key]['grades']:
+                        students_dict[student_key]['grades'][exam_key] = {
+                            'score': float(attempt.score),
+                            'max_points': float(attempt.exam.total_marks),
+                            'percentage': float(attempt.percentage),
+                            'submitted_at': attempt.submitted_at.isoformat(),
+                            'assignment_name': attempt.exam.title,
+                            'assignment_type': attempt.exam.exam_type
+                        }
+
+        # Calculate overall grades and convert dict to list
+        students_data = []
+        for student_key, student_info in students_dict.items():
+            grades = student_info['grades']
+
+            # Calculate overall grade
+            if grades:
+                total_percentage = sum(g['percentage'] for g in grades.values())
+                overall_grade = total_percentage / len(grades)
+            else:
+                overall_grade = 0.0
+
+            # Calculate grade letter using new scale
+            grade_letter = calculate_grade_letter(overall_grade)
+
+            student_info['overall_grade'] = round(overall_grade, 1)
+            student_info['grade_letter'] = grade_letter
+            students_data.append(student_info)
+
+        # Sort students by name
+        students_data.sort(key=lambda x: x['student_name'])
+
+        # Format assignments list
+        assignments_data = []
+        for assignment in assignments:
+            assignments_data.append({
+                'id': str(assignment.id),
+                'name': assignment.title,
+                'type': assignment.assignment_type,
+                'max_points': float(assignment.max_points),
+                'due_date': assignment.due_date.isoformat(),
+                'course': assignment.course.code
+            })
+
+        # Add exams to assignments list with prefix
+        for exam in exams:
+            assignments_data.append({
+                'id': f'exam_{exam.id}',
+                'name': exam.title,
+                'type': exam.exam_type,
+                'max_points': float(exam.total_marks),
+                'due_date': exam.due_date.isoformat() if isinstance(exam.due_date, datetime) else str(exam.due_date),
+                'course': exam.course.code
+            })
+
+        return Response({
+            'students': students_data,
+            'assignments': assignments_data,
+            'total_students': len(students_data),
+            'total_assignments': len(assignments_data),
+            'grading_scale': {
+                'A': '80-100%',
+                'A-': '75-79%',
+                'B': '70-74%',
+                'B-': '65-69%',
+                'C': '50-64%',
+                'D': '40-49%',
+                'F': '0-39%'
+            },
+            'message': f'Showing {len(students_data)} students from {courses.count()} courses'
+        })
+
+    except TeacherProfile.DoesNotExist:
+        return Response({'error': 'Teacher profile not found'}, status=404)
+    except Exception as e:
+        import traceback
+        print(f"Gradebook error: {traceback.format_exc()}")
+        return Response({'error': f'Server error: {str(e)}'}, status=500)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def grade_from_gradebook(request):
+    """Grade a student's assignment directly from the gradebook - allows grading any student in any course"""
+    if request.user.user_type != 'teacher':
+        return Response({'error': 'Teacher access only'}, status=403)
+
+    try:
+        from courses.models import Assignment, AssignmentSubmission, Exam, ExamAttempt
+        from students.models import StudentProfile
+        from .models import TeacherProfile
+
+        student_id = request.data.get('studentId')  # This is the student_id field (e.g., "STU00001")
+        assignment_id = request.data.get('assignmentId')
+        score = request.data.get('score')
+
+        print(f"🔍 DEBUG: Grading - studentId={student_id}, assignmentId={assignment_id}, score={score}")
+
+        if not all([student_id, assignment_id, score is not None]):
+            return Response({'error': 'Missing required fields'}, status=400)
+
+        # Validate score is a number
+        try:
+            score_value = float(score)
+            if score_value < 0:
+                return Response({'error': 'Score cannot be negative'}, status=400)
+        except (ValueError, TypeError):
+            return Response({'error': 'Invalid score value'}, status=400)
+
+        # Get student by student_id field (not database ID)
+        try:
+            student = StudentProfile.objects.get(student_id=student_id)
+            print(f"✅ Found student: {student.user.get_full_name()}")
+        except StudentProfile.DoesNotExist:
+            print(f"❌ Student not found with student_id={student_id}")
+            return Response({'error': f'Student not found with ID {student_id}'}, status=404)
+
+        # Get teacher profile
+        try:
+            teacher_profile = TeacherProfile.objects.get(user=request.user)
+        except TeacherProfile.DoesNotExist:
+            return Response({'error': 'Teacher profile not found'}, status=404)
+
+        # Check if this is an exam or assignment
+        if str(assignment_id).startswith('exam_'):
+            # Handle exam grading
+            exam_id = str(assignment_id).replace('exam_', '')
+            print(f"🔍 Grading exam with ID: {exam_id}")
+            try:
+                exam = Exam.objects.get(id=exam_id)
+
+                # Validate score doesn't exceed max marks
+                if score_value > float(exam.total_marks):
+                    return Response({'error': f'Score cannot exceed {exam.total_marks}'}, status=400)
+
+                # Get or create exam attempt
+                attempt, created = ExamAttempt.objects.get_or_create(
+                    student=student,
+                    exam=exam,
+                    defaults={
+                        'started_at': timezone.now(),
+                        'submitted_at': timezone.now()
+                    }
+                )
+
+                # Update score
+                attempt.score = score_value
+                attempt.percentage = (score_value / float(exam.total_marks)) * 100
+                attempt.graded_at = timezone.now()
+                attempt.graded_by = teacher_profile
+                attempt.save()
+
+                print(f"✅ Exam graded successfully: {attempt.score}/{exam.total_marks}")
+
+                return Response({
+                    'success': True,
+                    'message': f'Exam graded successfully',
+                    'grade': {
+                        'score': float(score_value),
+                        'max_points': float(exam.total_marks),
+                        'percentage': float(attempt.percentage)
+                    }
+                })
+            except Exam.DoesNotExist:
+                print(f"❌ Exam not found with ID: {exam_id}")
+                return Response({'error': f'Exam not found with ID {exam_id}'}, status=404)
+        else:
+            # Handle assignment grading
+            print(f"🔍 Grading assignment with ID: {assignment_id}")
+            try:
+                assignment = Assignment.objects.get(id=assignment_id)
+
+                # Validate score doesn't exceed max points
+                if score_value > float(assignment.max_points):
+                    return Response({'error': f'Score cannot exceed {assignment.max_points}'}, status=400)
+
+                # Get or create submission
+                submission, created = AssignmentSubmission.objects.get_or_create(
+                    student=student,
+                    assignment=assignment,
+                    defaults={
+                        'submission_text': 'Graded without submission',
+                        'submitted_at': timezone.now()
+                    }
+                )
+
+                # Update score (percentage_score is a computed property, so we only set points_earned)
+                submission.points_earned = score_value
+                submission.graded_at = timezone.now()
+                submission.graded_by = teacher_profile
+                submission.save()
+
+                # Calculate percentage for response
+                percentage = (score_value / float(assignment.max_points)) * 100
+
+                print(f"✅ Assignment graded successfully: {submission.points_earned}/{assignment.max_points}")
+
+                return Response({
+                    'success': True,
+                    'message': f'Assignment graded successfully',
+                    'grade': {
+                        'score': float(score_value),
+                        'max_points': float(assignment.max_points),
+                        'percentage': float(percentage)
+                    }
+                })
+            except Assignment.DoesNotExist:
+                print(f"❌ Assignment not found with ID: {assignment_id}")
+                return Response({'error': f'Assignment not found with ID {assignment_id}'}, status=404)
+
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"❌ Grading error: {error_trace}")
+        return Response({'error': f'Server error: {str(e)}'}, status=500)

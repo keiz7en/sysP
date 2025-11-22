@@ -82,6 +82,11 @@ const AcademicAutomation: React.FC = () => {
     const [takingExam, setTakingExam] = useState<Assessment | null>(null)
     const [examAnswers, setExamAnswers] = useState<{ [key: number]: string }>({})
     const [examTimeRemaining, setExamTimeRemaining] = useState(0)
+    const [examAttemptId, setExamAttemptId] = useState<number | null>(null)
+    const [examData, setExamData] = useState<any>(null)
+    const [answerText, setAnswerText] = useState('')
+    const [answerFile, setAnswerFile] = useState<File | null>(null)
+    const [submitting, setSubmitting] = useState(false)
 
     useEffect(() => {
         if (token) {
@@ -264,20 +269,116 @@ const AcademicAutomation: React.FC = () => {
         }
     }
 
-    const handleStartExam = (assessment: Assessment) => {
-        setTakingExam(assessment)
-        setExamTimeRemaining(assessment.duration * 60) // Convert to seconds
-        setExamAnswers({})
-        toast.success(`Starting ${assessment.title}. Good luck!`)
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0]
+            const maxSize = 25 * 1024 * 1024 // 25MB
+
+            if (file.size > maxSize) {
+                toast.error('File size exceeds 25MB limit')
+                e.target.value = ''
+                return
+            }
+
+            const allowedTypes = ['.pdf', '.doc', '.docx', '.txt']
+            const fileExt = file.name.substring(file.name.lastIndexOf('.')).toLowerCase()
+            if (!allowedTypes.includes(fileExt)) {
+                toast.error('File type not allowed. Please upload PDF, DOC, DOCX, or TXT files.')
+                e.target.value = ''
+                return
+            }
+
+            setAnswerFile(file)
+            toast.success(`File "${file.name}" selected`)
+        }
+    }
+
+    const handleStartExam = async (assessment: Assessment) => {
+        try {
+            const response = await fetch(`http://localhost:8000/api/students/exams/${assessment.id}/start/`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Token ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            })
+
+            const data = await response.json()
+
+            if (response.ok) {
+                setTakingExam(assessment)
+                setExamAttemptId(data.attempt_id)
+                setExamData(data.exam)
+                setExamTimeRemaining(data.time_remaining_seconds)
+                setExamAnswers({})
+                setAnswerText('')
+                setAnswerFile(null)
+
+                if (data.is_resumed) {
+                    toast.success(`Resuming ${assessment.title}. You have ${Math.floor(data.time_remaining_seconds / 60)} minutes remaining.`)
+                } else {
+                    toast.success(`Starting ${assessment.title}. Good luck!`)
+                }
+            } else {
+                toast.error(data.error || 'Failed to start exam')
+            }
+        } catch (error) {
+            console.error('Error starting exam:', error)
+            toast.error('Network error. Please try again.')
+        }
     }
 
     const handleSubmitExam = async () => {
-        if (!takingExam) return
+        if (!takingExam || !examAttemptId) return
 
-        toast.success('Exam submitted successfully!')
-        setTakingExam(null)
-        setExamAnswers({})
-        fetchAssessments() // Refresh assessments
+        if (!answerText && !answerFile) {
+            toast.error('Please provide answers (either text or file upload)')
+            return
+        }
+
+        if (window.confirm('Are you sure you want to submit? You cannot change your answers after submission.')) {
+            setSubmitting(true)
+            const loadingToast = toast.loading('Submitting your exam...')
+
+            try {
+                const formData = new FormData()
+                formData.append('answer_text', answerText)
+                if (answerFile) {
+                    formData.append('answer_file', answerFile)
+                }
+
+                const response = await fetch(`http://localhost:8000/api/students/exam-attempts/${examAttemptId}/submit/`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Token ${token}`
+                    },
+                    body: formData
+                })
+
+                const data = await response.json()
+
+                toast.dismiss(loadingToast)
+
+                if (response.ok) {
+                    toast.success(data.message || 'Exam submitted successfully!')
+                    setTakingExam(null)
+                    setExamAttemptId(null)
+                    setExamData(null)
+                    setExamAnswers({})
+                    setAnswerText('')
+                    setAnswerFile(null)
+                    fetchAssessments() // Refresh assessments
+                } else {
+                    toast.error(data.error || 'Failed to submit exam')
+                }
+            } catch (error) {
+                toast.dismiss(loadingToast)
+                console.error('Error submitting exam:', error)
+                toast.error('Network error. Please try again.')
+            } finally {
+                setSubmitting(false)
+            }
+        }
     }
 
     const formatTime = (seconds: number) => {
@@ -352,6 +453,7 @@ const AcademicAutomation: React.FC = () => {
                             <h2 style={{margin: 0, color: '#1f2937', fontSize: '1.8rem'}}>{takingExam.title}</h2>
                             <p style={{margin: '0.5rem 0 0 0', color: '#6b7280'}}>
                                 {takingExam.subject} • {takingExam.totalMarks} marks
+                                • {takingExam.questionsCount} questions
                             </p>
                         </div>
                         <div style={{
@@ -373,31 +475,207 @@ const AcademicAutomation: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Questions */}
-                    <div style={{marginBottom: '2rem'}}>
+                    {/* Question File Download */}
+                    {examData?.questions_file_url && (
                         <div style={{
-                            backgroundColor: '#f9fafb',
+                            marginBottom: '2rem',
                             padding: '1.5rem',
+                            backgroundColor: '#f0f9ff',
                             borderRadius: '12px',
-                            textAlign: 'center'
+                            border: '2px solid #3b82f6'
                         }}>
-                            <div style={{fontSize: '3rem', marginBottom: '1rem'}}>📝</div>
-                            <h3 style={{color: '#1f2937', marginBottom: '0.5rem'}}>Exam Questions Loading...</h3>
-                            <p style={{color: '#6b7280', margin: 0}}>
-                                Questions will be loaded from your teacher's assessment
-                            </p>
+                            <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
+                                <div style={{fontSize: '2.5rem'}}>📄</div>
+                                <div style={{flex: 1}}>
+                                    <h3 style={{margin: 0, fontSize: '1.1rem', color: '#1f2937'}}>
+                                        Exam Questions File
+                                    </h3>
+                                    <p style={{margin: '0.25rem 0 0 0', color: '#6b7280', fontSize: '0.9rem'}}>
+                                        {examData.questions_filename || 'Download questions file'}
+                                    </p>
+                                </div>
+                                <a
+                                    href={`http://localhost:8000${examData.questions_file_url}`}
+                                    download
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{
+                                        padding: '0.75rem 1.5rem',
+                                        backgroundColor: '#3b82f6',
+                                        color: 'white',
+                                        textDecoration: 'none',
+                                        borderRadius: '8px',
+                                        fontWeight: '600',
+                                        fontSize: '0.9rem'
+                                    }}
+                                >
+                                    📥 Download
+                                </a>
+                            </div>
                         </div>
+                    )}
+
+                    {/* Answer Section */}
+                    <div style={{marginBottom: '2rem'}}>
+                        <h3 style={{marginBottom: '1rem', color: '#1f2937', fontSize: '1.3rem'}}>
+                            ✍️ Your Answers
+                        </h3>
+
+                        {/* Text Answer Area */}
+                        <div style={{marginBottom: '1.5rem'}}>
+                            <label style={{
+                                display: 'block',
+                                marginBottom: '0.5rem',
+                                fontWeight: '600',
+                                color: '#374151'
+                            }}>
+                                Write your answers here:
+                            </label>
+                            <textarea
+                                value={answerText}
+                                onChange={(e) => setAnswerText(e.target.value)}
+                                placeholder="Type your answers here... You can write your complete answers or provide question numbers with answers."
+                                style={{
+                                    width: '100%',
+                                    minHeight: '300px',
+                                    padding: '1rem',
+                                    border: '2px solid #d1d5db',
+                                    borderRadius: '8px',
+                                    fontSize: '1rem',
+                                    fontFamily: 'inherit',
+                                    resize: 'vertical'
+                                }}
+                            />
+                            <div style={{
+                                marginTop: '0.5rem',
+                                fontSize: '0.85rem',
+                                color: '#6b7280'
+                            }}>
+                                {answerText.length} characters
+                            </div>
+                        </div>
+
+                        {/* OR Divider */}
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '1rem',
+                            marginBottom: '1.5rem'
+                        }}>
+                            <div style={{flex: 1, height: '1px', backgroundColor: '#d1d5db'}}/>
+                            <span style={{color: '#6b7280', fontWeight: '600'}}>OR</span>
+                            <div style={{flex: 1, height: '1px', backgroundColor: '#d1d5db'}}/>
+                        </div>
+
+                        {/* File Upload */}
+                        <div>
+                            <label style={{
+                                display: 'block',
+                                marginBottom: '0.5rem',
+                                fontWeight: '600',
+                                color: '#374151'
+                            }}>
+                                Upload your answer file (PDF, DOC, DOCX, TXT - Max 25MB):
+                            </label>
+                            <div style={{
+                                border: '2px dashed #d1d5db',
+                                borderRadius: '8px',
+                                padding: '2rem',
+                                textAlign: 'center',
+                                backgroundColor: '#f9fafb'
+                            }}>
+                                <input
+                                    type="file"
+                                    onChange={handleFileChange}
+                                    accept=".pdf,.doc,.docx,.txt"
+                                    style={{display: 'none'}}
+                                    id="answer-file-upload"
+                                />
+                                {answerFile ? (
+                                    <div>
+                                        <div style={{fontSize: '2rem', marginBottom: '0.5rem'}}>✅</div>
+                                        <div style={{
+                                            fontWeight: '600',
+                                            color: '#10b981',
+                                            marginBottom: '0.5rem'
+                                        }}>
+                                            {answerFile.name}
+                                        </div>
+                                        <div style={{fontSize: '0.85rem', color: '#6b7280', marginBottom: '1rem'}}>
+                                            {(answerFile.size / (1024 * 1024)).toFixed(2)} MB
+                                        </div>
+                                        <button
+                                            onClick={() => {
+                                                setAnswerFile(null)
+                                                const input = document.getElementById('answer-file-upload') as HTMLInputElement
+                                                if (input) input.value = ''
+                                            }}
+                                            style={{
+                                                padding: '0.5rem 1rem',
+                                                backgroundColor: '#ef4444',
+                                                color: 'white',
+                                                border: 'none',
+                                                borderRadius: '6px',
+                                                fontSize: '0.9rem',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            Remove File
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <div style={{fontSize: '3rem', marginBottom: '1rem'}}>📎</div>
+                                        <label
+                                            htmlFor="answer-file-upload"
+                                            style={{
+                                                padding: '0.75rem 1.5rem',
+                                                backgroundColor: '#3b82f6',
+                                                color: 'white',
+                                                borderRadius: '8px',
+                                                cursor: 'pointer',
+                                                display: 'inline-block',
+                                                fontWeight: '600'
+                                            }}
+                                        >
+                                            Choose File
+                                        </label>
+                                        <div style={{
+                                            marginTop: '1rem',
+                                            fontSize: '0.85rem',
+                                            color: '#6b7280'
+                                        }}>
+                                            Supported formats: PDF, DOC, DOCX, TXT (Max 25MB)
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {!answerText && !answerFile && (
+                            <div style={{
+                                marginTop: '1rem',
+                                padding: '1rem',
+                                backgroundColor: '#fef3c7',
+                                borderRadius: '8px',
+                                border: '1px solid #fbbf24',
+                                color: '#92400e',
+                                fontSize: '0.9rem'
+                            }}>
+                                ⚠️ Please provide your answers either by typing them above OR uploading a file.
+                            </div>
+                        )}
                     </div>
 
                     {/* Submit Button */}
                     <div style={{display: 'flex', gap: '1rem'}}>
                         <button
                             onClick={() => {
-                                if (window.confirm('Are you sure you want to cancel? Your progress will be lost.')) {
+                                if (window.confirm('Are you sure you want to cancel? Your progress will be saved and you can resume later.')) {
                                     setTakingExam(null)
-                                    setExamAnswers({})
                                 }
                             }}
+                            disabled={submitting}
                             style={{
                                 flex: 1,
                                 padding: '1rem 2rem',
@@ -406,27 +684,29 @@ const AcademicAutomation: React.FC = () => {
                                 border: 'none',
                                 borderRadius: '12px',
                                 fontWeight: '600',
-                                cursor: 'pointer',
-                                fontSize: '1rem'
+                                cursor: submitting ? 'not-allowed' : 'pointer',
+                                fontSize: '1rem',
+                                opacity: submitting ? 0.5 : 1
                             }}
                         >
-                            Cancel
+                            Save & Exit
                         </button>
                         <button
                             onClick={handleSubmitExam}
+                            disabled={submitting || (!answerText && !answerFile)}
                             style={{
                                 flex: 2,
                                 padding: '1rem 2rem',
-                                backgroundColor: '#3b82f6',
+                                backgroundColor: (!answerText && !answerFile) || submitting ? '#9ca3af' : '#10b981',
                                 color: 'white',
                                 border: 'none',
                                 borderRadius: '12px',
                                 fontWeight: '600',
-                                cursor: 'pointer',
+                                cursor: (!answerText && !answerFile) || submitting ? 'not-allowed' : 'pointer',
                                 fontSize: '1rem'
                             }}
                         >
-                            Submit Exam
+                            {submitting ? '📤 Submitting...' : '✅ Submit Exam'}
                         </button>
                     </div>
                 </div>

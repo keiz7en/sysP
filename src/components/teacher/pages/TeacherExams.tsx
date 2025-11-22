@@ -2,7 +2,7 @@ import React, {useState, useEffect} from 'react'
 import {motion, AnimatePresence} from 'framer-motion'
 import {useAuth} from '../../../contexts/AuthContext'
 import toast from 'react-hot-toast'
-import {COURSE_SYLLABI, getAllCourseCodes, getCourseByCode} from '../../../data/courseSyllabi'
+import {getAllCourseCodes, getCourseByCode} from '../../../data/courseSyllabi'
 
 interface Exam {
     id: number;
@@ -20,15 +20,36 @@ interface Exam {
     students_enrolled: number;
 }
 
+interface ExamSubmission {
+    id: number;
+    student_name: string;
+    student_id: string;
+    submitted_at: string;
+    time_taken_minutes: number;
+    answer_text: string;
+    answer_file_url: string | null;
+    answer_filename: string | null;
+    score: number | null;
+    percentage: number | null;
+    feedback: string;
+    is_graded: boolean;
+}
+
+interface TeacherCourse {
+    id: number;
+    title: string;
+    code: string;
+    credits: number;
+    status: string;
+}
+
 const TeacherExams: React.FC = () => {
     const {token} = useAuth()
     const [activeTab, setActiveTab] = useState<'all' | 'create'>('all')
     const [exams, setExams] = useState<Exam[]>([])
+    const [teacherCourses, setTeacherCourses] = useState<TeacherCourse[]>([])
     const [loading, setLoading] = useState(true)
     const [creating, setCreating] = useState(false)
-
-    // Get all available courses from syllabus
-    const availableCourses = Object.values(COURSE_SYLLABI)
 
     // Create Exam Form
     const [examForm, setExamForm] = useState({
@@ -43,9 +64,20 @@ const TeacherExams: React.FC = () => {
         materials: ''
     })
 
+    // Submissions modal state
+    const [showSubmissionsModal, setShowSubmissionsModal] = useState(false)
+    const [selectedExam, setSelectedExam] = useState<Exam | null>(null)
+    const [submissions, setSubmissions] = useState<ExamSubmission[]>([])
+    const [loadingSubmissions, setLoadingSubmissions] = useState(false)
+    const [selectedSubmission, setSelectedSubmission] = useState<ExamSubmission | null>(null)
+    const [gradingScore, setGradingScore] = useState('')
+    const [gradingFeedback, setGradingFeedback] = useState('')
+    const [grading, setGrading] = useState(false)
+
     useEffect(() => {
         if (token) {
             fetchExams()
+            fetchTeacherCourses()
         }
     }, [token])
 
@@ -70,6 +102,27 @@ const TeacherExams: React.FC = () => {
             setExams([])
         } finally {
             setLoading(false)
+        }
+    }
+
+    const fetchTeacherCourses = async () => {
+        try {
+            const response = await fetch('http://localhost:8000/api/teachers/courses/', {
+                headers: {
+                    'Authorization': `Token ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            })
+
+            if (response.ok) {
+                const data = await response.json()
+                setTeacherCourses(data.courses || [])
+            } else {
+                setTeacherCourses([])
+            }
+        } catch (error) {
+            console.error('Error fetching teacher courses:', error)
+            setTeacherCourses([])
         }
     }
 
@@ -198,6 +251,59 @@ const TeacherExams: React.FC = () => {
         'Quiz': 10,
         'Mid': 25,
         'Final': 40
+    }
+
+    const fetchSubmissions = async (examId: number) => {
+        setLoadingSubmissions(true)
+        try {
+            const response = await fetch(`http://localhost:8000/api/teachers/exams/${examId}/submissions/`, {
+                headers: {
+                    'Authorization': `Token ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            })
+
+            if (response.ok) {
+                const data = await response.json()
+                setSubmissions(data)
+            } else {
+                setSubmissions([])
+            }
+        } catch (error) {
+            console.error('Error fetching submissions:', error)
+            setSubmissions([])
+        } finally {
+            setLoadingSubmissions(false)
+        }
+    }
+
+    const handleGradeSubmission = async (submissionId: number, score: number, feedback: string) => {
+        setGrading(true)
+        try {
+            const response = await fetch(`http://localhost:8000/api/teachers/exams/grade/${submissionId}/`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Token ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({score, feedback})
+            })
+
+            if (response.ok) {
+                toast.success('Submission graded successfully!')
+                fetchSubmissions(selectedExam!.id)
+                setSelectedSubmission(null)
+                setGradingScore('')
+                setGradingFeedback('')
+            } else {
+                toast.error('Failed to grade submission')
+            }
+        } catch (error) {
+            console.error('Error grading submission:', error)
+            toast.error('Failed to grade submission')
+        } finally {
+            setGrading(false)
+        }
     }
 
     return (
@@ -528,6 +634,26 @@ const TeacherExams: React.FC = () => {
                                                         )}
 
                                                         <button
+                                                            onClick={() => {
+                                                                setSelectedExam(exam)
+                                                                setShowSubmissionsModal(true)
+                                                                fetchSubmissions(exam.id)
+                                                            }}
+                                                            style={{
+                                                                padding: '0.75rem 1.5rem',
+                                                                backgroundColor: '#4ade80',
+                                                                color: 'white',
+                                                                border: 'none',
+                                                                borderRadius: '8px',
+                                                                cursor: 'pointer',
+                                                                fontWeight: '600',
+                                                                fontSize: '0.9rem'
+                                                            }}
+                                                        >
+                                                            📝 View Submissions
+                                                        </button>
+
+                                                        <button
                                                             onClick={() => handleDeleteExam(exam.id)}
                                                             style={{
                                                                 padding: '0.75rem 1.5rem',
@@ -660,13 +786,26 @@ const TeacherExams: React.FC = () => {
                                                 }}
                                             >
                                                 <option value="">-- Select a course --</option>
-                                                {availableCourses.map(course => (
-                                                    <option key={course.code} value={course.code}>
+                                                {teacherCourses.map(course => (
+                                                    <option key={course.id} value={course.code}>
                                                         {course.code} - {course.title} ({course.credits} credits)
-                                                        [{course.level}]
                                                     </option>
                                                 ))}
                                             </select>
+                                            {teacherCourses.length === 0 && (
+                                                <div style={{
+                                                    marginTop: '0.5rem',
+                                                    padding: '0.75rem',
+                                                    backgroundColor: '#fef2f2',
+                                                    borderRadius: '6px',
+                                                    border: '1px solid #fecaca',
+                                                    color: '#991b1b',
+                                                    fontSize: '0.875rem'
+                                                }}>
+                                                    ⚠️ No courses found. Please create or get assigned to a course
+                                                    first.
+                                                </div>
+                                            )}
                                         </div>
 
                                         {examForm.course_code && (
@@ -683,12 +822,11 @@ const TeacherExams: React.FC = () => {
                                                     marginBottom: '0.5rem'
                                                 }}>
                                                     <span style={{fontSize: '1.2rem'}}>📚</span>
-                                                    <strong style={{color: '#166534'}}>Course Syllabus</strong>
+                                                    <strong style={{color: '#166534'}}>Course Selected</strong>
                                                 </div>
                                                 <div style={{color: '#166534', fontSize: '0.9rem'}}>
-                                                    {getCourseByCode(examForm.course_code)?.units.length} units
-                                                    available •
-                                                    Students can practice with AI based on this syllabus
+                                                    You are creating an exam
+                                                    for {teacherCourses.find(c => c.code === examForm.course_code)?.title}
                                                 </div>
                                             </div>
                                         )}
@@ -935,6 +1073,203 @@ const TeacherExams: React.FC = () => {
                     </>
                 )}
             </motion.div>
+
+            {showSubmissionsModal && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center'
+                }}>
+                    <div style={{
+                        backgroundColor: 'white',
+                        borderRadius: '16px',
+                        padding: '2rem',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                        border: '1px solid #e5e7eb',
+                        width: '80%',
+                        maxWidth: '800px'
+                    }}>
+                        <h2 style={{
+                            fontSize: '1.5rem',
+                            fontWeight: '600',
+                            marginBottom: '1.5rem',
+                            color: '#1f2937'
+                        }}>
+                            Submissions for {selectedExam?.title} ({selectedExam?.course_title})
+                        </h2>
+
+                        {loadingSubmissions ? (
+                            <div style={{textAlign: 'center', padding: '4rem'}}>
+                                <div style={{fontSize: '1.2rem', color: '#6b7280'}}>Loading submissions...</div>
+                            </div>
+                        ) : (
+                            <div style={{display: 'grid', gap: '1.5rem'}}>
+                                {submissions.map(submission => (
+                                    <div key={submission.id} style={{
+                                        backgroundColor: 'white',
+                                        borderRadius: '16px',
+                                        padding: '1rem',
+                                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                                        border: '1px solid #e5e7eb'
+                                    }}>
+                                        <div style={{
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'center'
+                                        }}>
+                                            <div>
+                                                <div style={{
+                                                    fontSize: '1.2rem',
+                                                    fontWeight: '600',
+                                                    marginBottom: '0.25rem'
+                                                }}>
+                                                    {submission.student_name}
+                                                </div>
+                                                <div style={{color: '#6b7280', fontSize: '0.9rem'}}>
+                                                    {submission.student_id} - {new Date(submission.submitted_at).toLocaleString()}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <button
+                                                    onClick={() => {
+                                                        setSelectedSubmission(submission)
+                                                    }}
+                                                    style={{
+                                                        padding: '0.5rem 1rem',
+                                                        backgroundColor: '#4ade80',
+                                                        color: 'white',
+                                                        border: 'none',
+                                                        borderRadius: '8px',
+                                                        cursor: 'pointer',
+                                                        fontWeight: '600',
+                                                        fontSize: '0.9rem'
+                                                    }}
+                                                >
+                                                    View Submission
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {selectedSubmission && selectedSubmission.id === submission.id && (
+                                            <div style={{marginTop: '1rem'}}>
+                                                <div style={{fontSize: '1rem', marginBottom: '0.5rem'}}>
+                                                    Answer:
+                                                </div>
+                                                <div style={{
+                                                    backgroundColor: '#f9fafb',
+                                                    padding: '1rem',
+                                                    borderRadius: '8px',
+                                                    border: '1px solid #d1d5db'
+                                                }}>
+                                                    {submission.answer_text}
+                                                </div>
+
+                                                {submission.answer_file_url && (
+                                                    <div style={{marginTop: '1rem'}}>
+                                                        <a href={submission.answer_file_url} target="_blank"
+                                                           rel="noopener noreferrer">
+                                                            Download Answer File ({submission.answer_filename})
+                                                        </a>
+                                                    </div>
+                                                )}
+
+                                                {submission.is_graded ? (
+                                                    <div style={{
+                                                        marginTop: '1rem',
+                                                        padding: '1rem',
+                                                        backgroundColor: '#f0fdf4',
+                                                        borderRadius: '8px',
+                                                        border: '1px solid #bbf7d0'
+                                                    }}>
+                                                        <div style={{fontSize: '1rem', marginBottom: '0.5rem'}}>
+                                                            Grade: {submission.score}/{selectedExam?.total_marks}
+                                                        </div>
+                                                        <div style={{fontSize: '0.9rem', color: '#6b7280'}}>
+                                                            Feedback: {submission.feedback}
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div style={{marginTop: '1rem'}}>
+                                                        <input
+                                                            type="number"
+                                                            value={gradingScore}
+                                                            onChange={(e) => setGradingScore(e.target.value)}
+                                                            placeholder="Enter grade"
+                                                            style={{
+                                                                width: '100%',
+                                                                padding: '0.75rem',
+                                                                border: '1px solid #d1d5db',
+                                                                borderRadius: '8px',
+                                                                fontSize: '1rem'
+                                                            }}
+                                                        />
+                                                        <textarea
+                                                            value={gradingFeedback}
+                                                            onChange={(e) => setGradingFeedback(e.target.value)}
+                                                            placeholder="Enter feedback"
+                                                            rows={3}
+                                                            style={{
+                                                                width: '100%',
+                                                                padding: '0.75rem',
+                                                                border: '1px solid #d1d5db',
+                                                                borderRadius: '8px',
+                                                                fontSize: '1rem',
+                                                                resize: 'vertical',
+                                                                marginTop: '1rem'
+                                                            }}
+                                                        />
+                                                        <button
+                                                            onClick={() => handleGradeSubmission(submission.id, Number(gradingScore), gradingFeedback)}
+                                                            disabled={grading}
+                                                            style={{
+                                                                padding: '0.75rem 1.5rem',
+                                                                backgroundColor: grading ? '#9ca3af' : '#4ade80',
+                                                                color: 'white',
+                                                                border: 'none',
+                                                                borderRadius: '8px',
+                                                                cursor: grading ? 'not-allowed' : 'pointer',
+                                                                fontWeight: '600',
+                                                                fontSize: '0.9rem',
+                                                                marginTop: '1rem'
+                                                            }}
+                                                        >
+                                                            {grading ? 'Grading...' : 'Grade Submission'}
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        <button
+                            onClick={() => setShowSubmissionsModal(false)}
+                            style={{
+                                padding: '0.75rem 1.5rem',
+                                backgroundColor: '#ef4444',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                fontWeight: '600',
+                                fontSize: '0.9rem',
+                                position: 'absolute',
+                                top: '1rem',
+                                right: '1rem'
+                            }}
+                        >
+                            Close
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

@@ -472,12 +472,17 @@ def dashboard_data(request):
         if user.user_type == 'student':
             try:
                 student_profile = StudentProfile.objects.get(user=user)
-                enrollments = CourseEnrollment.objects.filter(student=student_profile, status='active')
+                # Only get enrollments with valid instructors
+                enrollments = CourseEnrollment.objects.filter(
+                    student=student_profile,
+                    status='active',
+                    course__instructor__isnull=False
+                ).select_related('course', 'course__instructor', 'course__instructor__user')
 
                 # Get real course count
                 courses_count = enrollments.count()
 
-                # Get pending assignments
+                # Get pending assessments
                 if Assessment:
                     pending_assessments = Assessment.objects.filter(
                         course__in=[enrollment.course for enrollment in enrollments],
@@ -552,6 +557,10 @@ def dashboard_data(request):
 
             except StudentProfile.DoesNotExist:
                 dashboard_data['stats'] = {'gpa': 0.0, 'courses': 0, 'assignments': 0, 'study_hours': 0}
+            except Exception as e:
+                import traceback
+                print(f"Error in student dashboard: {traceback.format_exc()}")
+                dashboard_data['stats'] = {'gpa': 0.0, 'courses': 0, 'assignments': 0, 'study_hours': 0}
 
         elif user.user_type == 'teacher':
             try:
@@ -622,6 +631,10 @@ def dashboard_data(request):
 
             except TeacherProfile.DoesNotExist:
                 dashboard_data['stats'] = {'students': 0, 'courses': 0, 'assignments': 0, 'rating': 0.0}
+            except Exception as e:
+                import traceback
+                print(f"Error in teacher dashboard: {traceback.format_exc()}")
+                dashboard_data['stats'] = {'students': 0, 'courses': 0, 'assignments': 0, 'rating': 0.0}
 
         elif user.user_type == 'admin':
             if User:
@@ -664,6 +677,8 @@ def dashboard_data(request):
         return Response(dashboard_data, status=status.HTTP_200_OK)
 
     except Exception as e:
+        import traceback
+        print(f"Error in dashboard_data: {traceback.format_exc()}")
         return Response({
             'error': f'Failed to load dashboard data: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

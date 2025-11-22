@@ -19,6 +19,7 @@ interface StudentGrade {
         }
     }
     overall_grade: number
+    grade_letter: string
     attendance_rate: number
     participation_score: number
 }
@@ -49,6 +50,20 @@ const Gradebook: React.FC = () => {
     const [selectedStudent, setSelectedStudent] = useState<string | null>(null)
     const [selectedAssignment, setSelectedAssignment] = useState<string | null>(null)
     const [gradeFilter, setGradeFilter] = useState<'all' | 'pending' | 'graded'>('all')
+
+    // Grading modal state
+    const [showGradeModal, setShowGradeModal] = useState(false)
+    const [gradingData, setGradingData] = useState<{
+        studentId: string
+        studentName: string
+        assignmentId: string
+        assignmentName: string
+        maxPoints: number
+        currentScore: number | null
+    } | null>(null)
+    const [gradeScore, setGradeScore] = useState('')
+    const [gradeFeedback, setGradeFeedback] = useState('')
+    const [submitting, setSubmitting] = useState(false)
 
     useEffect(() => {
         if (user && token) {
@@ -160,27 +175,72 @@ const Gradebook: React.FC = () => {
     })
 
     const getGradeColor = (percentage: number) => {
-        if (percentage >= 90) return '#059669'
-        if (percentage >= 80) return '#3b82f6'
-        if (percentage >= 70) return '#d97706'
-        if (percentage >= 60) return '#f59e0b'
-        return '#dc2626'
+        if (percentage >= 80) return '#059669'  // A - green
+        if (percentage >= 75) return '#10b981'  // A- - lighter green
+        if (percentage >= 70) return '#3b82f6'  // B - blue
+        if (percentage >= 65) return '#60a5fa'  // B- - lighter blue
+        if (percentage >= 50) return '#d97706'  // C - orange
+        if (percentage >= 40) return '#f59e0b'  // D - yellow
+        return '#dc2626'  // F - red
     }
 
     const getGradeLetter = (percentage: number) => {
-        if (percentage >= 97) return 'A+'
-        if (percentage >= 93) return 'A'
-        if (percentage >= 90) return 'A-'
-        if (percentage >= 87) return 'B+'
-        if (percentage >= 83) return 'B'
-        if (percentage >= 80) return 'B-'
-        if (percentage >= 77) return 'C+'
-        if (percentage >= 73) return 'C'
-        if (percentage >= 70) return 'C-'
-        if (percentage >= 67) return 'D+'
-        if (percentage >= 63) return 'D'
-        if (percentage >= 60) return 'D-'
+        if (percentage >= 80) return 'A'
+        if (percentage >= 75) return 'A-'
+        if (percentage >= 70) return 'B'
+        if (percentage >= 65) return 'B-'
+        if (percentage >= 50) return 'C'
+        if (percentage >= 40) return 'D'
         return 'F'
+    }
+
+    const handleGradeClick = (studentId: string, assignmentId: string, assignmentName: string, maxPoints: number, currentScore: number | null) => {
+        setGradingData({
+            studentId,
+            studentName: studentGrades.find(s => s.student_id === studentId)?.student_name || '',
+            assignmentId,
+            assignmentName,
+            maxPoints,
+            currentScore
+        })
+        setShowGradeModal(true)
+    }
+
+    const handleGradeSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault()
+        if (submitting) return
+        setSubmitting(true)
+        try {
+            const response = await fetch(`http://localhost:8000/api/teachers/gradebook/grade/`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Token ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    studentId: gradingData?.studentId,
+                    assignmentId: gradingData?.assignmentId,
+                    score: parseInt(gradeScore, 10)
+                })
+            })
+
+            if (response.ok) {
+                toast.success('Grade updated successfully')
+                fetchGradebook()
+                setShowGradeModal(false)
+                setGradeScore('')
+                setGradeFeedback('')
+            } else {
+                const errorData = await response.json()
+                console.error('Error response:', errorData)
+                toast.error(`Failed to update grade: ${errorData.error || 'Unknown error'}`)
+            }
+        } catch (error) {
+            console.error('Error updating grade:', error)
+            toast.error('Error updating grade')
+        } finally {
+            setSubmitting(false)
+        }
     }
 
     if (loading) {
@@ -246,6 +306,33 @@ const Gradebook: React.FC = () => {
                     </button>
                 </div>
             </div>
+
+            {/* Grading Scale Legend */}
+            <motion.div
+                initial={{opacity: 0, y: 20}}
+                animate={{opacity: 1, y: 0}}
+                style={{
+                    background: 'white',
+                    padding: '1rem',
+                    borderRadius: '12px',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                    border: '1px solid #e5e7eb',
+                    marginBottom: '1.5rem'
+                }}
+            >
+                <h4 style={{margin: '0 0 0.75rem 0', fontSize: '0.95rem', fontWeight: '600', color: '#374151'}}>
+                    📊 Grading Scale
+                </h4>
+                <div style={{display: 'flex', gap: '1.5rem', flexWrap: 'wrap', fontSize: '0.85rem'}}>
+                    <span><strong style={{color: '#059669'}}>A</strong> = 80-100%</span>
+                    <span><strong style={{color: '#10b981'}}>A-</strong> = 75-79%</span>
+                    <span><strong style={{color: '#3b82f6'}}>B</strong> = 70-74%</span>
+                    <span><strong style={{color: '#60a5fa'}}>B-</strong> = 65-69%</span>
+                    <span><strong style={{color: '#d97706'}}>C</strong> = 50-64%</span>
+                    <span><strong style={{color: '#f59e0b'}}>D</strong> = 40-49%</span>
+                    <span><strong style={{color: '#dc2626'}}>F</strong> = 0-39%</span>
+                </div>
+            </motion.div>
 
             {/* Controls */}
             <motion.div
@@ -576,9 +663,21 @@ const Gradebook: React.FC = () => {
                                                         </div>
                                                     </div>
                                                 ) : (
-                                                    <div style={{color: '#9ca3af', fontSize: '0.875rem'}}>
-                                                        —
-                                                    </div>
+                                                    <button
+                                                        onClick={() => handleGradeClick(student.student_id, assignment.id, assignment.name, assignment.max_points, null)}
+                                                        style={{
+                                                            padding: '0.5rem 1rem',
+                                                            backgroundColor: '#10b981',
+                                                            color: 'white',
+                                                            border: 'none',
+                                                            borderRadius: '6px',
+                                                            fontSize: '0.875rem',
+                                                            fontWeight: '600',
+                                                            cursor: 'pointer'
+                                                        }}
+                                                    >
+                                                        Grade
+                                                    </button>
                                                 )}
                                             </td>
                                         )
@@ -624,6 +723,141 @@ const Gradebook: React.FC = () => {
                     </div>
                 )}
             </motion.div>
+            {showGradeModal && gradingData && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center'
+                }}>
+                    <div style={{
+                        background: 'white',
+                        padding: '2rem',
+                        borderRadius: '12px',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                        border: '1px solid #e5e7eb',
+                        width: '500px',
+                        maxWidth: '90%'
+                    }}>
+                        <h2 style={{margin: '0 0 1.5rem 0', fontSize: '1.25rem', fontWeight: '600', color: '#1f2937'}}>
+                            Grade Assignment
+                        </h2>
+                        <div style={{
+                            marginBottom: '1rem',
+                            padding: '1rem',
+                            backgroundColor: '#f0f9ff',
+                            borderRadius: '8px'
+                        }}>
+                            <div style={{fontSize: '0.9rem', color: '#1e40af', marginBottom: '0.25rem'}}>
+                                <strong>Student:</strong> {gradingData.studentName}
+                            </div>
+                            <div style={{fontSize: '0.9rem', color: '#1e40af', marginBottom: '0.25rem'}}>
+                                <strong>Assignment:</strong> {gradingData.assignmentName}
+                            </div>
+                            <div style={{fontSize: '0.9rem', color: '#1e40af'}}>
+                                <strong>Max Points:</strong> {gradingData.maxPoints}
+                            </div>
+                        </div>
+                        <form onSubmit={handleGradeSubmit}>
+                            <div style={{margin: '1rem 0'}}>
+                                <label style={{
+                                    display: 'block',
+                                    marginBottom: '0.5rem',
+                                    fontWeight: '600',
+                                    color: '#374151'
+                                }}>
+                                    Score (0 - {gradingData.maxPoints})
+                                </label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    max={gradingData.maxPoints}
+                                    value={gradeScore}
+                                    onChange={(e) => setGradeScore(e.target.value)}
+                                    required
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.75rem',
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: '6px',
+                                        fontSize: '0.875rem'
+                                    }}
+                                    placeholder={`Enter score (0-${gradingData.maxPoints})`}
+                                />
+                            </div>
+                            <div style={{margin: '1rem 0'}}>
+                                <label style={{
+                                    display: 'block',
+                                    marginBottom: '0.5rem',
+                                    fontWeight: '600',
+                                    color: '#374151'
+                                }}>
+                                    Feedback (optional)
+                                </label>
+                                <textarea
+                                    value={gradeFeedback}
+                                    onChange={(e) => setGradeFeedback(e.target.value)}
+                                    rows={3}
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.75rem',
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: '6px',
+                                        fontSize: '0.875rem',
+                                        resize: 'vertical'
+                                    }}
+                                    placeholder="Enter feedback for the student..."
+                                />
+                            </div>
+                            <div style={{display: 'flex', gap: '1rem', marginTop: '1.5rem'}}>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowGradeModal(false)
+                                        setGradeScore('')
+                                        setGradeFeedback('')
+                                    }}
+                                    style={{
+                                        flex: 1,
+                                        padding: '0.75rem 1.5rem',
+                                        backgroundColor: '#f3f4f6',
+                                        color: '#374151',
+                                        border: 'none',
+                                        borderRadius: '8px',
+                                        fontSize: '0.9rem',
+                                        fontWeight: '600',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={submitting || !gradeScore}
+                                    style={{
+                                        flex: 2,
+                                        padding: '0.75rem 1.5rem',
+                                        backgroundColor: (submitting || !gradeScore) ? '#9ca3af' : '#10b981',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '8px',
+                                        fontSize: '0.9rem',
+                                        fontWeight: '600',
+                                        cursor: (submitting || !gradeScore) ? 'not-allowed' : 'pointer'
+                                    }}
+                                >
+                                    {submitting ? 'Submitting...' : 'Submit Grade'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

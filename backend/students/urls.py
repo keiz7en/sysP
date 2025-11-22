@@ -14,6 +14,7 @@ from .ai_complete_views import (
     ai_engagement_analysis,
     ai_comprehensive_dashboard
 )
+from . import exam_views
 
 router = DefaultRouter()
 router.register(r'profiles', views.StudentProfileViewSet, basename='student-profile')
@@ -35,6 +36,16 @@ urlpatterns = [
     path('engagement-analytics/', views.get_engagement_analytics, name='engagement-analytics'),
     path('generate-ai-assessment/', views.generate_ai_assessment, name='generate-ai-assessment'),
     path('ai-learning-insights/', views.get_ai_learning_insights, name='ai-learning-insights'),
+
+    # ========== ASSIGNMENT MANAGEMENT ENDPOINTS ==========
+    path('assignments/', views.get_student_assignments, name='student-assignments'),
+    path('submit-assignment/', views.submit_assignment, name='submit-assignment'),
+    path('assignment/<int:assignment_id>/', views.get_assignment_detail, name='assignment-detail'),
+
+    # ========== EXAM TAKING ENDPOINTS ==========
+    path('exams/<int:exam_id>/start/', exam_views.start_exam, name='start-exam'),
+    path('exam-attempts/<int:attempt_id>/submit/', exam_views.submit_exam, name='submit-exam'),
+    path('exam-attempts/<int:attempt_id>/status/', exam_views.get_attempt_status, name='exam-attempt-status'),
 
     # ========== AI-POWERED ENDPOINTS (Gemini AI) ==========
     # Feature 1: Student Information & Academic Records (AI-Enhanced)

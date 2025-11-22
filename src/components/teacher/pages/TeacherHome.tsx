@@ -306,7 +306,7 @@ const TeacherHome: React.FC = () => {
                                     {rec.description}
                                 </p>
                                 <button
-                                    onClick={() => toast.info(rec.action)}
+                                    onClick={() => toast(rec.action)}
                                     style={{
                                         padding: '0.5rem 1rem',
                                         backgroundColor: getPriorityColor(rec.priority),

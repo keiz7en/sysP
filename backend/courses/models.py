@@ -279,6 +279,11 @@ class Assignment(models.Model):
     due_date = models.DateTimeField()
     is_published = models.BooleanField(default=True)
 
+    # File attachments for assignment instructions
+    attachment_file = models.FileField(upload_to='assignment_attachments/', blank=True, null=True,
+                                       help_text='Assignment file (PDF, DOC, DOCX, TXT)')
+    attachment_filename = models.CharField(max_length=255, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -290,13 +295,97 @@ class Assignment(models.Model):
         return f'{self.course.code} - {self.title}'
 
 
+class Exam(models.Model):
+    """Exams/Tests for courses"""
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='exams')
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+
+    EXAM_TYPES = [
+        ('Quiz', 'Quiz'),
+        ('Mid', 'Mid Term'),
+        ('Final', 'Final Exam'),
+    ]
+    exam_type = models.CharField(max_length=20, choices=EXAM_TYPES, default='Quiz')
+
+    total_marks = models.IntegerField(default=10)
+    duration_minutes = models.IntegerField(default=30)
+    due_date = models.DateTimeField()
+    questions_count = models.IntegerField(default=10)
+
+    STATUS_CHOICES = [
+        ('draft', 'Draft'),
+        ('published', 'Published'),
+        ('completed', 'Completed'),
+    ]
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+
+    # File attachments for exam questions
+    questions_file = models.FileField(upload_to='exam_questions/', blank=True, null=True,
+                                      help_text='Questions file (PDF, DOC, DOCX, TXT)')
+    questions_filename = models.CharField(max_length=255, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'exams'
+        ordering = ['due_date']
+
+    def __str__(self):
+        return f'{self.course.code} - {self.title} ({self.exam_type})'
+
+
+class ExamAttempt(models.Model):
+    """Student attempts at exams"""
+    exam = models.ForeignKey(Exam, on_delete=models.CASCADE, related_name='attempts')
+    student = models.ForeignKey('students.StudentProfile', on_delete=models.CASCADE, related_name='exam_attempts')
+
+    started_at = models.DateTimeField(auto_now_add=True)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    time_taken = models.DurationField(null=True, blank=True)
+
+    score = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+
+    # Answer file upload
+    answer_file = models.FileField(upload_to='exam_answers/', blank=True, null=True,
+                                   help_text='Answer file (PDF, DOC, DOCX, TXT)')
+    answer_filename = models.CharField(max_length=255, blank=True)
+    answer_text = models.TextField(blank=True)
+
+    # AI Detection for exam answers
+    ai_detection_score = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True,
+                                             help_text='AI detection confidence (0-100)')
+    ai_detection_result = models.JSONField(default=dict, blank=True, help_text='Detailed AI detection analysis')
+    ai_detection_performed = models.BooleanField(default=False)
+    ai_detection_timestamp = models.DateTimeField(null=True, blank=True)
+    is_flagged_ai = models.BooleanField(default=False, help_text='Flagged as potentially AI-generated')
+    flag_reason = models.TextField(blank=True)
+
+    # Grading
+    feedback = models.TextField(blank=True)
+    graded_at = models.DateTimeField(null=True, blank=True)
+    graded_by = models.ForeignKey('teachers.TeacherProfile', on_delete=models.SET_NULL, null=True, blank=True)
+
+    class Meta:
+        db_table = 'exam_attempts'
+        ordering = ['-started_at']
+
+    def __str__(self):
+        return f'{self.student.user.get_full_name()} - {self.exam.title}'
+
+
 class AssignmentSubmission(models.Model):
     """Student submissions for assignments"""
     assignment = models.ForeignKey(Assignment, on_delete=models.CASCADE, related_name='submissions')
     student = models.ForeignKey('students.StudentProfile', on_delete=models.CASCADE, related_name='submissions')
 
     submission_text = models.TextField(blank=True)
-    file_upload = models.FileField(upload_to='assignments/', blank=True, null=True)
+    file_upload = models.FileField(upload_to='assignments/', blank=True, null=True,
+                                   help_text='Submission file (PDF, DOC, DOCX, TXT)')
+    file_name = models.CharField(max_length=255, blank=True)
+    file_size = models.IntegerField(default=0, help_text='File size in bytes')
 
     submitted_at = models.DateTimeField(auto_now_add=True)
     is_late = models.BooleanField(default=False)
@@ -306,6 +395,17 @@ class AssignmentSubmission(models.Model):
     feedback = models.TextField(blank=True)
     graded_at = models.DateTimeField(null=True, blank=True)
     graded_by = models.ForeignKey('teachers.TeacherProfile', on_delete=models.SET_NULL, null=True, blank=True)
+
+    # AI Detection for submission content
+    ai_detection_score = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True,
+                                             help_text='AI detection confidence (0-100)')
+    ai_detection_result = models.JSONField(default=dict, blank=True, help_text='Detailed AI detection analysis')
+    ai_detection_performed = models.BooleanField(default=False)
+    ai_detection_timestamp = models.DateTimeField(null=True, blank=True)
+
+    # Flags for suspicious content
+    is_flagged_ai = models.BooleanField(default=False, help_text='Flagged as potentially AI-generated')
+    flag_reason = models.TextField(blank=True)
 
     class Meta:
         db_table = 'assignment_submissions'

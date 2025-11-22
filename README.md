@@ -1,6 +1,64 @@
 # AI Education & Career Platform
 
-### Teacher-Course Management System with Strict Approval Chains
+## 🎉 Latest Updates - Assignment & Exam Enhancements
+
+### ⚡ Latest Fix (Just Now)
+
+✅ **Student Exam Display Fixed**
+
+- Fixed issue where teacher-created exams weren't showing in student panel
+- Students can now see all published exams from their enrolled courses
+- Backend now fetches from both Exam model (teacher-created) and Assessment model
+- Real-time data - no dummy or hardcoded data
+
+✅ **Exam Endpoints Working**
+- Fixed 404 error on `/api/teachers/exams/` endpoint
+- Teachers can create exams for their assigned courses
+- Subject validation ensures teachers only create exams for approved subjects
+
+✅ **Real Instructor Data Only**
+
+- Students only see courses with actual assigned instructors
+- No dummy or placeholder instructor names
+- Backend validates all instructor assignments
+
+### New Features (Latest Release)
+
+✅ **File Upload Support**
+
+- Teachers can upload assignment files (PDF, DOC, DOCX, TXT) when creating assignments
+- Students can submit assignments as text, file, or both
+- Exam question paper uploads for teachers
+- Student answer file submissions for exams
+- Drag-and-drop file upload interface
+- File size limit: 10MB per file
+
+✅ **AI Detection System**
+
+- Automatic detection of AI-generated content in submissions
+- 10 sophisticated heuristic checks
+- Confidence scoring (0-100%)
+- Detailed analysis and reporting
+- Teacher alerts for flagged submissions
+- Detection flags displayed to both teachers and students
+
+✅ **Enhanced Student Panel**
+
+- Renamed "AI Practice & Assessment" to "Assignment Submission"
+- New dedicated Assignment Submission component
+- Beautiful gradient statistics cards
+- Filter assignments by status (pending, submitted, graded)
+- View teacher feedback and AI detection results
+- Download teacher-uploaded assignment files
+
+✅ **Improved Teacher Panel**
+
+- View all submissions with AI detection results
+- Access detailed AI analysis for each submission
+- Manage assignment attachments
+- Enhanced grading workflow
+
+## Teacher-Course Management System with Strict Approval Chains
 
 ## System Overview
 

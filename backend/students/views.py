@@ -108,13 +108,21 @@ class StudentDashboardView(APIView):
         # Add ALL enrollment details (active, pending, etc.)
         if all_enrollments.exists():
             enrollments_data = []
+            import logging
             for enrollment in all_enrollments:
+                # Verify instructor exists (safety check for data integrity)
+                if not enrollment.course.instructor or not enrollment.course.instructor.user:
+                    # Log the issue but don't crash - skip this enrollment
+                    logging.warning(f"Course {enrollment.course.code} has no valid instructor assigned")
+                    continue  # Skip enrollments with invalid instructor data
+
                 enrollments_data.append({
                     'id': enrollment.id,
                     'course_id': enrollment.course.id,
                     'course_title': enrollment.course.title,
                     'course_code': enrollment.course.code,
-                    'instructor_name': enrollment.course.instructor.user.get_full_name(),
+                    'instructor_name': enrollment.course.instructor.user.get_full_name(),  # REAL from DB
+                    'instructor_id': enrollment.course.instructor.id,  # For verification
                     'progress_percentage': float(enrollment.completion_percentage),
                     'enrollment_date': enrollment.enrollment_date.strftime('%Y-%m-%d'),
                     'status': enrollment.status,
@@ -124,7 +132,14 @@ class StudentDashboardView(APIView):
                     'ai_features_unlocked': enrollment.ai_features_unlocked,  # Explicit field
                     'subject': enrollment.course.subject.name if enrollment.course.subject else 'General'
                 })
-            dashboard_data['current_enrollments'] = enrollments_data
+
+            # Only add enrollments_data if we have valid enrollments
+            if enrollments_data:
+                dashboard_data['current_enrollments'] = enrollments_data
+            else:
+                dashboard_data['has_courses'] = False
+                dashboard_data['is_new_student'] = True
+                dashboard_data['message'] = 'No valid course enrollments. Teachers will add you to courses.'
 
         return Response(dashboard_data, status=status.HTTP_200_OK)
 
@@ -145,6 +160,10 @@ class AcademicRecordsView(APIView):
             # Build academic records array
             academic_records = []
             for enrollment in enrollments:
+                # Skip enrollments with missing instructor or instructor user
+                if not enrollment.course.instructor or not enrollment.course.instructor.user:
+                    continue
+
                 # Determine grade based on final score
                 grade = 'In Progress'
                 if enrollment.status == 'completed':
@@ -163,7 +182,7 @@ class AcademicRecordsView(APIView):
                 academic_records.append({
                     'course_title': enrollment.course.title,
                     'course_code': enrollment.course.code,
-                    'instructor': enrollment.course.instructor.user.get_full_name() if enrollment.course.instructor else 'N/A',
+                    'instructor': enrollment.course.instructor.user.get_full_name(),
                     'grade': grade,
                     'credits': enrollment.course.credits,
                     'semester': f"{enrollment.course.subject.name if enrollment.course.subject else 'General'} - {enrollment.enrolled_at.strftime('%B %Y')}",
@@ -172,8 +191,13 @@ class AcademicRecordsView(APIView):
                     'status': enrollment.status
                 })
 
-            # Calculate GPA
-            completed_enrollments = [e for e in enrollments if e.status == 'completed' and e.final_score]
+            # Calculate GPA - only completed enrollments with valid instructor
+            completed_enrollments = [
+                e for e in enrollments
+                if e.status == 'completed'
+                   and e.final_score
+                   and (e.course.instructor and e.course.instructor.user)
+            ]
             total_grade_points = sum(
                 (e.final_score / 25) * e.course.credits
                 for e in completed_enrollments if e.final_score
@@ -210,6 +234,8 @@ class AcademicRecordsView(APIView):
 
             return Response(transcript_data)
         except Exception as e:
+            import traceback
+            print(f"Error in AcademicRecordsView: {traceback.format_exc()}")
             return Response({'error': str(e)}, status=500)
 
 
@@ -334,7 +360,7 @@ class CareerGuidanceView(APIView):
 
 
 class AssessmentsView(APIView):
-    """REAL Assessments - only actual teacher-created assessments"""
+    """REAL Assessments - shows both Assessment model AND Exam model (teacher-created exams)"""
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
@@ -350,6 +376,11 @@ class AssessmentsView(APIView):
                 status='active'
             ).select_related('course')
 
+            print(f"\n=== DEBUG: Student {student_profile.user.username} ===")
+            print(f"Total enrollments: {enrollments.count()}")
+            for enr in enrollments:
+                print(f"  - Enrolled in: {enr.course.code} ({enr.course.title}) - Status: {enr.status}")
+
             if not enrollments.exists():
                 return Response({
                     'upcoming_assessments': [],
@@ -363,65 +394,182 @@ class AssessmentsView(APIView):
                 })
 
             enrolled_courses = [enrollment.course for enrollment in enrollments]
+            print(f"Enrolled course IDs: {[c.id for c in enrolled_courses]}")
+            print(f"Enrolled course codes: {[c.code for c in enrolled_courses]}")
 
-            # Get actual assessments created by teachers
-            upcoming_assessments = Assessment.objects.filter(
+            # ========== GET EXAMS FROM EXAM MODEL (Teacher Created) ==========
+            from courses.models import Exam, ExamAttempt
+
+            # Get published exams from teacher's Exam model - Include ALL published exams, not just future ones
+            teacher_exams = Exam.objects.filter(
                 course__in=enrolled_courses,
-                available_until__gte=timezone.now()
-            ).order_by('available_until')
+                status='published'
+            ).select_related('course').order_by('due_date')
+
+            print(f"\nFound {teacher_exams.count()} published exams")
+            for exam in teacher_exams:
+                print(f"  - Exam: {exam.title} ({exam.exam_type}) in {exam.course.code} - Due: {exam.due_date}")
+
+            # Get ALL exams (for debugging)
+            all_exams = Exam.objects.all().select_related('course')
+            print(f"\nTotal exams in database: {all_exams.count()}")
+            for exam in all_exams:
+                print(
+                    f"  - Exam: {exam.title} ({exam.exam_type}) in {exam.course.code} - Status: {exam.status} - Due: {exam.due_date}")
+
+            # Get student's exam attempts
+            student_exam_attempts = ExamAttempt.objects.filter(
+                student=student_profile
+            ).values_list('exam_id', flat=True)
+
+            print(f"Student has attempted {len(student_exam_attempts)} exams")
+            print(f"Attempted exam IDs: {list(student_exam_attempts)}")
+
+            # ========== GET ASSESSMENTS FROM ASSESSMENT MODEL ==========
+            # Get assessments from assessments app
+            upcoming_assessments_from_app = Assessment.objects.filter(
+                course__in=enrolled_courses
+            ).order_by('available_until') if Assessment else []
 
             # Check which assessments student has already completed
             student_attempts = StudentAssessmentAttempt.objects.filter(
                 student=student_profile,
                 status__in=['submitted', 'graded']
-            ).values_list('assessment_id', flat=True)
+            ).values_list('assessment_id', flat=True) if StudentAssessmentAttempt else []
 
+            # ========== COMBINE BOTH SOURCES ==========
             assessments_data = []
-            for assessment in upcoming_assessments:
+
+            # Add teacher-created exams (show all, let frontend handle filtering)
+            for exam in teacher_exams:
+                # Convert due_date to date for comparison if it's a datetime
+                exam_due_date = exam.due_date
+                if isinstance(exam_due_date, datetime):
+                    exam_due_date_only = exam_due_date.date()
+                else:
+                    exam_due_date_only = exam_due_date
+
+                # For display, convert to string
+                due_date_str = exam.due_date
+                if isinstance(due_date_str, datetime):
+                    due_date_str = due_date_str.strftime('%Y-%m-%d')
+                elif not isinstance(due_date_str, str):
+                    due_date_str = str(due_date_str)
+
+                # Check if student has submitted (not just attempted)
+                has_submitted = ExamAttempt.objects.filter(
+                    exam=exam,
+                    student=student_profile,
+                    submitted_at__isnull=False
+                ).exists()
+
+                assessments_data.append({
+                    'id': exam.id,
+                    'title': exam.title,
+                    'course': exam.course.title,
+                    'course_id': exam.course.id,
+                    'course_code': exam.course.code,
+                    'type': exam.exam_type,  # 'Quiz', 'Mid', 'Final'
+                    'total_marks': exam.total_marks,
+                    'due_date': due_date_str,
+                    'duration': exam.duration_minutes,
+                    'description': exam.description,
+                    'questions_count': exam.questions_count,
+                    'created_by_teacher': exam.course.instructor.user.get_full_name() if exam.course.instructor else 'Unknown',
+                    'source': 'exam_model',  # Flag to identify source
+                    'status': 'completed' if has_submitted else (
+                        'upcoming' if exam_due_date_only >= timezone.now().date() else 'overdue'),
+                    'attempted': has_submitted
+                })
+
+            print(f"\nTotal assessments to show: {len(assessments_data)}")
+            for a in assessments_data:
+                print(f"  - {a['title']} ({a['type']}) - Course: {a['course_code']} - Status: {a['status']}")
+
+            # Add assessments from assessments app
+            for assessment in upcoming_assessments_from_app:
                 if assessment.id not in student_attempts:
                     assessments_data.append({
                         'id': assessment.id,
                         'title': assessment.title,
                         'course': assessment.course.title,
+                        'course_id': assessment.course.id,
                         'type': assessment.type,
                         'total_marks': assessment.total_marks,
                         'due_date': assessment.available_until.strftime('%Y-%m-%d'),
+                        'duration': assessment.duration_minutes if hasattr(assessment,
+                                                                           'duration_minutes') and assessment.duration_minutes else 60,
                         'description': assessment.description,
-                        'created_by_teacher': assessment.course.instructor.user.get_full_name()
+                        'questions_count': assessment.questions.count() if hasattr(assessment, 'questions') else 0,
+                        'created_by_teacher': assessment.course.instructor.user.get_full_name() if assessment.course.instructor else 'Unknown',
+                        'source': 'assessment_model'  # Flag to identify source
                     })
 
-            # Get completed assessments with results
+            # Get completed assessments with results (both sources)
+            recent_results = []
+
+            # Get completed exams from Exam model
+            completed_exam_attempts = ExamAttempt.objects.filter(
+                student=student_profile,
+                submitted_at__isnull=False
+            ).select_related('exam', 'exam__course').order_by('-submitted_at')
+
+            for attempt in completed_exam_attempts:
+                recent_results.append({
+                    'assessment_title': attempt.exam.title,
+                    'course': attempt.exam.course.title,
+                    'course_id': attempt.exam.course.id,
+                    'type': attempt.exam.exam_type,
+                    'score': float(attempt.percentage) if attempt.percentage else 0,
+                    'total_marks': attempt.exam.total_marks,
+                    'submitted_at': attempt.submitted_at.strftime('%Y-%m-%d %H:%M') if attempt.submitted_at else 'N/A',
+                    'graded_by': attempt.graded_by.user.get_full_name() if getattr(attempt, 'graded_by',
+                                                                                   None) else 'Auto-graded',
+                    'source': 'exam_model'
+                })
+
+            # Get completed assessments from Assessment model
             completed_attempts = StudentAssessmentAttempt.objects.filter(
                 student=student_profile,
                 status='graded'
             ).select_related('assessment', 'assessment__course').order_by('-submitted_at')
 
-            recent_results = []
             for attempt in completed_attempts:
                 recent_results.append({
                     'assessment_title': attempt.assessment.title,
                     'course': attempt.assessment.course.title,
+                    'course_id': attempt.assessment.course.id,
+                    'type': attempt.assessment.type,
                     'score': float(attempt.percentage) if attempt.percentage else 0,
                     'total_marks': attempt.assessment.total_marks,
                     'submitted_at': attempt.submitted_at.strftime('%Y-%m-%d %H:%M') if attempt.submitted_at else 'N/A',
-                    'graded_by': attempt.assessment.course.instructor.user.get_full_name()
+                    'graded_by': attempt.assessment.course.instructor.user.get_full_name(),
+                    'source': 'assessment_model'
                 })
 
-            avg_score = completed_attempts.aggregate(avg=Avg('percentage'))['avg'] or 0
+            # Calculate average score from all completed assessments
+            all_scores = [r['score'] for r in recent_results if r['score'] > 0]
+            avg_score = sum(all_scores) / len(all_scores) if all_scores else 0
 
             return Response({
                 'upcoming_assessments': assessments_data,
-                'recent_results': recent_results,
+                'recent_results': recent_results[:10],  # Limit to last 10
                 'summary': {
                     'total_upcoming': len(assessments_data),
-                    'completed_total': completed_attempts.count(),
+                    'completed_total': len(recent_results),
                     'average_score': round(float(avg_score), 1) if avg_score else 0,
-                    'enrolled_courses': len(enrolled_courses)
+                    'enrolled_courses': len(enrolled_courses),
+                    'exams_from_teachers': len([a for a in assessments_data if a['source'] == 'exam_model']),
+                    'assessments_from_system': len([a for a in assessments_data if a['source'] == 'assessment_model'])
                 }
             })
 
         except StudentProfile.DoesNotExist:
             return Response({'error': 'Student profile not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            import traceback
+            print(f"Error in AssessmentsView: {traceback.format_exc()}")
+            return Response({'error': f'Server error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class LearningInsightsView(APIView):
@@ -1041,7 +1189,8 @@ def get_ai_learning_insights(request):
 def get_available_courses(request):
     """
     Get all courses available for student enrollment
-    Filtered by: approved status, open for enrollment, and teacher has approved subject
+    ONLY shows courses with REAL instructors assigned from database
+    NO dummy or placeholder data
     """
     if not hasattr(request.user, 'user_type') or request.user.user_type != 'student':
         return Response({
@@ -1054,21 +1203,27 @@ def get_available_courses(request):
 
         student = StudentProfile.objects.get(user=request.user)
 
-        # Get all approved courses that are open for enrollment
+        # Get ONLY courses with REAL instructor assignments
+        # Filter: must have instructor, instructor must exist, and course must be approved/active
         available_courses = Course.objects.filter(
-            status__in=['approved', 'active']
+            status__in=['approved', 'active'],
+            instructor__isnull=False  # MUST have an instructor
         ).select_related(
             'instructor__user',
             'subject'
         ).prefetch_related('enrollments')
 
-        # Get student's current enrollments to mark already enrolled courses
+        # Get student's current enrollments
         student_enrollments = CourseEnrollment.objects.filter(
             student=student
         ).values_list('course_id', flat=True)
 
         courses_data = []
         for course in available_courses:
+            # Double-check instructor exists (safety check)
+            if not course.instructor or not course.instructor.user:
+                continue  # Skip courses without valid instructor
+
             # Check if already enrolled
             is_enrolled = course.id in student_enrollments
             enrollment_status = None
@@ -1084,9 +1239,10 @@ def get_available_courses(request):
                 'description': course.description or 'No description provided',
                 'credits': course.credits,
                 'difficulty_level': course.difficulty_level,
-                'instructor_name': course.instructor.user.get_full_name(),
-                'subject_name': course.subject.name,
-                'subject_code': course.subject.code,
+                'instructor_name': course.instructor.user.get_full_name(),  # REAL instructor name from DB
+                'instructor_id': course.instructor.id,  # Include instructor ID for verification
+                'subject_name': course.subject.name if course.subject else 'General',
+                'subject_code': course.subject.code if course.subject else 'N/A',
                 'current_enrollments': course.enrolled_count,
                 'enrollment_limit': course.enrollment_limit,
                 'is_enrolled': is_enrolled,
@@ -1101,7 +1257,8 @@ def get_available_courses(request):
             'available_courses': courses_data,
             'total_courses': len(courses_data),
             'enrolled_count': len(student_enrollments),
-            'message': 'Contact your teacher to request enrollment in a course' if len(courses_data) > 0 and len(
+            'message': 'Showing only courses with assigned instructors. Contact your teacher to request enrollment.' if len(
+                courses_data) > 0 and len(
                 student_enrollments) == 0 else None
         })
 
@@ -1194,3 +1351,313 @@ def get_my_enrollments(request):
         return Response({
             'error': f'Failed to fetch enrollments: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_student_assignments(request):
+    """Get all assignments for student's enrolled courses"""
+    if request.user.user_type != 'student':
+        return Response({'error': 'Student access only'}, status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        student_profile = StudentProfile.objects.get(user=request.user)
+
+        # Get enrolled courses
+        enrollments = CourseEnrollment.objects.filter(
+            student=student_profile,
+            status='active'
+        ).select_related('course')
+
+        enrolled_courses = [e.course for e in enrollments]
+
+        if not enrolled_courses:
+            return Response({
+                'assignments': [],
+                'message': 'No active course enrollments'
+            })
+
+        # Get assignments from enrolled courses
+        from courses.models import Assignment, AssignmentSubmission
+
+        assignments = Assignment.objects.filter(
+            course__in=enrolled_courses,
+            is_published=True
+        ).select_related('course').order_by('-due_date')
+
+        assignments_data = []
+        for assignment in assignments:
+            # Check if student has submitted
+            try:
+                submission = AssignmentSubmission.objects.get(
+                    assignment=assignment,
+                    student=student_profile
+                )
+
+                # Determine status
+                if submission.points_earned is not None:
+                    status = 'graded'
+                else:
+                    status = 'submitted'
+
+                submission_data = {
+                    'id': submission.id,
+                    'submitted_at': submission.submitted_at.isoformat(),
+                    'submission_text': submission.submission_text,
+                    'points_earned': float(submission.points_earned) if submission.points_earned else None,
+                    'feedback': submission.feedback,
+                    'is_late': submission.is_late
+                }
+
+                # Add file info if exists
+                if submission.file_upload:
+                    submission_data['file'] = {
+                        'url': submission.file_upload.url,
+                        'filename': submission.file_name,
+                        'size': submission.file_size
+                    }
+
+                # Add AI detection if performed
+                if submission.ai_detection_performed:
+                    submission_data['ai_detection'] = {
+                        'score': float(submission.ai_detection_score) if submission.ai_detection_score else 0,
+                        'is_flagged': submission.is_flagged_ai,
+                        'flag_reason': submission.flag_reason,
+                        'result': submission.ai_detection_result
+                    }
+
+            except AssignmentSubmission.DoesNotExist:
+                # Not submitted yet
+                status = 'overdue' if assignment.due_date < timezone.now() else 'pending'
+                submission_data = None
+
+            assignment_data = {
+                'id': assignment.id,
+                'title': assignment.title,
+                'description': assignment.description,
+                'course_title': assignment.course.title,
+                'course_id': assignment.course.id,
+                'due_date': assignment.due_date.isoformat(),
+                'max_points': float(assignment.max_points),
+                'assignment_type': assignment.assignment_type,
+                'status': status,
+                'submission': submission_data
+            }
+
+            # Add attachment if exists
+            if assignment.attachment_file:
+                assignment_data['attachment'] = {
+                    'url': assignment.attachment_file.url,
+                    'filename': assignment.attachment_filename,
+                    'size': assignment.attachment_file.size if hasattr(assignment.attachment_file, 'size') else 0
+                }
+
+            assignments_data.append(assignment_data)
+
+        return Response({
+            'assignments': assignments_data,
+            'total_assignments': len(assignments_data),
+            'pending_count': len([a for a in assignments_data if a['status'] == 'pending']),
+            'submitted_count': len([a for a in assignments_data if a['status'] in ['submitted', 'graded']]),
+            'graded_count': len([a for a in assignments_data if a['status'] == 'graded'])
+        })
+
+    except StudentProfile.DoesNotExist:
+        return Response({'error': 'Student profile not found'}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        import traceback
+        print(f"Error fetching assignments: {traceback.format_exc()}")
+        return Response({'error': f'Server error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def submit_assignment(request):
+    """Submit an assignment with file upload and AI detection"""
+    if request.user.user_type != 'student':
+        return Response({'error': 'Student access only'}, status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        student_profile = StudentProfile.objects.get(user=request.user)
+
+        # Get assignment ID
+        assignment_id = request.data.get('assignment_id')
+        if not assignment_id:
+            return Response({'error': 'assignment_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Get assignment
+        from courses.models import Assignment, AssignmentSubmission
+        try:
+            assignment = Assignment.objects.get(id=assignment_id)
+        except Assignment.DoesNotExist:
+            return Response({'error': 'Assignment not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Check if student is enrolled in the course
+        if not CourseEnrollment.objects.filter(
+                student=student_profile,
+                course=assignment.course,
+                status='active'
+        ).exists():
+            return Response({'error': 'You are not enrolled in this course'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Check if already submitted
+        if AssignmentSubmission.objects.filter(assignment=assignment, student=student_profile).exists():
+            return Response({'error': 'You have already submitted this assignment'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Get submission data
+        submission_text = request.data.get('submission_text', '')
+        file_upload = request.FILES.get('file')
+
+        # Validate - need at least one of text or file
+        if not submission_text and not file_upload:
+            return Response({'error': 'Please provide either text submission or file upload'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        # Check if late
+        is_late = timezone.now() > assignment.due_date
+
+        # Create submission
+        submission = AssignmentSubmission.objects.create(
+            assignment=assignment,
+            student=student_profile,
+            submission_text=submission_text,
+            is_late=is_late
+        )
+
+        # Handle file upload
+        if file_upload:
+            submission.file_upload = file_upload
+            submission.file_name = file_upload.name
+            submission.file_size = file_upload.size
+            submission.save()
+
+        # Perform AI detection on text
+        ai_detection_result = None
+        if submission_text:
+            # Import detection function from assignment_views
+            from teachers.assignment_views import detect_ai_content
+            ai_detection_result = detect_ai_content(submission_text)
+
+            submission.ai_detection_performed = True
+            submission.ai_detection_timestamp = timezone.now()
+            submission.ai_detection_score = ai_detection_result['confidence']
+            submission.ai_detection_result = ai_detection_result
+            submission.is_flagged_ai = ai_detection_result['is_ai_generated']
+            if submission.is_flagged_ai:
+                submission.flag_reason = ai_detection_result['warning']
+            submission.save()
+
+        response_data = {
+            'success': True,
+            'message': 'Assignment submitted successfully!',
+            'submission': {
+                'id': submission.id,
+                'submitted_at': submission.submitted_at.isoformat(),
+                'is_late': is_late,
+                'has_file': bool(file_upload),
+                'has_text': bool(submission_text)
+            }
+        }
+
+        # Include AI detection results if performed
+        if ai_detection_result:
+            response_data['ai_detection'] = ai_detection_result
+
+        return Response(response_data, status=status.HTTP_201_CREATED)
+
+    except StudentProfile.DoesNotExist:
+        return Response({'error': 'Student profile not found'}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        import traceback
+        print(f"Error submitting assignment: {traceback.format_exc()}")
+        return Response({'error': f'Server error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_assignment_detail(request, assignment_id):
+    """Get detailed information about a specific assignment"""
+    if request.user.user_type != 'student':
+        return Response({'error': 'Student access only'}, status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        student_profile = StudentProfile.objects.get(user=request.user)
+
+        # Get assignment
+        from courses.models import Assignment, AssignmentSubmission
+        try:
+            assignment = Assignment.objects.select_related('course').get(id=assignment_id)
+        except Assignment.DoesNotExist:
+            return Response({'error': 'Assignment not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Check if student is enrolled
+        if not CourseEnrollment.objects.filter(
+                student=student_profile,
+                course=assignment.course,
+                status='active'
+        ).exists():
+            return Response({'error': 'You are not enrolled in this course'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Get submission if exists
+        try:
+            submission = AssignmentSubmission.objects.get(
+                assignment=assignment,
+                student=student_profile
+            )
+            has_submitted = True
+            submission_data = {
+                'id': submission.id,
+                'submitted_at': submission.submitted_at.isoformat(),
+                'submission_text': submission.submission_text,
+                'points_earned': float(submission.points_earned) if submission.points_earned else None,
+                'feedback': submission.feedback,
+                'is_late': submission.is_late,
+                'is_graded': submission.points_earned is not None
+            }
+
+            if submission.file_upload:
+                submission_data['file'] = {
+                    'url': submission.file_upload.url,
+                    'filename': submission.file_name,
+                    'size': submission.file_size
+                }
+
+            if submission.ai_detection_performed:
+                submission_data['ai_detection'] = {
+                    'score': float(submission.ai_detection_score) if submission.ai_detection_score else 0,
+                    'is_flagged': submission.is_flagged_ai,
+                    'flag_reason': submission.flag_reason
+                }
+        except AssignmentSubmission.DoesNotExist:
+            has_submitted = False
+            submission_data = None
+
+        assignment_data = {
+            'id': assignment.id,
+            'title': assignment.title,
+            'description': assignment.description,
+            'course_title': assignment.course.title,
+            'course_code': assignment.course.code,
+            'due_date': assignment.due_date.isoformat(),
+            'max_points': float(assignment.max_points),
+            'assignment_type': assignment.assignment_type,
+            'has_submitted': has_submitted,
+            'submission': submission_data
+        }
+
+        # Add attachment if exists
+        if assignment.attachment_file:
+            assignment_data['attachment'] = {
+                'url': assignment.attachment_file.url,
+                'filename': assignment.attachment_filename,
+                'size': assignment.attachment_file.size if hasattr(assignment.attachment_file, 'size') else 0
+            }
+
+        return Response(assignment_data)
+
+    except StudentProfile.DoesNotExist:
+        return Response({'error': 'Student profile not found'}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        import traceback
+        print(f"Error getting assignment detail: {traceback.format_exc()}")
+        return Response({'error': f'Server error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

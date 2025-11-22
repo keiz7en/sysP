@@ -15,6 +15,7 @@ import EngagementAccessibility from './pages/EngagementAccessibility'
 import StudentProfile from './pages/StudentProfile'
 import StudentChat from './pages/StudentChat'
 import AILearningAssistant from './pages/AILearningAssistant'
+import AssignmentSubmission from './pages/AssignmentSubmission'
 
 // Import shared components
 import Sidebar from '../shared/Sidebar'
@@ -75,11 +76,11 @@ const StudentDashboard: React.FC = () => {
             description: 'Job matching and resume analysis'
         },
         {
-            id: 'assessments',
-            label: 'AI Practice & Assessment',
-            icon: '⚡',
-            path: '/student/assessments',
-            description: 'Practice with AI-generated questions'
+            id: 'assignments',
+            label: 'Assignment Submission',
+            icon: '📋',
+            path: '/student/assignments',
+            description: 'Submit assignments and view feedback'
         },
         {
             id: 'insights',
@@ -159,7 +160,7 @@ const StudentDashboard: React.FC = () => {
                         <Route path="records" element={<StudentRecords/>}/>
                         <Route path="learning" element={<AdaptiveLearning/>}/>
                         <Route path="career" element={<CareerGuidance/>}/>
-                        <Route path="assessments" element={<AcademicAutomation/>}/>
+                        <Route path="assignments" element={<AssignmentSubmission/>}/>
                         <Route path="insights" element={<ResearchInsights/>}/>
                         <Route path="accessibility" element={<EngagementAccessibility/>}/>
                         <Route path="chat" element={<StudentChat/>}/>
