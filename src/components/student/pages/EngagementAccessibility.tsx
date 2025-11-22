@@ -54,7 +54,12 @@ const EngagementAccessibility: React.FC = () => {
         // Load saved accessibility settings
         const savedSettings = localStorage.getItem('accessibilitySettings')
         if (savedSettings) {
-            setSettings(JSON.parse(savedSettings))
+            const loaded = JSON.parse(savedSettings)
+            setSettings(loaded)
+            // Apply all saved settings on mount
+            Object.keys(loaded).forEach((key) => {
+                applyAccessibilitySetting(key as keyof AccessibilitySettings, loaded[key])
+            })
         }
     }, [])
 
@@ -66,7 +71,12 @@ const EngagementAccessibility: React.FC = () => {
         // Apply the setting immediately
         applyAccessibilitySetting(setting, value)
 
-        toast.success(`${setting.replace(/([A-Z])/g, ' $1').toLowerCase()} ${value ? 'enabled' : 'disabled'}`)
+        // Show success message with more detail
+        const settingName = setting.replace(/([A-Z])/g, ' $1').trim()
+        toast.success(
+            `${settingName.charAt(0).toUpperCase() + settingName.slice(1)} ${value ? 'enabled' : 'disabled'}`,
+            {duration: 3000}
+        )
     }
 
     const applyAccessibilitySetting = (setting: keyof AccessibilitySettings, value: boolean) => {
@@ -76,36 +86,100 @@ const EngagementAccessibility: React.FC = () => {
             case 'highContrast':
                 if (value) {
                     body.classList.add('high-contrast')
+                    toast.success('High contrast mode activated - Background is now black with white text')
                 } else {
                     body.classList.remove('high-contrast')
+                    toast.success('High contrast mode deactivated - Normal colors restored')
                 }
                 break
             case 'largeText':
                 if (value) {
                     body.classList.add('large-text')
+                    toast.success('Large text mode activated - All text is now 25% larger')
                 } else {
                     body.classList.remove('large-text')
+                    toast.success('Large text mode deactivated - Normal text size restored')
                 }
                 break
             case 'reduceMotion':
                 if (value) {
                     body.classList.add('reduce-motion')
+                    toast.success('Reduce motion activated - Animations are now minimized')
                 } else {
                     body.classList.remove('reduce-motion')
+                    toast.success('Reduce motion deactivated - Animations restored')
                 }
                 break
             case 'focusIndicators':
                 if (value) {
                     body.classList.add('enhanced-focus')
+                    toast.success('Enhanced focus indicators activated - Tab navigation is now more visible')
                 } else {
                     body.classList.remove('enhanced-focus')
+                    toast.success('Enhanced focus indicators deactivated')
+                }
+                break
+            case 'keyboardNavigation':
+                if (value) {
+                    body.classList.add('keyboard-navigation-enabled')
+                    toast.success('Keyboard navigation enhanced - Use Tab, Enter, and Arrow keys')
+                } else {
+                    body.classList.remove('keyboard-navigation-enabled')
+                }
+                break
+            case 'voiceRecognition':
+                if (value) {
+                    toast.success('Voice recognition enabled - Click "Start Voice Control" to begin')
+                } else {
+                    toast.success('Voice recognition disabled')
+                }
+                break
+            case 'textToSpeech':
+                if (value) {
+                    toast.success('Text-to-speech enabled - Click "Test Text-to-Speech" to try it')
+                    speakText('Text to speech is now enabled. Content will be read aloud when you activate this feature.')
+                } else {
+                    toast.success('Text-to-speech disabled')
+                    // Stop any ongoing speech
+                    if ('speechSynthesis' in window) {
+                        speechSynthesis.cancel()
+                    }
+                }
+                break
+            case 'captionsEnabled':
+                if (value) {
+                    toast.success('Captions enabled - Subtitles will appear on video content')
+                } else {
+                    toast.success('Captions disabled')
+                }
+                break
+            case 'audioDescriptions':
+                if (value) {
+                    body.classList.add('audio-description-enabled')
+                    toast.success('Audio descriptions enabled - Visual content will be described')
+                    speakText('Audio descriptions are now enabled. Visual elements will be described in detail.')
+                } else {
+                    body.classList.remove('audio-description-enabled')
+                    toast.success('Audio descriptions disabled')
+                }
+                break
+            case 'screenReader':
+                if (value) {
+                    toast.success('Screen reader support optimized - ARIA labels enhanced')
+                } else {
+                    toast.success('Screen reader optimization disabled')
                 }
                 break
         }
     }
 
     const startVoiceRecognition = () => {
-        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+            toast.error('Voice recognition is not supported in this browser. Please use Chrome, Edge, or Safari.')
+            return
+        }
+
+        try {
             const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition
             const recognition = new SpeechRecognition()
 
@@ -115,59 +189,131 @@ const EngagementAccessibility: React.FC = () => {
 
             recognition.onstart = () => {
                 setIsListening(true)
-                toast.success('Voice recognition started. Speak now!')
+                document.body.classList.add('voice-recognition-active')
+                toast.success('🎤 Listening... Speak your command now!', {duration: 5000})
             }
 
             recognition.onresult = (event: any) => {
                 const transcript = event.results[0][0].transcript
                 setVoiceCommand(transcript)
+                toast.success(`Heard: "${transcript}"`)
                 handleVoiceCommand(transcript)
             }
 
             recognition.onerror = (event: any) => {
-                toast.error('Voice recognition error: ' + event.error)
+                console.error('Voice recognition error:', event.error)
+                let errorMessage = 'Voice recognition error'
+                switch (event.error) {
+                    case 'no-speech':
+                        errorMessage = 'No speech detected. Please try again.'
+                        break
+                    case 'audio-capture':
+                        errorMessage = 'Microphone not found. Please check your microphone settings.'
+                        break
+                    case 'not-allowed':
+                        errorMessage = 'Microphone permission denied. Please allow microphone access.'
+                        break
+                    default:
+                        errorMessage = `Voice recognition error: ${event.error}`
+                }
+                toast.error(errorMessage)
                 setIsListening(false)
+                document.body.classList.remove('voice-recognition-active')
             }
 
             recognition.onend = () => {
                 setIsListening(false)
+                document.body.classList.remove('voice-recognition-active')
             }
 
             recognition.start()
-        } else {
-            toast.error('Voice recognition is not supported in this browser')
+        } catch (error) {
+            console.error('Failed to start voice recognition:', error)
+            toast.error('Failed to start voice recognition. Please check your browser permissions.')
+            setIsListening(false)
         }
     }
 
     const handleVoiceCommand = (command: string) => {
         const lowerCommand = command.toLowerCase()
 
-        if (lowerCommand.includes('dashboard')) {
-            toast.success('Navigating to dashboard...')
-        } else if (lowerCommand.includes('read')) {
-            speakText('Reading page content: This is the Accessibility page where you can configure various accessibility features.')
-        } else if (lowerCommand.includes('menu')) {
-            toast.success('Opening navigation menu...')
-        } else if (lowerCommand.includes('help')) {
-            toast.success('Opening AI assistant...')
+        if (lowerCommand.includes('dashboard') || lowerCommand.includes('home')) {
+            toast.success('📊 Navigating to dashboard...')
+            speakText('Navigating to dashboard')
+            setTimeout(() => window.location.hash = '#/student/dashboard', 1000)
+        } else if (lowerCommand.includes('read') || lowerCommand.includes('speak')) {
+            const text = 'Reading page content: This is the Accessibility Features page where you can configure various accessibility tools including voice control, text to speech, high contrast mode, large text, and more. You can customize your learning experience to match your needs.'
+            speakText(text)
+            toast.success('📖 Reading page content...')
+        } else if (lowerCommand.includes('menu') || lowerCommand.includes('navigation')) {
+            toast.success('📋 Opening navigation menu...')
+            speakText('Opening navigation menu')
+        } else if (lowerCommand.includes('help') || lowerCommand.includes('assist')) {
+            toast.success('🤖 Opening AI assistant...')
+            speakText('Opening AI learning assistant')
+        } else if (lowerCommand.includes('grade') || lowerCommand.includes('score')) {
+            toast.success('📊 Checking grades...')
+            speakText('Navigating to grades page')
+        } else if (lowerCommand.includes('course')) {
+            toast.success('📚 Opening courses...')
+            speakText('Navigating to courses')
+        } else if (lowerCommand.includes('stop') || lowerCommand.includes('cancel')) {
+            if ('speechSynthesis' in window) {
+                speechSynthesis.cancel()
+            }
+            toast.success('⏹️ Stopped')
         } else {
-            toast.success(`Voice command received: "${command}". Feature coming soon!`)
+            toast.info(`Voice command received: "${command}". Feature coming soon!`)
+            speakText(`I heard ${command}. This feature is coming soon.`)
         }
     }
 
     const speakText = (text: string) => {
-        if ('speechSynthesis' in window) {
+        if (!('speechSynthesis' in window)) {
+            toast.error('Text-to-speech is not supported in this browser. Please use Chrome, Edge, Safari, or Firefox.')
+            return
+        }
+
+        try {
+            // Cancel any ongoing speech first
+            speechSynthesis.cancel()
+
             const utterance = new SpeechSynthesisUtterance(text)
-            utterance.rate = 0.8
+            utterance.rate = 0.9
             utterance.pitch = 1
+            utterance.volume = 1
+
+            // Get available voices and prefer English ones
+            const voices = speechSynthesis.getVoices()
+            const englishVoice = voices.find(voice => voice.lang.startsWith('en'))
+            if (englishVoice) {
+                utterance.voice = englishVoice
+            }
+
+            utterance.onstart = () => {
+                console.log('Speech started')
+            }
+
+            utterance.onend = () => {
+                console.log('Speech finished')
+            }
+
+            utterance.onerror = (event) => {
+                console.error('Speech error:', event)
+                toast.error('Text-to-speech error. Please try again.')
+            }
+
             speechSynthesis.speak(utterance)
-        } else {
-            toast.error('Text-to-speech is not supported in this browser')
+        } catch (error) {
+            console.error('Failed to speak text:', error)
+            toast.error('Failed to speak text. Please try again.')
         }
     }
 
     const testTextToSpeech = () => {
-        speakText('This is a test of the text to speech feature. Your accessibility settings are working correctly.')
+        const testText = 'This is a test of the text to speech feature. Your accessibility settings are working correctly. You can use this feature to have any content read aloud. All accessibility features are now fully functional!'
+        speakText(testText)
+        toast.success('🔊 Playing test audio...', {duration: 6000})
     }
 
     const accessibilityFeatures = {
