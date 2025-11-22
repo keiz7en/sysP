@@ -1,18 +1,29 @@
 /* ========================================
-   ACCESSIBILITY STYLES
+   ACCESSIBILITY STYLES - SAFE VERSION
    ======================================== */
 
-/* High Contrast Mode */
+/* HIGH CONTRAST MODE - Only when body.high-contrast class is present */
 body.high-contrast {
     background-color: #000000 !important;
     color: #FFFFFF !important;
 }
 
-body.high-contrast * {
-    border-color: #FFFFFF !important;
+body.high-contrast .card,
+body.high-contrast .panel,
+body.high-contrast .modal,
+body.high-contrast div[class*="rounded"],
+body.high-contrast div[class*="bg-"] {
+    background-color: #1a1a1a !important;
+    color: #FFFFFF !important;
+    border: 1px solid #FFFFFF !important;
 }
 
-body.high-contrast button,
+body.high-contrast button {
+    background-color: #1a1a1a !important;
+    color: #FFFFFF !important;
+    border: 2px solid #FFFFFF !important;
+}
+
 body.high-contrast input,
 body.high-contrast select,
 body.high-contrast textarea {
@@ -26,34 +37,30 @@ body.high-contrast a {
     text-decoration: underline !important;
 }
 
-body.high-contrast div,
-body.high-contrast span,
-body.high-contrast p,
 body.high-contrast h1,
 body.high-contrast h2,
 body.high-contrast h3,
 body.high-contrast h4,
 body.high-contrast h5,
 body.high-contrast h6 {
-    background-color: transparent !important;
-    color: inherit !important;
+    color: #FFFFFF !important;
 }
 
-body.high-contrast nav,
-body.high-contrast aside,
-body.high-contrast header,
-body.high-contrast footer {
-    background-color: #1a1a1a !important;
-    border: 2px solid #FFFFFF !important;
+body.high-contrast p,
+body.high-contrast span,
+body.high-contrast label,
+body.high-contrast li {
+    color: #FFFFFF !important;
 }
 
-/* Large Text Mode */
+body.high-contrast ::selection {
+    background: #00FFFF;
+    color: #000000;
+}
+
+/* LARGE TEXT MODE */
 body.large-text {
-    font-size: 20px !important;
-}
-
-body.large-text * {
-    font-size: inherit !important;
+    font-size: 125% !important;
 }
 
 body.large-text h1 {
@@ -68,37 +75,19 @@ body.large-text h3 {
     font-size: 2rem !important;
 }
 
-body.large-text h4 {
-    font-size: 1.75rem !important;
-}
-
-body.large-text h5 {
-    font-size: 1.5rem !important;
-}
-
-body.large-text h6 {
-    font-size: 1.25rem !important;
-}
-
-body.large-text p,
-body.large-text span,
-body.large-text div {
-    font-size: 1.25rem !important;
-}
-
 body.large-text button {
-    font-size: 1.2rem !important;
+    font-size: 1.1rem !important;
     padding: 1rem 1.5rem !important;
 }
 
 body.large-text input,
 body.large-text select,
 body.large-text textarea {
-    font-size: 1.2rem !important;
+    font-size: 1.1rem !important;
     padding: 0.75rem !important;
 }
 
-/* Reduce Motion */
+/* REDUCE MOTION */
 body.reduce-motion *,
 body.reduce-motion *::before,
 body.reduce-motion *::after {
@@ -109,51 +98,59 @@ body.reduce-motion *::after {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
+    * {
         animation-duration: 0.01ms !important;
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
-        scroll-behavior: auto !important;
     }
 }
 
-/* Enhanced Focus Indicators */
-body.enhanced-focus *:focus {
+/* ENHANCED FOCUS INDICATORS */
+body.enhanced-focus *:focus,
+body.enhanced-focus *:focus-visible {
     outline: 4px solid #3b82f6 !important;
     outline-offset: 4px !important;
     box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.3) !important;
 }
 
-body.enhanced-focus button:focus,
-body.enhanced-focus a:focus,
-body.enhanced-focus input:focus,
-body.enhanced-focus select:focus,
-body.enhanced-focus textarea:focus {
-    outline: 4px solid #3b82f6 !important;
-    outline-offset: 4px !important;
-    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.3) !important;
-}
-
-body.enhanced-focus button:focus-visible,
-body.enhanced-focus a:focus-visible {
-    outline: 4px solid #f59e0b !important;
-    outline-offset: 4px !important;
-    box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.3) !important;
-}
-
-/* Keyboard Navigation Mode */
-body.keyboard-navigation-enabled {
-    cursor: default;
-}
-
+/* KEYBOARD NAVIGATION */
 body.keyboard-navigation-enabled *:focus {
     outline: 3px solid #3b82f6 !important;
     outline-offset: 2px !important;
 }
 
-/* Screen Reader Only Content */
+/* AUDIO DESCRIPTION INDICATOR */
+body.audio-description-enabled::after {
+    content: "🎧 Audio Description Active";
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: #10b981;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    z-index: 9998;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* VOICE RECOGNITION ACTIVE INDICATOR */
+body.voice-recognition-active::before {
+    content: "🎤 Listening...";
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #f59e0b;
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border-radius: 25px;
+    font-weight: 600;
+    z-index: 9999;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* SCREEN READER ONLY CONTENT */
 .sr-only {
     position: absolute;
     width: 1px;
@@ -166,7 +163,22 @@ body.keyboard-navigation-enabled *:focus {
     border-width: 0;
 }
 
-/* Skip to Main Content Link */
+/* GENERAL ACCESSIBILITY IMPROVEMENTS */
+button,
+a {
+    min-height: 44px;
+    min-width: 44px;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+}
+
 .skip-to-main {
     position: absolute;
     top: -40px;
@@ -182,79 +194,6 @@ body.keyboard-navigation-enabled *:focus {
     top: 0;
 }
 
-/* Accessibility Toolbar */
-.accessibility-toolbar {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 9999;
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    padding: 1rem;
-}
-
-/* ARIA Live Regions */
-.aria-live-polite {
-    position: absolute;
-    left: -10000px;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-}
-
-[aria-live="polite"],
-[aria-live="assertive"] {
-    position: absolute;
-    left: -10000px;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-}
-
-/* Improved Button Accessibility */
-button {
-    cursor: pointer;
-    position: relative;
-}
-
-button:disabled {
-    cursor: not-allowed;
-    opacity: 0.6;
-}
-
-/* Link Accessibility */
-a:focus-visible {
-    outline: 2px solid #3b82f6;
-    outline-offset: 2px;
-}
-
-/* Form Accessibility */
-input:focus,
-select:focus,
-textarea:focus {
-    outline: 2px solid #3b82f6;
-    outline-offset: 2px;
-}
-
-input:invalid,
-select:invalid,
-textarea:invalid {
-    border-color: #ef4444;
-}
-
-/* Tooltip Accessibility */
-[role="tooltip"] {
-    position: absolute;
-    background: #1f2937;
-    color: white;
-    padding: 0.5rem 1rem;
-    border-radius: 6px;
-    font-size: 0.875rem;
-    z-index: 1000;
-}
-
-/* Modal Accessibility */
 [role="dialog"] {
     position: fixed;
     top: 50%;
@@ -273,112 +212,33 @@ textarea:invalid {
     z-index: 999;
 }
 
-/* Text Selection */
+.captions-enabled video::cue {
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    font-size: 1.2rem;
+    line-height: 1.5;
+}
+
 ::selection {
     background: #3b82f6;
     color: white;
 }
 
-body.high-contrast ::selection {
-    background: #00FFFF;
-    color: #000000;
+input:invalid,
+select:invalid,
+textarea:invalid {
+    border-color: #ef4444;
 }
 
-/* Print Styles for Accessibility */
-@media print {
-    body.high-contrast {
-        background-color: white !important;
-        color: black !important;
-    }
-
-    a {
-        text-decoration: underline;
-    }
-
-    a[href]:after {
-        content: " (" attr(href) ")";
-    }
+button:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
 }
 
-/* Touch Target Sizes (44x44px minimum) */
-button,
-a,
-input[type="checkbox"],
-input[type="radio"] {
-    min-height: 44px;
-    min-width: 44px;
-}
-
-/* Ensure readable contrast ratios */
-body {
-    color: #1f2937;
-    background-color: #ffffff;
-}
-
-/* Caption Styles */
-.captions-enabled video {
-    cue {
-        background-color: rgba(0, 0, 0, 0.8);
-        color: white;
-        font-size: 1.2rem;
-        line-height: 1.5;
-    }
-}
-
-/* Audio Description Indicator */
-.audio-description-enabled::after {
-    content: "🎧 Audio Description Active";
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    background: #10b981;
-    color: white;
-    padding: 0.5rem 1rem;
-    border-radius: 8px;
-    font-size: 0.875rem;
-    z-index: 9998;
-}
-
-/* Voice Recognition Active Indicator */
-.voice-recognition-active::before {
-    content: "🎤 Listening...";
-    position: fixed;
-    top: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #f59e0b;
-    color: white;
-    padding: 0.75rem 1.5rem;
-    border-radius: 25px;
-    font-weight: 600;
-    z-index: 9999;
-    animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-    0%, 100% {
-        opacity: 1;
-    }
-    50% {
-        opacity: 0.7;
-    }
-}
-
-/* Combination Modes */
-body.high-contrast.large-text button {
-    font-size: 1.5rem !important;
-    padding: 1.25rem 2rem !important;
-}
-
-body.high-contrast.enhanced-focus *:focus {
-    outline: 5px solid #00FFFF !important;
-    outline-offset: 5px !important;
-}
-
-/* Responsive Accessibility */
+/* RESPONSIVE ACCESSIBILITY */
 @media (max-width: 768px) {
     body.large-text {
-        font-size: 18px !important;
+        font-size: 112% !important;
     }
 
     body.enhanced-focus *:focus {
@@ -386,10 +246,15 @@ body.high-contrast.enhanced-focus *:focus {
     }
 }
 
-/* Dark Mode Compatibility */
-@media (prefers-color-scheme: dark) {
-    body:not(.high-contrast) {
-        background-color: #1f2937;
-        color: #f9fafb;
+/* PRINT STYLES */
+@media print {
+    body.high-contrast {
+        background-color: white !important;
+        color: black !important;
+    }
+
+    body.high-contrast * {
+        color: black !important;
+        background-color: white !important;
     }
 }

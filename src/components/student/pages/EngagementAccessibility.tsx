@@ -51,6 +51,17 @@ const EngagementAccessibility: React.FC = () => {
     ]
 
     useEffect(() => {
+        // Clean up any stuck classes first
+        document.body.classList.remove(
+            'high-contrast',
+            'large-text',
+            'reduce-motion',
+            'enhanced-focus',
+            'keyboard-navigation-enabled',
+            'audio-description-enabled',
+            'voice-recognition-active'
+        )
+
         // Load saved accessibility settings
         const savedSettings = localStorage.getItem('accessibilitySettings')
         if (savedSettings) {
