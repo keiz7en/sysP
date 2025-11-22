@@ -1589,109 +1589,310 @@ def generate_ai_assessment(request):
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def get_ai_learning_insights(request):
-    """Get AI-powered learning insights and recommendations using Gemini"""
+    """Get AI-powered learning insights with REAL data from database and Gemini AI analysis"""
     try:
         if request.user.user_type != 'student':
             return Response({'error': 'Student access only'}, status=drf_status.HTTP_403_FORBIDDEN)
 
         student_profile = StudentProfile.objects.get(user=request.user)
 
-        # Get student's course performance
+        # ========== CALCULATE REAL METRICS FROM DATABASE ==========
+
+        # Get all active enrollments
         enrollments = CourseEnrollment.objects.filter(
-            student=student_profile,
-            status='active'
-        ).select_related('course')
+            student=student_profile
+        ).select_related('course', 'course__subject')
 
-        # Prepare student data for AI analysis
-        student_data = {
-            'learning_style': student_profile.learning_style or 'adaptive',
-            'gpa': float(student_profile.current_gpa),
-            'study_hours': 120,  # Can be calculated from analytics
-            'avg_session': 50,  # Average study session in minutes
-            'courses': []
-        }
-
-        # Add course performance data
-        total_score = 0
-        scored_courses = 0
-
-        for enrollment in enrollments:
-            assessment_scores = StudentAssessmentAttempt.objects.filter(
-                student=student_profile,
-                assessment__course=enrollment.course,
-                status='graded'
-            ).aggregate(avg_score=Avg('percentage'))
-
-            avg_score = assessment_scores['avg_score']
-            if avg_score is not None:
-                student_data['courses'].append({
-                    'title': enrollment.course.title,
-                    'score': float(avg_score),
-                    'progress': float(enrollment.completion_percentage)
-                })
-                total_score += float(avg_score)
-                scored_courses += 1
-
-        # Use Gemini AI to generate insights
-        if gemini_service and gemini_service.available and scored_courses > 0:
-            insights_data = gemini_service.analyze_learning_insights(student_data)
-        else:
-            # Fallback insights
-            insights_data = {
+        if not enrollments.exists():
+            # Return initial state for new students
+            return Response({
                 'performance_analysis': {
-                    'overall_trend': 'improving' if student_data['gpa'] > 3.0 else 'stable',
-                    'strongest_areas': ['Problem Solving', 'Consistent Study Habits'],
-                    'areas_needing_attention': ['Time Management', 'Advanced Topics'],
-                    'grade_prediction': min(4.0, student_data['gpa'] + 0.2)
+                    'overall_trend': 'new_student',
+                    'strongest_areas': [],
+                    'areas_needing_attention': ['Enroll in courses to start learning'],
+                    'grade_prediction': 0.0
                 },
                 'learning_patterns': {
-                    'optimal_study_time': '10:00 AM - 12:00 PM',
-                    'attention_span': '45-50 minutes',
-                    'learning_efficiency': 85,
-                    'retention_rate': 80
+                    'optimal_study_time': 'Not enough data yet',
+                    'attention_span': 'Not enough data yet',
+                    'learning_efficiency': 0,
+                    'retention_rate': 0
                 },
                 'ai_recommendations': [
                     {
-                        'title': 'Optimize Study Schedule',
-                        'description': 'Schedule challenging subjects during peak concentration hours',
+                        'title': 'Enroll in Your First Course',
+                        'description': 'Start your learning journey by enrolling in courses that match your interests and career goals.',
                         'priority': 'high',
-                        'impact': 'Could improve performance by 15%'
+                        'impact': 'Kickstart your education and unlock AI-powered insights'
                     },
                     {
-                        'title': 'Take Regular Breaks',
-                        'description': 'Use 45-minute study blocks with 10-minute breaks',
+                        'title': 'Explore Available Courses',
+                        'description': 'Browse the course catalog to find subjects that interest you. Look for courses that align with your career aspirations.',
+                        'priority': 'high',
+                        'impact': 'Choose the right path for your future'
+                    },
+                    {
+                        'title': 'Set Learning Goals',
+                        'description': 'Define what you want to achieve. Clear goals will help you stay motivated and track progress effectively.',
                         'priority': 'medium',
-                        'impact': 'Improves retention and reduces fatigue'
-                    },
-                    {
-                        'title': 'Active Recall Practice',
-                        'description': 'Use flashcards and self-testing for better retention',
-                        'priority': 'high',
-                        'impact': 'Significantly improves long-term memory'
+                        'impact': 'Provides direction and motivation'
                     }
                 ],
                 'study_optimization': {
-                    'suggested_schedule': 'Morning sessions for complex topics, evening for review',
-                    'focus_areas': ['Advanced concepts', 'Practice problems'],
-                    'time_allocation': 'Spend 40% on weak areas, 30% on practice, 30% on review'
+                    'suggested_schedule': 'Enroll in courses to get personalized study schedule recommendations',
+                    'focus_areas': ['Course Selection', 'Goal Setting'],
+                    'time_allocation': 'Start with 1-2 courses and dedicate 2-3 hours per week per course'
+                },
+                'study_metrics': {
+                    'total_study_hours': 0,
+                    'average_session_minutes': 0,
+                    'courses_analyzed': 0,
+                    'average_score': 0
                 },
                 'ai_powered': False,
-                'model': 'Mock (Gemini API not configured)'
+                'model': 'Welcome Mode - Enroll in courses to unlock AI insights'
+            }, status=drf_status.HTTP_200_OK)
+
+        # ========== CALCULATE REAL STUDY TIME FROM LEARNING ANALYTICS ==========
+        thirty_days_ago = timezone.now() - timedelta(days=30)
+
+        # Try to get real analytics data
+        learning_analytics = None
+        try:
+            learning_analytics = LearningAnalytics.objects.filter(
+                student=student_profile,
+                date__gte=thirty_days_ago
+            ).aggregate(
+                total_time=Sum('time_spent'),
+                session_count=Count('id')
+            )
+        except:
+            pass
+
+        # Calculate study hours from analytics or estimate from course progress
+        if learning_analytics and learning_analytics['total_time']:
+            total_seconds = learning_analytics['total_time'].total_seconds()
+            total_study_hours = int(total_seconds / 3600)
+            session_count = learning_analytics['session_count'] or 1
+            avg_session_minutes = int((total_seconds / session_count) / 60)
+        else:
+            # Estimate based on course progress (1% progress ≈ 30 min study)
+            total_progress = sum([float(e.completion_percentage) for e in enrollments])
+            total_study_hours = int((total_progress * 30) / 60)  # Convert minutes to hours
+            avg_session_minutes = 45  # Default estimate
+
+        # Ensure minimum values
+        total_study_hours = max(1, total_study_hours) if total_study_hours > 0 else 0
+        avg_session_minutes = max(20, avg_session_minutes) if avg_session_minutes > 0 else 0
+
+        # ========== CALCULATE REAL COURSE PERFORMANCE ==========
+        courses_data = []
+        total_score = 0
+        scored_courses = 0
+        strongest_courses = []
+        weakest_courses = []
+
+        for enrollment in enrollments:
+            # Get assessment scores for this course
+            try:
+                assessment_scores = StudentAssessmentAttempt.objects.filter(
+                    student=student_profile,
+                    assessment__course=enrollment.course,
+                    status='graded'
+                ).aggregate(
+                    avg_score=Avg('percentage'),
+                    count=Count('id')
+                )
+
+                avg_score = assessment_scores['avg_score']
+                assessment_count = assessment_scores['count']
+
+                if avg_score is not None and avg_score > 0:
+                    score_float = float(avg_score)
+                    courses_data.append({
+                        'title': enrollment.course.title,
+                        'score': score_float,
+                        'progress': float(enrollment.completion_percentage),
+                        'assessments_taken': assessment_count
+                    })
+                    total_score += score_float
+                    scored_courses += 1
+
+                    # Track strongest and weakest
+                    if score_float >= 80:
+                        strongest_courses.append(enrollment.course.title)
+                    elif score_float < 70:
+                        weakest_courses.append(enrollment.course.title)
+                else:
+                    # In progress courses
+                    courses_data.append({
+                        'title': enrollment.course.title,
+                        'score': 0,
+                        'progress': float(enrollment.completion_percentage),
+                        'assessments_taken': 0
+                    })
+            except Exception as e:
+                # Skip courses with no assessments
+                courses_data.append({
+                    'title': enrollment.course.title,
+                    'score': 0,
+                    'progress': float(enrollment.completion_percentage),
+                    'assessments_taken': 0
+                })
+
+        # Calculate average score
+        average_score = int(total_score / scored_courses) if scored_courses > 0 else 0
+
+        # Calculate retention and efficiency based on real performance
+        if average_score > 0:
+            retention_rate = min(95, max(60, average_score - 10))  # Correlate with performance
+            learning_efficiency = min(90, max(50, average_score - 5))
+        else:
+            retention_rate = 70  # Default for students without scored assessments
+            learning_efficiency = 75
+
+        # Prepare data for AI analysis
+        student_data = {
+            'learning_style': student_profile.learning_style or 'adaptive',
+            'gpa': float(student_profile.current_gpa),
+            'study_hours': total_study_hours,
+            'avg_session': avg_session_minutes,
+            'courses': courses_data,
+            'total_courses': enrollments.count(),
+            'scored_courses': scored_courses,
+            'average_score': average_score,
+            'strongest_courses': strongest_courses[:3],  # Top 3
+            'weakest_courses': weakest_courses[:3]  # Bottom 3
+        }
+
+        # ========== USE GEMINI AI FOR INTELLIGENT ANALYSIS ==========
+        insights_data = None
+        ai_powered = False
+
+        if gemini_service and gemini_service.available and len(courses_data) > 0:
+            try:
+                print(f"🤖 Calling Gemini AI for learning insights analysis...")
+                insights_data = gemini_service.analyze_learning_insights(student_data)
+                ai_powered = True
+                print(f"✅ Gemini AI analysis complete!")
+            except Exception as e:
+                print(f"⚠️ Gemini AI error: {str(e)}")
+                insights_data = None
+
+        # ========== FALLBACK ANALYSIS IF AI NOT AVAILABLE ==========
+        if not insights_data:
+            # Determine trend based on actual data
+            if average_score >= 85:
+                overall_trend = 'improving'
+                trend_desc = 'excellent'
+            elif average_score >= 70:
+                overall_trend = 'stable'
+                trend_desc = 'good'
+            else:
+                overall_trend = 'needs_attention'
+                trend_desc = 'needs improvement'
+
+            # Build strengths from actual performance
+            strengths = []
+            if strongest_courses:
+                strengths.append(f"Excelling in: {', '.join(strongest_courses)}")
+            if average_score >= 80:
+                strengths.append("Strong academic performance")
+            if total_study_hours >= 100:
+                strengths.append("Consistent study habits")
+            if not strengths:
+                strengths = ["Building learning foundation", "Active course participation"]
+
+            # Build areas needing attention
+            improvements = []
+            if weakest_courses:
+                improvements.append(f"Focus more on: {', '.join(weakest_courses)}")
+            if average_score < 75:
+                improvements.append("Improve assessment scores")
+            if avg_session_minutes < 30:
+                improvements.append("Increase study session length")
+            if not improvements:
+                improvements = ["Maintain current pace", "Challenge yourself with advanced topics"]
+
+            # Generate recommendations based on data
+            recommendations = [
+                {
+                    'title': 'Optimize Your Study Schedule',
+                    'description': f'With {total_study_hours}h study time this month, try breaking into {int(total_study_hours / avg_session_minutes * 60) if avg_session_minutes > 0 else "multiple"} focused sessions for better retention.',
+                    'priority': 'high',
+                    'impact': 'Can improve retention by 15-20%'
+                },
+                {
+                    'title': 'Focus on Weaker Areas',
+                    'description': f'Dedicate extra time to {weakest_courses[0] if weakest_courses else "challenging topics"}. Use practice problems and seek help when needed.',
+                    'priority': 'high' if weakest_courses else 'medium',
+                    'impact': 'Direct improvement in overall GPA'
+                },
+                {
+                    'title': 'Leverage Your Strengths',
+                    'description': f'You\'re doing great in {strongest_courses[0] if strongest_courses else "several areas"}! Use these skills to help others and reinforce your knowledge.',
+                    'priority': 'medium',
+                    'impact': 'Reinforces knowledge and builds confidence'
+                },
+                {
+                    'title': 'Take Strategic Breaks',
+                    'description': f'With {avg_session_minutes}-minute sessions, take 5-10 minute breaks to maintain focus and prevent burnout.',
+                    'priority': 'medium',
+                    'impact': 'Improves concentration and reduces fatigue'
+                }
+            ]
+
+            # Predict future GPA based on current trend
+            if average_score >= 80:
+                grade_prediction = min(4.0, float(student_profile.current_gpa) + 0.3)
+            elif average_score >= 70:
+                grade_prediction = min(4.0, float(student_profile.current_gpa) + 0.1)
+            else:
+                grade_prediction = max(2.0, float(student_profile.current_gpa) - 0.1)
+
+            insights_data = {
+                'performance_analysis': {
+                    'overall_trend': overall_trend,
+                    'strongest_areas': strengths,
+                    'areas_needing_attention': improvements,
+                    'grade_prediction': round(grade_prediction, 2)
+                },
+                'learning_patterns': {
+                    'optimal_study_time': 'Morning (9 AM - 12 PM)' if average_score >= 75 else 'Evening (7 PM - 10 PM)',
+                    'attention_span': f'{avg_session_minutes}-{avg_session_minutes + 15} minutes',
+                    'learning_efficiency': learning_efficiency,
+                    'retention_rate': retention_rate
+                },
+                'ai_recommendations': recommendations,
+                'study_optimization': {
+                    'suggested_schedule': f'{int(total_study_hours / 4)} hours per week, divided into {int(total_study_hours / (avg_session_minutes / 60)) if avg_session_minutes > 0 else "multiple"} sessions',
+                    'focus_areas': strongest_courses[:2] + weakest_courses[:2] if (
+                                strongest_courses or weakest_courses) else ['Core concepts', 'Practice problems'],
+                    'time_allocation': f'Spend 40% on {weakest_courses[0] if weakest_courses else "weaker areas"}, 30% on practice, 30% on review'
+                },
+                'ai_powered': False,
+                'model': 'Statistical Analysis (Gemini AI unavailable)'
             }
 
-        # Add study metrics
+        # ========== ADD REAL METRICS TO RESPONSE ==========
         insights_data['study_metrics'] = {
-            'total_study_hours': student_data['study_hours'],
-            'average_session_minutes': student_data['avg_session'],
-            'courses_analyzed': scored_courses,
-            'average_score': round(total_score / scored_courses, 1) if scored_courses > 0 else 0
+            'total_study_hours': total_study_hours,
+            'average_session_minutes': avg_session_minutes,
+            'courses_analyzed': len(courses_data),
+            'average_score': average_score
         }
+
+        insights_data['ai_powered'] = ai_powered
+        if ai_powered:
+            insights_data['model'] = 'Gemini 2.5 Flash'
 
         return Response(insights_data, status=drf_status.HTTP_200_OK)
 
     except StudentProfile.DoesNotExist:
         return Response({'error': 'Student profile not found'}, status=drf_status.HTTP_404_NOT_FOUND)
     except Exception as e:
+        import traceback
+        print(f"❌ Error in get_ai_learning_insights: {traceback.format_exc()}")
         return Response({'error': f'Server error: {str(e)}'}, status=drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 

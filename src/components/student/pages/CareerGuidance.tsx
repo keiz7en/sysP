@@ -76,7 +76,9 @@ const CareerGuidance: React.FC = () => {
 
     // Generate learning resources for a career using Gemini AI
     const generateLearningResources = async (careerTitle: string, skills: string[]): Promise<LearningResource[]> => {
-        if (!token) return generateFallbackResources(careerTitle, skills)
+        // Ensure skills is a valid array
+        const validSkills = Array.isArray(skills) && skills.length > 0 ? skills : [careerTitle]
+        if (!token) return generateFallbackResources(careerTitle, validSkills)
 
         try {
             const response = await fetch('http://localhost:8000/api/students/ai/chatbot/', {
@@ -97,7 +99,7 @@ For each resource, provide:
 6. Whether it's free or paid
 7. A brief description (one sentence)
 
-Focus on these skills: ${skills.join(', ')}
+Focus on these skills: ${validSkills.join(', ')}
 
 Return ONLY a valid JSON array in this exact format, nothing else:
 [
@@ -120,7 +122,7 @@ Make sure URLs are real and specific, not search pages. Provide actual course/vi
 
             if (!response.ok) {
                 console.warn('AI API failed, using fallback resources')
-                return generateFallbackResources(careerTitle, skills)
+                return generateFallbackResources(careerTitle, validSkills)
             }
 
             const data = await response.json()
@@ -166,23 +168,27 @@ Make sure URLs are real and specific, not search pages. Provide actual course/vi
             }
 
             console.warn('AI did not return valid resources, using fallback')
-            return generateFallbackResources(careerTitle, skills)
+            return generateFallbackResources(careerTitle, validSkills)
 
         } catch (error) {
             console.error('Error calling AI for learning resources:', error)
-            return generateFallbackResources(careerTitle, skills)
+            return generateFallbackResources(careerTitle, validSkills)
         }
     }
 
     // Fallback learning resources based on career - improved with better URLs
     const generateFallbackResources = (careerTitle: string, skills: string[]): LearningResource[] => {
-        const encodedCareer = encodeURIComponent(careerTitle)
-        const primarySkill = skills[0] || careerTitle
+        // Ensure we have valid data
+        const safeCareerTitle = careerTitle || 'Professional Development'
+        const safeSkills = Array.isArray(skills) && skills.length > 0 ? skills : [safeCareerTitle]
+        const primarySkill = safeSkills[0] || safeCareerTitle
+
+        const encodedCareer = encodeURIComponent(safeCareerTitle)
         const encodedSkill = encodeURIComponent(primarySkill)
 
         return [
             {
-                title: `${careerTitle} Professional Certificate`,
+                title: `${safeCareerTitle} Professional Certificate`,
                 type: 'course',
                 provider: 'Coursera',
                 url: `https://www.coursera.org/search?query=${encodedCareer}`,
@@ -203,7 +209,7 @@ Make sure URLs are real and specific, not search pages. Provide actual course/vi
                 ai_generated: false
             },
             {
-                title: `${careerTitle} Bootcamp`,
+                title: `${safeCareerTitle} Bootcamp`,
                 type: 'course',
                 provider: 'Udemy',
                 url: `https://www.udemy.com/courses/search/?q=${encodedCareer}`,
@@ -224,7 +230,7 @@ Make sure URLs are real and specific, not search pages. Provide actual course/vi
                 ai_generated: false
             },
             {
-                title: `${careerTitle} Career Guide 2024`,
+                title: `${safeCareerTitle} Career Guide 2024`,
                 type: 'article',
                 provider: 'Medium',
                 url: `https://medium.com/search?q=${encodedCareer}+guide`,
@@ -258,7 +264,12 @@ Make sure URLs are real and specific, not search pages. Provide actual course/vi
             // Generate learning resources for each career
             const careersWithResources = await Promise.all(
                 careers.map(async (career: CareerRecommendation) => {
-                    const resources = await generateLearningResources(career.title, career.missing_skills)
+                    // Ensure we have valid data before calling generateLearningResources
+                    const missingSkills = Array.isArray(career.missing_skills) ? career.missing_skills : []
+                    const resources = await generateLearningResources(
+                        career.title || 'Career Development',
+                        missingSkills.length > 0 ? missingSkills : [career.title || 'Career Development']
+                    )
                     return {...career, learning_resources: resources}
                 })
             )

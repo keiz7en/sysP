@@ -665,7 +665,7 @@ def ai_engagement_analysis(request):
             student=student_profile, status='active'
         )
 
-        avg_progress = enrollments.aggregate(avg=Avg('progress_percentage'))['avg'] or 0
+        avg_progress = enrollments.aggregate(avg=Avg('completion_percentage'))['avg'] or 0
 
         engagement_data = {
             'overall_engagement': 'high' if avg_progress > 70 else 'medium',

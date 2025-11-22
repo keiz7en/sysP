@@ -434,7 +434,7 @@ def get_career_recommendations(request):
         # Analyze student's current skills from courses
         for enrollment in enrollments:
             course_title = enrollment.course.title
-            progress = float(enrollment.progress_percentage)
+            progress = float(enrollment.completion_percentage)
 
             if progress > 70:
                 career_recommendations['skills_analysis']['current_strengths'].append(course_title)

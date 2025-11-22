@@ -215,7 +215,7 @@ def adaptive_difficulty_adjustment(request):
         student_performance = {
             'recent_scores': recent_scores if recent_scores else [70],
             'time_spent': 120,  # minutes
-            'completion_rate': enrollments.aggregate(avg=Avg('progress_percentage'))['avg'] or 0,
+            'completion_rate': enrollments.aggregate(avg=Avg('completion_percentage'))['avg'] or 0,
             'engagement_level': 'high' if len(recent_scores) > 5 else 'medium'
         }
 
@@ -294,7 +294,7 @@ def predict_dropout_risk(request):
         )
 
         # Calculate metrics
-        avg_progress = enrollments.aggregate(avg=Avg('progress_percentage'))['avg'] or 0
+        avg_progress = enrollments.aggregate(avg=Avg('completion_percentage'))['avg'] or 0
         total_courses = enrollments.count()
 
         # Get attendance (if tracked)

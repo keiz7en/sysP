@@ -354,7 +354,7 @@ class GeminiAIService:
             for enrollment in enrollments:
                 courses_info.append({
                     'title': enrollment.course.title,
-                    'progress': float(enrollment.progress_percentage),
+                    'progress': float(enrollment.completion_percentage),
                     'credits': enrollment.course.credits
                 })
 
@@ -402,7 +402,7 @@ class GeminiAIService:
             learning_paths = []
             for idx, enrollment in enumerate(enrollments):
                 course = enrollment.course
-                progress = float(enrollment.progress_percentage)
+                progress = float(enrollment.completion_percentage)
 
                 # Get AI recommendations for this course
                 ai_data = ai_recommendations_list[idx] if idx < len(ai_recommendations_list) else {}
@@ -587,7 +587,7 @@ class GeminiAIService:
         learning_paths = []
         for idx, enrollment in enumerate(enrollments):
             course = enrollment.course
-            progress = float(enrollment.progress_percentage)
+            progress = float(enrollment.completion_percentage)
 
             # Determine difficulty level
             difficulty_map = {

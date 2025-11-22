@@ -581,7 +581,10 @@ const ResearchInsights: React.FC = () => {
                                             color: '#6366f1',
                                             marginBottom: '0.5rem'
                                         }}>
-                                            {insights.performance_analysis.grade_prediction.toFixed(2)}
+                                            {typeof insights.performance_analysis.grade_prediction === 'number'
+                                                ? insights.performance_analysis.grade_prediction.toFixed(2)
+                                                : parseFloat(insights.performance_analysis.grade_prediction as any).toFixed(2) || '0.00'
+                                            }
                                         </div>
                                         <div style={{color: '#6b7280', fontSize: '0.9rem'}}>
                                             Predicted GPA for Next Semester
