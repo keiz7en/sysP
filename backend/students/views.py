@@ -1,13 +1,15 @@
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework import status, permissions, viewsets
+from rest_framework import permissions, viewsets
 from rest_framework.views import APIView
+from rest_framework import status as drf_status
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from django.db.models import Q, Avg, Count, Sum
 from datetime import datetime, timedelta
 import json
+import os
 
 from .models import StudentProfile, AcademicRecord, AttendanceRecord, LearningProgress, StudentBehaviorMetrics
 from .serializers import StudentProfileSerializer
@@ -66,14 +68,14 @@ class StudentDashboardView(APIView):
         if request.user.user_type != 'student':
             return Response({
                 'error': 'This endpoint is only accessible to students'
-            }, status=status.HTTP_403_FORBIDDEN)
+            }, status=drf_drf_drf_status.HTTP_403_FORBIDDEN)
 
         try:
             student_profile = StudentProfile.objects.get(user=request.user)
         except StudentProfile.DoesNotExist:
             return Response({
                 'error': 'Student profile not found'
-            }, status=status.HTTP_404_NOT_FOUND)
+            }, status=drf_drf_drf_status.HTTP_404_NOT_FOUND)
 
         # Get REAL enrollments - include ALL statuses so students see everything
         enrollments = CourseEnrollment.objects.filter(
@@ -141,7 +143,7 @@ class StudentDashboardView(APIView):
                 dashboard_data['is_new_student'] = True
                 dashboard_data['message'] = 'No valid course enrollments. Teachers will add you to courses.'
 
-        return Response(dashboard_data, status=status.HTTP_200_OK)
+        return Response(dashboard_data, status=drf_drf_drf_status.HTTP_200_OK)
 
 
 class AcademicRecordsView(APIView):
@@ -236,7 +238,7 @@ class AcademicRecordsView(APIView):
         except Exception as e:
             import traceback
             print(f"Error in AcademicRecordsView: {traceback.format_exc()}")
-            return Response({'error': str(e)}, status=500)
+            return Response({'error': str(e)}, status=drf_drf_drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class AdaptiveLearningView(APIView):
@@ -245,7 +247,7 @@ class AdaptiveLearningView(APIView):
 
     def get(self, request):
         if request.user.user_type != 'student':
-            return Response({'error': 'Student access only'}, status=status.HTTP_403_FORBIDDEN)
+            return Response({'error': 'Student access only'}, status=drf_drf_drf_status.HTTP_403_FORBIDDEN)
 
         try:
             student_profile = StudentProfile.objects.get(user=request.user)
@@ -290,7 +292,7 @@ class AdaptiveLearningView(APIView):
             })
 
         except StudentProfile.DoesNotExist:
-            return Response({'error': 'Student profile not found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'Student profile not found'}, status=drf_drf_drf_status.HTTP_404_NOT_FOUND)
 
 
 class CareerGuidanceView(APIView):
@@ -299,7 +301,7 @@ class CareerGuidanceView(APIView):
 
     def get(self, request):
         if request.user.user_type != 'student':
-            return Response({'error': 'Student access only'}, status=status.HTTP_403_FORBIDDEN)
+            return Response({'error': 'Student access only'}, status=drf_drf_status.HTTP_403_FORBIDDEN)
 
         try:
             student_profile = StudentProfile.objects.get(user=request.user)
@@ -356,7 +358,7 @@ class CareerGuidanceView(APIView):
             })
 
         except StudentProfile.DoesNotExist:
-            return Response({'error': 'Student profile not found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'Student profile not found'}, status=drf_drf_drf_status.HTTP_404_NOT_FOUND)
 
 
 class AssessmentsView(APIView):
@@ -365,7 +367,7 @@ class AssessmentsView(APIView):
 
     def get(self, request):
         if request.user.user_type != 'student':
-            return Response({'error': 'Student access only'}, status=status.HTTP_403_FORBIDDEN)
+            return Response({'error': 'Student access only'}, status=drf_drf_status.HTTP_403_FORBIDDEN)
 
         try:
             student_profile = StudentProfile.objects.get(user=request.user)
@@ -565,11 +567,11 @@ class AssessmentsView(APIView):
             })
 
         except StudentProfile.DoesNotExist:
-            return Response({'error': 'Student profile not found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'Student profile not found'}, status=drf_drf_drf_status.HTTP_404_NOT_FOUND)
         except Exception as e:
             import traceback
             print(f"Error in AssessmentsView: {traceback.format_exc()}")
-            return Response({'error': f'Server error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({'error': f'Server error: {str(e)}'}, status=drf_drf_drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class LearningInsightsView(APIView):
@@ -578,7 +580,7 @@ class LearningInsightsView(APIView):
 
     def get(self, request):
         if request.user.user_type != 'student':
-            return Response({'error': 'Student access only'}, status=status.HTTP_403_FORBIDDEN)
+            return Response({'error': 'Student access only'}, status=drf_drf_status.HTTP_403_FORBIDDEN)
 
         try:
             student_profile = StudentProfile.objects.get(user=request.user)
@@ -656,7 +658,7 @@ class LearningInsightsView(APIView):
             })
 
         except StudentProfile.DoesNotExist:
-            return Response({'error': 'Student profile not found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'Student profile not found'}, status=drf_drf_drf_status.HTTP_404_NOT_FOUND)
 
 
 @api_view(['GET'])
@@ -785,7 +787,7 @@ def get_ai_progress_analysis(request):
 
         return Response(progress_analysis)
     except Exception as e:
-        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({'error': str(e)}, status=drf_drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['GET'])
@@ -794,7 +796,7 @@ def get_personalized_learning_path(request):
     """AI-generated personalized learning path - Fixed for frontend compatibility"""
     try:
         if request.user.user_type != 'student':
-            return Response({'error': 'Student access only'}, status=status.HTTP_403_FORBIDDEN)
+            return Response({'error': 'Student access only'}, status=drf_drf_status.HTTP_403_FORBIDDEN)
 
         student_profile = StudentProfile.objects.get(user=request.user)
 
@@ -962,9 +964,9 @@ def get_personalized_learning_path(request):
         return Response(learning_data)
 
     except StudentProfile.DoesNotExist:
-        return Response({'error': 'Student profile not found'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({'error': 'Student profile not found'}, status=drf_drf_drf_status.HTTP_404_NOT_FOUND)
     except Exception as e:
-        return Response({'error': f'Server error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({'error': f'Server error: {str(e)}'}, status=drf_drf_drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['GET'])
@@ -1005,7 +1007,7 @@ def get_engagement_analytics(request):
 
         return Response(engagement_data)
     except Exception as e:
-        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({'error': str(e)}, status=drf_drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['POST'])
@@ -1014,7 +1016,7 @@ def generate_ai_assessment(request):
     """Generate AI-powered assessment questions using Gemini"""
     try:
         if request.user.user_type != 'student':
-            return Response({'error': 'Student access only'}, status=status.HTTP_403_FORBIDDEN)
+            return Response({'error': 'Student access only'}, status=drf_drf_status.HTTP_403_FORBIDDEN)
 
         student_profile = StudentProfile.objects.get(user=request.user)
 
@@ -1038,7 +1040,7 @@ def generate_ai_assessment(request):
                     assessment_type=assessment_type
                 )
                 print(f" Generated assessment: {assessment_data.get('assessment_title', 'Unknown')}")
-                return Response(assessment_data, status=status.HTTP_200_OK)
+                return Response(assessment_data, status=drf_drf_status.HTTP_200_OK)
             except Exception as e:
                 print(f" Gemini AI error: {str(e)}")
                 # Continue to fallback
@@ -1064,15 +1066,15 @@ def generate_ai_assessment(request):
                 'type': 'multiple_choice' if assessment_type != 'essay' else 'essay'
             })
 
-        return Response(assessment_data, status=status.HTTP_200_OK)
+        return Response(assessment_data, status=drf_drf_status.HTTP_200_OK)
 
     except StudentProfile.DoesNotExist:
-        return Response({'error': 'Student profile not found'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({'error': 'Student profile not found'}, status=drf_drf_drf_status.HTTP_404_NOT_FOUND)
     except Exception as e:
         print(f" Server error in generate_ai_assessment: {str(e)}")
         import traceback
         traceback.print_exc()
-        return Response({'error': f'Server error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({'error': f'Server error: {str(e)}'}, status=drf_drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['GET'])
@@ -1081,7 +1083,7 @@ def get_ai_learning_insights(request):
     """Get AI-powered learning insights and recommendations using Gemini"""
     try:
         if request.user.user_type != 'student':
-            return Response({'error': 'Student access only'}, status=status.HTTP_403_FORBIDDEN)
+            return Response({'error': 'Student access only'}, status=drf_drf_status.HTTP_403_FORBIDDEN)
 
         student_profile = StudentProfile.objects.get(user=request.user)
 
@@ -1176,12 +1178,12 @@ def get_ai_learning_insights(request):
             'average_score': round(total_score / scored_courses, 1) if scored_courses > 0 else 0
         }
 
-        return Response(insights_data, status=status.HTTP_200_OK)
+        return Response(insights_data, status=drf_drf_status.HTTP_200_OK)
 
     except StudentProfile.DoesNotExist:
-        return Response({'error': 'Student profile not found'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({'error': 'Student profile not found'}, status=drf_drf_status.HTTP_404_NOT_FOUND)
     except Exception as e:
-        return Response({'error': f'Server error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({'error': f'Server error: {str(e)}'}, status=drf_drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['GET'])
@@ -1195,7 +1197,7 @@ def get_available_courses(request):
     if not hasattr(request.user, 'user_type') or request.user.user_type != 'student':
         return Response({
             'error': 'Only students can view available courses'
-        }, status=status.HTTP_403_FORBIDDEN)
+        }, status=drf_drf_drf_status.HTTP_403_FORBIDDEN)
 
     try:
         from courses.models import Course, CourseEnrollment
@@ -1265,13 +1267,13 @@ def get_available_courses(request):
     except StudentProfile.DoesNotExist:
         return Response({
             'error': 'Student profile not found'
-        }, status=status.HTTP_404_NOT_FOUND)
+        }, status=drf_drf_drf_status.HTTP_404_NOT_FOUND)
     except Exception as e:
         import traceback
         print(f"Error getting available courses: {traceback.format_exc()}")
         return Response({
             'error': f'Server error: {str(e)}'
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        }, status=drf_drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['GET'])
@@ -1284,7 +1286,7 @@ def get_my_enrollments(request):
     if not hasattr(request.user, 'user_type') or request.user.user_type != 'student':
         return Response({
             'error': 'Only students can view enrollments'
-        }, status=status.HTTP_403_FORBIDDEN)
+        }, status=drf_drf_drf_status.HTTP_403_FORBIDDEN)
 
     try:
         from courses.models import CourseEnrollment
@@ -1346,21 +1348,22 @@ def get_my_enrollments(request):
     except StudentProfile.DoesNotExist:
         return Response({
             'error': 'Student profile not found'
-        }, status=status.HTTP_404_NOT_FOUND)
+        }, status=drf_drf_drf_status.HTTP_404_NOT_FOUND)
     except Exception as e:
         return Response({
             'error': f'Failed to fetch enrollments: {str(e)}'
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        }, status=drf_drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_student_assignments(request):
-    """Get all assignments for student's enrolled courses"""
+    """Get all assignments for student's enrolled courses - REAL DATA ONLY"""
     if request.user.user_type != 'student':
-        return Response({'error': 'Student access only'}, status=status.HTTP_403_FORBIDDEN)
+        return Response({'error': 'Student access only'}, status=drf_drf_status.HTTP_403_FORBIDDEN)
 
     try:
+        import os
         student_profile = StudentProfile.objects.get(user=request.user)
 
         # Get enrolled courses
@@ -1374,8 +1377,12 @@ def get_student_assignments(request):
         if not enrolled_courses:
             return Response({
                 'assignments': [],
-                'message': 'No active course enrollments'
-            })
+                'total_assignments': 0,
+                'pending_count': 0,
+                'submitted_count': 0,
+                'graded_count': 0,
+                'message': 'No active course enrollments. Enroll in courses to see assignments.'
+            }, status=drf_drf_drf_status.HTTP_200_OK)
 
         # Get assignments from enrolled courses
         from courses.models import Assignment, AssignmentSubmission
@@ -1383,7 +1390,17 @@ def get_student_assignments(request):
         assignments = Assignment.objects.filter(
             course__in=enrolled_courses,
             is_published=True
-        ).select_related('course').order_by('-due_date')
+        ).select_related('course').order_by('due_date')
+
+        if not assignments.exists():
+            return Response({
+                'assignments': [],
+                'total_assignments': 0,
+                'pending_count': 0,
+                'submitted_count': 0,
+                'graded_count': 0,
+                'message': 'No assignments published yet. Your teachers will publish assignments soon.'
+            }, status=drf_drf_drf_status.HTTP_200_OK)
 
         assignments_data = []
         for assignment in assignments:
@@ -1406,7 +1423,8 @@ def get_student_assignments(request):
                     'submission_text': submission.submission_text,
                     'points_earned': float(submission.points_earned) if submission.points_earned else None,
                     'feedback': submission.feedback,
-                    'is_late': submission.is_late
+                    'is_late': submission.is_late,
+                    'percentage_score': submission.percentage_score if submission.points_earned else 0
                 }
 
                 # Add file info if exists
@@ -1427,8 +1445,9 @@ def get_student_assignments(request):
                     }
 
             except AssignmentSubmission.DoesNotExist:
-                # Not submitted yet
-                status = 'overdue' if assignment.due_date < timezone.now() else 'pending'
+                # Not submitted yet - determine if pending or overdue
+                is_overdue = timezone.now() > assignment.due_date
+                status = 'overdue' if is_overdue else 'pending'
                 submission_data = None
 
             assignment_data = {
@@ -1448,26 +1467,32 @@ def get_student_assignments(request):
             if assignment.attachment_file:
                 assignment_data['attachment'] = {
                     'url': assignment.attachment_file.url,
-                    'filename': assignment.attachment_filename,
+                    'filename': assignment.attachment_filename or os.path.basename(assignment.attachment_file.name),
                     'size': assignment.attachment_file.size if hasattr(assignment.attachment_file, 'size') else 0
                 }
 
             assignments_data.append(assignment_data)
 
+        # Calculate counts
+        pending_count = len([a for a in assignments_data if a['status'] in ['pending', 'overdue']])
+        submitted_count = len([a for a in assignments_data if a['status'] == 'submitted'])
+        graded_count = len([a for a in assignments_data if a['status'] == 'graded'])
+
         return Response({
             'assignments': assignments_data,
             'total_assignments': len(assignments_data),
-            'pending_count': len([a for a in assignments_data if a['status'] == 'pending']),
-            'submitted_count': len([a for a in assignments_data if a['status'] in ['submitted', 'graded']]),
-            'graded_count': len([a for a in assignments_data if a['status'] == 'graded'])
-        })
+            'pending_count': pending_count,
+            'submitted_count': submitted_count,
+            'graded_count': graded_count,
+            'enrolled_courses_count': len(enrolled_courses)
+        }, status=drf_drf_drf_status.HTTP_200_OK)
 
     except StudentProfile.DoesNotExist:
-        return Response({'error': 'Student profile not found'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({'error': 'Student profile not found'}, status=drf_drf_status.HTTP_404_NOT_FOUND)
     except Exception as e:
         import traceback
         print(f"Error fetching assignments: {traceback.format_exc()}")
-        return Response({'error': f'Server error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({'error': f'Server error: {str(e)}'}, status=drf_drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['POST'])
@@ -1475,7 +1500,7 @@ def get_student_assignments(request):
 def submit_assignment(request):
     """Submit an assignment with file upload and AI detection"""
     if request.user.user_type != 'student':
-        return Response({'error': 'Student access only'}, status=status.HTTP_403_FORBIDDEN)
+        return Response({'error': 'Student access only'}, status=drf_drf_status.HTTP_403_FORBIDDEN)
 
     try:
         student_profile = StudentProfile.objects.get(user=request.user)
@@ -1483,14 +1508,14 @@ def submit_assignment(request):
         # Get assignment ID
         assignment_id = request.data.get('assignment_id')
         if not assignment_id:
-            return Response({'error': 'assignment_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'assignment_id is required'}, status=drf_drf_status.HTTP_400_BAD_REQUEST)
 
         # Get assignment
         from courses.models import Assignment, AssignmentSubmission
         try:
             assignment = Assignment.objects.get(id=assignment_id)
         except Assignment.DoesNotExist:
-            return Response({'error': 'Assignment not found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'Assignment not found'}, status=drf_drf_status.HTTP_404_NOT_FOUND)
 
         # Check if student is enrolled in the course
         if not CourseEnrollment.objects.filter(
@@ -1498,11 +1523,11 @@ def submit_assignment(request):
                 course=assignment.course,
                 status='active'
         ).exists():
-            return Response({'error': 'You are not enrolled in this course'}, status=status.HTTP_403_FORBIDDEN)
+            return Response({'error': 'You are not enrolled in this course'}, status=drf_drf_status.HTTP_403_FORBIDDEN)
 
         # Check if already submitted
         if AssignmentSubmission.objects.filter(assignment=assignment, student=student_profile).exists():
-            return Response({'error': 'You have already submitted this assignment'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'You have already submitted this assignment'}, status=drf_drf_status.HTTP_400_BAD_REQUEST)
 
         # Get submission data
         submission_text = request.data.get('submission_text', '')
@@ -1511,7 +1536,7 @@ def submit_assignment(request):
         # Validate - need at least one of text or file
         if not submission_text and not file_upload:
             return Response({'error': 'Please provide either text submission or file upload'},
-                            status=status.HTTP_400_BAD_REQUEST)
+                            status=drf_drf_drf_status.HTTP_400_BAD_REQUEST)
 
         # Check if late
         is_late = timezone.now() > assignment.due_date
@@ -1563,14 +1588,14 @@ def submit_assignment(request):
         if ai_detection_result:
             response_data['ai_detection'] = ai_detection_result
 
-        return Response(response_data, status=status.HTTP_201_CREATED)
+        return Response(response_data, status=drf_drf_drf_status.HTTP_201_CREATED)
 
     except StudentProfile.DoesNotExist:
-        return Response({'error': 'Student profile not found'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({'error': 'Student profile not found'}, status=drf_drf_status.HTTP_404_NOT_FOUND)
     except Exception as e:
         import traceback
         print(f"Error submitting assignment: {traceback.format_exc()}")
-        return Response({'error': f'Server error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({'error': f'Server error: {str(e)}'}, status=drf_drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['GET'])
@@ -1578,7 +1603,7 @@ def submit_assignment(request):
 def get_assignment_detail(request, assignment_id):
     """Get detailed information about a specific assignment"""
     if request.user.user_type != 'student':
-        return Response({'error': 'Student access only'}, status=status.HTTP_403_FORBIDDEN)
+        return Response({'error': 'Student access only'}, status=drf_drf_status.HTTP_403_FORBIDDEN)
 
     try:
         student_profile = StudentProfile.objects.get(user=request.user)
@@ -1588,7 +1613,7 @@ def get_assignment_detail(request, assignment_id):
         try:
             assignment = Assignment.objects.select_related('course').get(id=assignment_id)
         except Assignment.DoesNotExist:
-            return Response({'error': 'Assignment not found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'Assignment not found'}, status=drf_drf_status.HTTP_404_NOT_FOUND)
 
         # Check if student is enrolled
         if not CourseEnrollment.objects.filter(
@@ -1596,7 +1621,7 @@ def get_assignment_detail(request, assignment_id):
                 course=assignment.course,
                 status='active'
         ).exists():
-            return Response({'error': 'You are not enrolled in this course'}, status=status.HTTP_403_FORBIDDEN)
+            return Response({'error': 'You are not enrolled in this course'}, status=drf_drf_status.HTTP_403_FORBIDDEN)
 
         # Get submission if exists
         try:
@@ -1656,8 +1681,8 @@ def get_assignment_detail(request, assignment_id):
         return Response(assignment_data)
 
     except StudentProfile.DoesNotExist:
-        return Response({'error': 'Student profile not found'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({'error': 'Student profile not found'}, status=drf_drf_status.HTTP_404_NOT_FOUND)
     except Exception as e:
         import traceback
         print(f"Error getting assignment detail: {traceback.format_exc()}")
-        return Response({'error': f'Server error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({'error': f'Server error: {str(e)}'}, status=drf_drf_status.HTTP_500_INTERNAL_SERVER_ERROR)

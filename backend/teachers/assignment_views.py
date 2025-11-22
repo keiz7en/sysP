@@ -24,7 +24,7 @@ from students.models import StudentProfile
 @permission_classes([IsAuthenticated])
 def teacher_assignments(request):
     """
-    GET: List all assignments for teacher's courses
+    GET: List all assignments for teacher's courses (REAL DATA ONLY)
     POST: Create new assignment with optional file attachment
     """
     if request.user.user_type != 'teacher':
@@ -36,18 +36,40 @@ def teacher_assignments(request):
         return Response({'error': 'Teacher profile not found'}, status=status.HTTP_404_NOT_FOUND)
 
     if request.method == 'GET':
-        # Get all assignments from teacher's courses
+        # Get all assignments from teacher's courses - REAL DATA ONLY
         teacher_courses = Course.objects.filter(instructor=teacher_profile)
+
+        if not teacher_courses.exists():
+            return Response({
+                'assignments': [],
+                'total_assignments': 0,
+                'message': 'No courses assigned yet. Create or get assigned to courses first.'
+            }, status=status.HTTP_200_OK)
+
         assignments = Assignment.objects.filter(course__in=teacher_courses).select_related('course')
+
+        if not assignments.exists():
+            return Response({
+                'assignments': [],
+                'total_assignments': 0,
+                'message': 'No assignments created yet. Create your first assignment to get started.'
+            }, status=status.HTTP_200_OK)
 
         assignments_data = []
         for assignment in assignments:
             # Get submission stats
             submissions = AssignmentSubmission.objects.filter(assignment=assignment)
             submissions_count = submissions.count()
-            avg_score = submissions.filter(points_earned__isnull=False).aggregate(
-                avg=Avg('points_earned')
-            )['avg'] or 0
+
+            # Calculate average score percentage
+            graded_submissions = submissions.filter(points_earned__isnull=False)
+            if graded_submissions.exists():
+                avg_percentage = sum(
+                    (float(s.points_earned) / float(assignment.max_points)) * 100
+                    for s in graded_submissions
+                ) / graded_submissions.count()
+            else:
+                avg_percentage = 0.0
 
             assignment_data = {
                 'id': assignment.id,
@@ -61,7 +83,7 @@ def teacher_assignments(request):
                 'status': 'published' if assignment.is_published else 'draft',
                 'created_date': assignment.created_at.isoformat(),
                 'submissions_count': submissions_count,
-                'avg_score': round(float(avg_score), 1) if avg_score else 0
+                'avg_score': round(avg_percentage, 1)
             }
 
             # Add attachment info if exists
@@ -76,7 +98,10 @@ def teacher_assignments(request):
 
         return Response({
             'assignments': assignments_data,
-            'total_assignments': len(assignments_data)
+            'total_assignments': len(assignments_data),
+            'published_count': len([a for a in assignments_data if a['status'] == 'published']),
+            'draft_count': len([a for a in assignments_data if a['status'] == 'draft']),
+            'total_submissions': sum(a['submissions_count'] for a in assignments_data)
         }, status=status.HTTP_200_OK)
 
     elif request.method == 'POST':
