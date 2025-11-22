@@ -737,6 +737,34 @@ const StudentCourses: React.FC = () => {
                                                         >
                                                             🔒 Course Full
                                                         </button>
+                                                    ) : !course.instructor_name || course.instructor_name.trim() === '' || course.instructor_name === 'TBD' || course.instructor_name === 'No instructor' ? (
+                                                        <div style={{
+                                                            width: '100%',
+                                                            padding: '0.875rem',
+                                                            backgroundColor: '#fef3c7',
+                                                            color: '#92400e',
+                                                            border: '1px solid #fbbf24',
+                                                            borderRadius: '10px',
+                                                            fontWeight: '600',
+                                                            fontSize: '0.85rem',
+                                                            textAlign: 'center',
+                                                            lineHeight: 1.5
+                                                        }}>
+                                                            <div style={{
+                                                                marginBottom: '0.25rem',
+                                                                fontSize: '1.2rem'
+                                                            }}>👨‍🏫
+                                                            </div>
+                                                            <div style={{marginBottom: '0.25rem'}}>No Teacher Assigned
+                                                            </div>
+                                                            <div style={{
+                                                                fontSize: '0.75rem',
+                                                                fontWeight: '500',
+                                                                opacity: 0.9
+                                                            }}>
+                                                                If teacher available we will notify you
+                                                            </div>
+                                                        </div>
                                                     ) : (
                                                         <button
                                                             onClick={() => handleEnrollRequest(course.id)}
@@ -768,7 +796,7 @@ const StudentCourses: React.FC = () => {
                                                         </button>
                                                     )}
 
-                                                    {!course.is_enrolled && !course.is_full && (
+                                                    {!course.is_enrolled && !course.is_full && course.instructor_name && course.instructor_name.trim() !== '' && course.instructor_name !== 'TBD' && course.instructor_name !== 'No instructor' && (
                                                         <p style={{
                                                             marginTop: '0.75rem',
                                                             fontSize: '0.8rem',
