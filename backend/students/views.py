@@ -544,7 +544,7 @@ class CareerGuidanceView(APIView):
         try:
             student_profile = StudentProfile.objects.get(user=request.user)
 
-            # Get real job market data from database
+            # Get real jjob market data from database
             job_opportunities = JobMarketData.objects.all().order_by('-growth_rate')
 
             if not job_opportunities.exists():
