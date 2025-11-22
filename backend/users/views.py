@@ -950,103 +950,102 @@ def reject_student(request, student_id):
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def all_users(request):
-    """Get all system users with complete profile information (Admin only)"""
+    """Get all system users with complete profile information (Admin only) - FIXED"""
     if request.user.user_type != 'admin':
         return Response({
             'error': 'Permission denied. Admin access required.'
         }, status=status.HTTP_403_FORBIDDEN)
 
     try:
-        users = User.objects.all().select_related('student_profile', 'teacher_profile').order_by('-date_joined')
+        users = User.objects.all().order_by('-date_joined')
         users_data = []
 
         for user in users:
-            user_data = UserSerializer(user).data
+            try:
+                user_data = UserSerializer(user).data
 
-            # Add profile-specific information
-            if user.user_type == 'student':
-                try:
-                    profile = user.student_profile
-                    user_data.update({
-                        'student_id': profile.student_id,
-                        'current_gpa': float(profile.current_gpa) if profile.current_gpa else 0.0,
-                        'grade_level': profile.grade_level or 'Not specified',
-                        'academic_status': profile.academic_status or 'active',
-                        'guardian_name': profile.guardian_name or '',
-                        'guardian_email': profile.guardian_email or '',
-                        'learning_style': profile.learning_style or 'adaptive',
-                        'enrollment_date': profile.enrollment_date.strftime(
-                            '%Y-%m-%d') if profile.enrollment_date else '',
-                        'profile_exists': True
-                    })
-                except:
-                    # Create missing student profile
+                # Add profile-specific information with proper error handling
+                if user.user_type == 'student':
                     try:
-                        profile = StudentProfile.objects.create(
-                            user=user,
-                            student_id=f'STU{user.id:05d}',
-                            academic_status='active',
-                            current_gpa=0.0
-                        )
+                        profile = user.student_profile
                         user_data.update({
                             'student_id': profile.student_id,
-                            'current_gpa': 0.0,
-                            'grade_level': 'Not specified',
-                            'academic_status': 'active',
-                            'profile_exists': True,
-                            'profile_created': True
+                            'current_gpa': float(profile.current_gpa) if profile.current_gpa else 0.0,
+                            'grade_level': profile.grade_level or 'Not specified',
+                            'academic_status': profile.academic_status or 'active',
+                            'guardian_name': getattr(profile, 'guardian_name', '') or '',
+                            'guardian_email': getattr(profile, 'guardian_email', '') or '',
+                            'learning_style': profile.learning_style or 'adaptive',
+                            'enrollment_date': profile.enrollment_date.strftime('%Y-%m-%d') if hasattr(profile,
+                                                                                                       'enrollment_date') and profile.enrollment_date else '',
+                            'profile_exists': True
                         })
-                    except:
+                    except Exception as e:
+                        # Student profile missing or error accessing it
+                        print(f"Student profile error for {user.username}: {e}")
                         user_data.update({
-                            'student_id': 'No ID',
+                            'student_id': 'No Profile',
                             'current_gpa': 0.0,
                             'grade_level': 'Not specified',
                             'academic_status': 'unknown',
+                            'guardian_name': '',
+                            'guardian_email': '',
+                            'learning_style': 'adaptive',
+                            'enrollment_date': '',
                             'profile_exists': False
                         })
 
-            elif user.user_type == 'teacher':
-                try:
-                    profile = user.teacher_profile
-                    user_data.update({
-                        'employee_id': profile.employee_id,
-                        'department': profile.department or 'General',
-                        'specialization': profile.specialization or [],
-                        'experience_years': profile.experience_years or 0,
-                        'teaching_rating': float(profile.teaching_rating) if profile.teaching_rating else 0.0,
-                        'is_teacher_approved': profile.is_approved,
-                        'approved_at': profile.approved_at.strftime('%Y-%m-%d') if profile.approved_at else None,
-                        'profile_exists': True
-                    })
-                except:
-                    user_data.update({
-                        'employee_id': 'No ID',
-                        'department': 'General',
-                        'specialization': [],
-                        'experience_years': 0,
-                        'teaching_rating': 0.0,
-                        'is_teacher_approved': False,
-                        'profile_exists': False
-                    })
+                elif user.user_type == 'teacher':
+                    try:
+                        profile = user.teacher_profile
+                        user_data.update({
+                            'employee_id': profile.employee_id,
+                            'department': profile.department or 'General',
+                            'specialization': profile.specialization if isinstance(profile.specialization,
+                                                                                   list) else [],
+                            'experience_years': profile.experience_years or 0,
+                            'teaching_rating': float(profile.teaching_rating) if profile.teaching_rating else 0.0,
+                            'is_teacher_approved': profile.is_approved,
+                            'approved_at': profile.approved_at.strftime('%Y-%m-%d') if profile.approved_at else None,
+                            'profile_exists': True
+                        })
+                    except Exception as e:
+                        # Teacher profile missing or error accessing it
+                        print(f"Teacher profile error for {user.username}: {e}")
+                        user_data.update({
+                            'employee_id': 'No Profile',
+                            'department': 'General',
+                            'specialization': [],
+                            'experience_years': 0,
+                            'teaching_rating': 0.0,
+                            'is_teacher_approved': False,
+                            'approved_at': None,
+                            'profile_exists': False
+                        })
 
-            # Add additional useful information
-            user_data.update({
-                'last_login_display': user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else 'Never',
-                'date_joined_display': user.date_joined.strftime('%Y-%m-%d') if user.date_joined else '',
-                'approval_status_display': user.approval_status.title(),
-                'is_active_display': 'Active' if user.is_active else 'Inactive',
-                'user_type_display': user.user_type.title()
-            })
+                # Add additional useful information
+                user_data.update({
+                    'last_login_display': user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else 'Never',
+                    'date_joined_display': user.date_joined.strftime('%Y-%m-%d') if user.date_joined else '',
+                    'approval_status_display': user.approval_status.title() if hasattr(user,
+                                                                                       'approval_status') else 'Unknown',
+                    'is_active_display': 'Active' if user.is_active else 'Inactive',
+                    'user_type_display': user.user_type.title()
+                })
 
-            users_data.append(user_data)
+                users_data.append(user_data)
+            except Exception as e:
+                # Skip users that cause errors
+                print(f"Error processing user {user.username if hasattr(user, 'username') else 'unknown'}: {e}")
+                continue
 
         # Calculate statistics
         total_users = len(users_data)
-        active_users = len([u for u in users_data if u['is_active']])
-        pending_users = len([u for u in users_data if u['approval_status'] == 'pending'])
-        students_count = len([u for u in users_data if u['user_type'] == 'student'])
-        teachers_count = len([u for u in users_data if u['user_type'] == 'teacher'])
-        admins_count = len([u for u in users_data if u['user_type'] == 'admin'])
+        active_users = len([u for u in users_data if u.get('is_active', False)])
+        pending_users = len([u for u in users_data if u.get('approval_status', '') == 'pending'])
+        students_count = len([u for u in users_data if u.get('user_type', '') == 'student'])
+        teachers_count = len([u for u in users_data if u.get('user_type', '') == 'teacher'])
+        admins_count = len([u for u in users_data if u.get('user_type', '') == 'admin'])
 
         return Response({
             'users': users_data,
@@ -1062,8 +1061,21 @@ def all_users(request):
         }, status=status.HTTP_200_OK)
 
     except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"Fatal error in all_users: {error_trace}")
         return Response({
-            'error': f'Failed to fetch users: {str(e)}'
+            'error': f'Failed to fetch users: {str(e)}',
+            'users': [],
+            'statistics': {
+                'total_users': 0,
+                'active_users': 0,
+                'pending_users': 0,
+                'students': 0,
+                'teachers': 0,
+                'admins': 0
+            },
+            'total_count': 0
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 

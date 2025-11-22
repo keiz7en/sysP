@@ -21,6 +21,13 @@ except ImportError:
     gemini_service = None
     print("⚠️ Gemini AI service not available in students/views.py")
 
+# Import new GeminiService for advanced AI analysis
+try:
+    from ai_services.gemini_service import GeminiService
+except ImportError:
+    GeminiService = None
+    print("⚠️ GeminiService not available in students/views.py")
+
 # Safe imports for other apps
 try:
     from courses.models import Course, CourseEnrollment
@@ -68,14 +75,14 @@ class StudentDashboardView(APIView):
         if request.user.user_type != 'student':
             return Response({
                 'error': 'This endpoint is only accessible to students'
-            }, status=drf_drf_drf_status.HTTP_403_FORBIDDEN)
+            }, status=drf_status.HTTP_403_FORBIDDEN)
 
         try:
             student_profile = StudentProfile.objects.get(user=request.user)
         except StudentProfile.DoesNotExist:
             return Response({
                 'error': 'Student profile not found'
-            }, status=drf_drf_drf_status.HTTP_404_NOT_FOUND)
+            }, status=drf_status.HTTP_404_NOT_FOUND)
 
         # Get REAL enrollments - include ALL statuses so students see everything
         enrollments = CourseEnrollment.objects.filter(
@@ -143,7 +150,7 @@ class StudentDashboardView(APIView):
                 dashboard_data['is_new_student'] = True
                 dashboard_data['message'] = 'No valid course enrollments. Teachers will add you to courses.'
 
-        return Response(dashboard_data, status=drf_drf_drf_status.HTTP_200_OK)
+        return Response(dashboard_data, status=drf_status.HTTP_200_OK)
 
 
 class AcademicRecordsView(APIView):
@@ -187,7 +194,7 @@ class AcademicRecordsView(APIView):
                     'instructor': enrollment.course.instructor.user.get_full_name(),
                     'grade': grade,
                     'credits': enrollment.course.credits,
-                    'semester': f"{enrollment.course.subject.name if enrollment.course.subject else 'General'} - {enrollment.enrolled_at.strftime('%B %Y')}",
+                    'semester': f"{enrollment.course.subject.name if enrollment.course.subject else 'General'} - {enrollment.enrollment_date.strftime('%B %Y')}",
                     'progress_percentage': float(enrollment.completion_percentage),
                     'final_score': float(enrollment.final_score) if enrollment.final_score else 0.0,
                     'status': enrollment.status
@@ -211,7 +218,7 @@ class AcademicRecordsView(APIView):
             gpa_by_semester = {}
             semester_map = {}
             for enrollment in completed_enrollments:
-                semester = f"{enrollment.course.subject.name if enrollment.course.subject else 'General'} - {enrollment.enrolled_at.strftime('%B %Y')}"
+                semester = f"{enrollment.course.subject.name if enrollment.course.subject else 'General'} - {enrollment.enrollment_date.strftime('%B %Y')}"
                 if semester not in semester_map:
                     semester_map[semester] = []
                 semester_map[semester].append(enrollment)
@@ -220,6 +227,104 @@ class AcademicRecordsView(APIView):
                 sem_grade_points = sum((e.final_score / 25) * e.course.credits for e in enrols if e.final_score)
                 sem_credits = sum(e.course.credits for e in enrols)
                 gpa_by_semester[semester] = (sem_grade_points / sem_credits) if sem_credits > 0 else 0.0
+
+            # AI-Powered Analysis
+            ai_feedback = None
+            if academic_records:  # Only generate AI feedback if there are records
+                try:
+                    gemini = GeminiService() if GeminiService else None
+
+                    # Prepare data for AI analysis
+                    analysis_prompt = f"""Analyze this student's academic performance and provide personalized feedback:
+
+Student: {request.user.get_full_name()}
+Current GPA: {current_gpa:.2f}
+Total Credits: {total_credits}
+Completed Courses: {len(completed_enrollments)}
+In Progress: {len([e for e in enrollments if e.status == 'active'])}
+
+Academic Records:
+{chr(10).join([f"- {r['course_title']}: {r['grade']} ({r['final_score']:.1f}%) - {r['status']}" for r in academic_records])}
+
+GPA Trend by Semester:
+{chr(10).join([f"- {sem}: {gpa:.2f}" for sem, gpa in gpa_by_semester.items()])}
+
+Provide a comprehensive academic analysis with:
+1. Overall Performance Assessment (2-3 sentences)
+2. Key Strengths (3-4 specific points)
+3. Areas for Improvement (2-3 specific points)
+4. Personalized Recommendations (4-5 actionable items)
+5. Risk Level (low/medium/high) with explanation
+6. Next Steps (3-4 immediate action items)
+
+Format as JSON:
+{{
+    "overall_assessment": "...",
+    "strengths": ["...", "...", "..."],
+    "improvements": ["...", "..."],
+    "recommendations": ["...", "...", "...", "..."],
+    "risk_level": "low/medium/high",
+    "risk_explanation": "...",
+    "next_steps": ["...", "...", "..."],
+    "motivational_message": "..."
+}}"""
+
+                    if gemini and hasattr(gemini, 'generate_content'):
+                        ai_response = gemini.generate_content(analysis_prompt)
+
+                        # Parse JSON response
+                        import json
+                        import re
+                        json_match = re.search(r'\{.*\}', ai_response, re.DOTALL)
+                        if json_match:
+                            ai_feedback = json.loads(json_match.group())
+                            ai_feedback['ai_powered'] = True
+                            ai_feedback['model'] = 'Gemini 1.5 Flash'
+                    else:
+                        raise Exception("GeminiService is not available")
+                except Exception as e:
+                    print(f"AI Analysis Error: {str(e)}")
+                    # Provide fallback feedback
+                    progress_msg = (
+                        f"You have completed {len(completed_enrollments)} courses and are currently enrolled in {len([e for e in enrollments if e.status == 'active'])} active courses."
+                    )
+                    if current_gpa >= 3.0:
+                        progress_msg += " Your academic performance is excellent!"
+                    else:
+                        progress_msg += " Keep working to improve your results!"
+
+                    ai_feedback = {
+                        'overall_assessment': progress_msg,
+                        'strengths': [
+                            f"Completed {total_credits} credits",
+                            "Demonstrated commitment to learning",
+                            "Consistently engaged in courses",
+                            "Good attendance record" if current_gpa >= 2.0 else "Needs attendance improvement"
+                        ],
+                        'improvements': [
+                            "Increase participation in class discussions",
+                            "Seek additional help in challenging subjects" if current_gpa < 3.0 else "Continue current study strategies",
+                            "Aim to improve assignment scores"
+                        ],
+                        'recommendations': [
+                            "Set aside dedicated study time each day",
+                            "Review course materials regularly",
+                            "Use practice exercises and flashcards",
+                            "Join peer study groups or forums",
+                            "Take regular breaks to avoid burnout"
+                        ],
+                        'risk_level': 'low' if current_gpa >= 3.0 else 'medium' if current_gpa >= 2.5 else 'high',
+                        'risk_explanation': f"GPA of {current_gpa:.2f} is {'excellent' if current_gpa >= 3.0 else 'moderate, improvement recommended' if current_gpa >= 2.5 else 'below optimal'}",
+                        'next_steps': [
+                            "Complete remaining coursework",
+                            "Consult your instructor for feedback",
+                            "Review weak areas before assessments",
+                            "Develop a targeted study plan"
+                        ],
+                        'motivational_message': "Every step forward is progress. Stay consistent and trust the process!",
+                        'ai_powered': False,
+                        'model': 'Fallback (Gemini API error)'
+                    }
 
             transcript_data = {
                 'student_info': {
@@ -231,68 +336,201 @@ class AcademicRecordsView(APIView):
                     'enrollment_date': student.enrollment_date.isoformat() if student.enrollment_date else None
                 },
                 'academic_records': academic_records,
-                'gpa_by_semester': gpa_by_semester
+                'gpa_by_semester': gpa_by_semester,
+                'ai_feedback': ai_feedback
             }
 
             return Response(transcript_data)
         except Exception as e:
             import traceback
             print(f"Error in AcademicRecordsView: {traceback.format_exc()}")
-            return Response({'error': str(e)}, status=drf_drf_drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({'error': str(e)}, status=drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class AdaptiveLearningView(APIView):
-    """REAL Adaptive Learning - only actual course data"""
+    """AI-Powered Adaptive Learning - personalized learning paths"""
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
         if request.user.user_type != 'student':
-            return Response({'error': 'Student access only'}, status=drf_drf_drf_status.HTTP_403_FORBIDDEN)
+            return Response({'error': 'Student access only'}, status=drf_status.HTTP_403_FORBIDDEN)
 
         try:
             student_profile = StudentProfile.objects.get(user=request.user)
 
-            # Get real course enrollments only
+            # Get active enrollments
             enrollments = CourseEnrollment.objects.filter(
-                student=student_profile,
-                status='active'
-            ).select_related('course')
+                student=student_profile
+            ).select_related('course', 'course__subject')
 
             if not enrollments.exists():
                 return Response({
                     'learning_paths': [],
                     'message': 'No active courses. Enroll in courses to see adaptive learning paths.',
                     'student_learning_style': student_profile.learning_style or 'Not set',
-                    'overall_progress': 0
+                    'overall_progress': 0,
+                    'total_courses': 0,
+                    'preferred_difficulty': student_profile.preferred_difficulty,
+                    'ai_recommendations': None
                 })
 
             learning_paths = []
+            completed_courses = []
+            in_progress_courses = []
+
             for enrollment in enrollments:
-                learning_paths.append({
+                course_info = {
                     'course_title': enrollment.course.title,
                     'course_code': enrollment.course.code,
-                    'difficulty_level': enrollment.course.difficulty_level.title() if hasattr(enrollment.course,
-                                                                                              'difficulty_level') else 'Intermediate',
+                    'difficulty_level': enrollment.course.difficulty_level,
                     'progress_percentage': float(enrollment.completion_percentage),
-                    'estimated_completion': enrollment.course.end_date.strftime('%Y-%m-%d'),
-                    'learning_objectives': enrollment.course.learning_objectives or [],
-                    'duration_weeks': enrollment.course.duration_weeks if hasattr(enrollment.course,
-                                                                                  'duration_weeks') else 12,
-                    'credits': enrollment.course.credits
-                })
+                    'estimated_completion': enrollment.course.end_date.strftime(
+                        '%B %d, %Y') if enrollment.course.end_date else 'Not set',
+                    'duration_weeks': ((enrollment.course.end_date - enrollment.course.start_date).days // 7) if (
+                                enrollment.course.end_date and enrollment.course.start_date) else 0,
+                    'credits': enrollment.course.credits,
+                    'status': enrollment.status,
+                    'final_score': float(enrollment.final_score) if enrollment.final_score else 0.0,
+                    'description': enrollment.course.description[
+                        :200] if enrollment.course.description else 'No description available'
+                }
+
+                learning_paths.append(course_info)
+
+                # Track completed vs in-progress
+                if enrollment.status == 'completed':
+                    completed_courses.append(course_info)
+                elif enrollment.status == 'active':
+                    in_progress_courses.append(course_info)
 
             overall_progress = enrollments.aggregate(avg_progress=Avg('completion_percentage'))['avg_progress'] or 0
 
+            # AI-Powered Recommendations
+            ai_recommendations = None
+            try:
+                gemini = GeminiService() if GeminiService else None
+
+                # Prepare data for AI analysis
+                learning_style = student_profile.learning_style or 'adaptive'
+                completed_courses = [p for p in learning_paths if p['status'] == 'completed']
+                in_progress_courses = [p for p in learning_paths if p['status'] == 'active']
+
+                ai_prompt = f"""Analyze this student's learning journey and provide personalized adaptive learning recommendations:
+
+Student: {request.user.get_full_name()}
+Learning Style: {learning_style}
+Overall Progress: {overall_progress:.1f}%
+Total Courses: {len(learning_paths)}
+Completed: {len(completed_courses)}
+In Progress: {len(in_progress_courses)}
+
+Courses in Progress:
+{chr(10).join([f"- {c['course_title']}: {c['progress_percentage']:.1f}% complete" for c in in_progress_courses]) if in_progress_courses else "None"}
+
+Completed Courses:
+{chr(10).join([f"- {c['course_title']}: {c['final_score']:.1f}%" for c in completed_courses]) if completed_courses else "None"}
+
+Generate personalized adaptive learning recommendations:
+1. Learning Path Analysis (2-3 sentences about their learning journey)
+2. Personalized Study Tips (4-5 specific tips based on their learning style)
+3. Next Course Recommendations (3-4 courses they should take next with reasons)
+4. Study Schedule Optimization (3-4 actionable schedule improvements)
+5. Learning Style Adjustments (2-3 suggestions to optimize their approach)
+6. Progress Milestones (4-5 specific milestones with timeframes)
+7. Motivational Strategy (personalized encouragement based on their progress)
+
+Format as JSON:
+{{
+    "learning_path_analysis": "...",
+    "study_tips": ["...", "...", "...", "..."],
+    "next_courses": [
+        {{"title": "...", "reason": "...", "difficulty": "beginner/intermediate/advanced"}},
+        ...
+    ],
+    "schedule_optimization": ["...", "...", "..."],
+    "learning_style_adjustments": ["...", "..."],
+    "milestones": [
+        {{"milestone": "...", "timeframe": "...", "actionable": "..."}},
+        ...
+    ],
+    "motivational_message": "..."
+}}"""
+
+                if gemini and hasattr(gemini, 'generate_content'):
+                    ai_response = gemini.generate_content(ai_prompt)
+
+                    # Parse JSON response
+                    import json
+                    import re
+                    json_match = re.search(r'\{.*\}', ai_response, re.DOTALL)
+                    if json_match:
+                        ai_recommendations = json.loads(json_match.group())
+                        ai_recommendations['ai_powered'] = True
+                        ai_recommendations['model'] = 'Gemini 1.5 Flash'
+                else:
+                    raise Exception("GeminiService not available")
+
+            except Exception as e:
+                print(f"AI Recommendations Error: {str(e)}")
+                # Fallback recommendations
+                progress_msg = f"You are making progress with {len(in_progress_courses)} active courses and {len(completed_courses)} completed courses."
+                if overall_progress >= 70:
+                    progress_msg += " Excellent progress!"
+                else:
+                    progress_msg += " Keep going!"
+
+                ai_recommendations = {
+                    'learning_path_analysis': progress_msg,
+                    'study_tips': [
+                        "Set aside dedicated study time each day",
+                        "Review course materials before and after class",
+                        "Practice with real-world examples",
+                        "Join study groups or discussion forums",
+                        "Take regular breaks to avoid burnout"
+                    ],
+                    'next_courses': [
+                        {'title': 'Advanced concepts in your field', 'reason': 'Build on current knowledge',
+                         'difficulty': 'intermediate'},
+                        {'title': 'Practical projects course', 'reason': 'Apply what you have learned',
+                         'difficulty': 'intermediate'},
+                        {'title': 'Industry certification prep', 'reason': 'Validate your skills',
+                         'difficulty': 'advanced'}
+                    ],
+                    'schedule_optimization': [
+                        "Study during your peak energy hours",
+                        "Break large topics into smaller chunks",
+                        "Use the Pomodoro Technique (25 min focus + 5 min break)",
+                        "Review previous material before starting new content"
+                    ],
+                    'learning_style_adjustments': [
+                        f"Your {learning_style} learning style is well-suited for online learning",
+                        "Try mixing different learning methods for better retention"
+                    ],
+                    'milestones': [
+                        {'milestone': 'Complete current course modules', 'timeframe': '2 weeks',
+                         'actionable': 'Focus on one module per week'},
+                        {'milestone': 'Achieve 80%+ on assignments', 'timeframe': '1 month',
+                         'actionable': 'Review feedback and improve'},
+                        {'milestone': 'Finish one course completely', 'timeframe': '6 weeks',
+                         'actionable': 'Maintain consistent study schedule'},
+                        {'milestone': 'Enroll in advanced course', 'timeframe': '2 months',
+                         'actionable': 'Build strong foundation first'}
+                    ],
+                    'motivational_message': "Every step forward is progress. Stay consistent and trust the process!",
+                    'ai_powered': False
+                }
+
             return Response({
                 'learning_paths': learning_paths,
-                'student_learning_style': student_profile.learning_style or 'adaptive',
+                'student_learning_style': learning_style,
                 'preferred_difficulty': student_profile.preferred_difficulty,
                 'overall_progress': round(float(overall_progress), 1),
-                'total_courses': enrollments.count()
+                'total_courses': enrollments.count(),
+                'ai_recommendations': ai_recommendations
             })
 
         except StudentProfile.DoesNotExist:
-            return Response({'error': 'Student profile not found'}, status=drf_drf_drf_status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'Student profile not found'}, status=drf_status.HTTP_404_NOT_FOUND)
 
 
 class CareerGuidanceView(APIView):
@@ -301,7 +539,7 @@ class CareerGuidanceView(APIView):
 
     def get(self, request):
         if request.user.user_type != 'student':
-            return Response({'error': 'Student access only'}, status=drf_drf_status.HTTP_403_FORBIDDEN)
+            return Response({'error': 'Student access only'}, status=drf_status.HTTP_403_FORBIDDEN)
 
         try:
             student_profile = StudentProfile.objects.get(user=request.user)
@@ -358,7 +596,7 @@ class CareerGuidanceView(APIView):
             })
 
         except StudentProfile.DoesNotExist:
-            return Response({'error': 'Student profile not found'}, status=drf_drf_drf_status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'Student profile not found'}, status=drf_status.HTTP_404_NOT_FOUND)
 
 
 class AssessmentsView(APIView):
@@ -367,7 +605,7 @@ class AssessmentsView(APIView):
 
     def get(self, request):
         if request.user.user_type != 'student':
-            return Response({'error': 'Student access only'}, status=drf_drf_status.HTTP_403_FORBIDDEN)
+            return Response({'error': 'Student access only'}, status=drf_status.HTTP_403_FORBIDDEN)
 
         try:
             student_profile = StudentProfile.objects.get(user=request.user)
@@ -567,11 +805,282 @@ class AssessmentsView(APIView):
             })
 
         except StudentProfile.DoesNotExist:
-            return Response({'error': 'Student profile not found'}, status=drf_drf_drf_status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'Student profile not found'}, status=drf_status.HTTP_404_NOT_FOUND)
         except Exception as e:
             import traceback
             print(f"Error in AssessmentsView: {traceback.format_exc()}")
-            return Response({'error': f'Server error: {str(e)}'}, status=drf_drf_drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({'error': f'Server error: {str(e)}'}, status=drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def ai_career_guidance(request):
+    """Comprehensive AI-powered career guidance using Gemini"""
+    if request.user.user_type != 'student':
+        return Response({'error': 'Student access only'}, status=drf_status.HTTP_403_FORBIDDEN)
+
+    try:
+        student_profile = StudentProfile.objects.get(user=request.user)
+        guidance_type = request.data.get('type', 'comprehensive')  # comprehensive, skills, career_path, training
+
+        # Get student's current courses and performance
+        enrollments = CourseEnrollment.objects.filter(
+            student=student_profile
+        ).select_related('course', 'course__subject')
+
+        courses_info = []
+        for enrollment in enrollments:
+            courses_info.append({
+                'title': enrollment.course.title,
+                'subject': enrollment.course.subject.name if enrollment.course.subject else 'General',
+                'progress': float(enrollment.completion_percentage),
+                'status': enrollment.status,
+                'final_score': float(enrollment.final_score) if enrollment.final_score else None
+            })
+
+        # Prepare context for AI
+        student_context = f"""Student Profile:
+Name: {request.user.get_full_name()}
+Learning Style: {student_profile.learning_style or 'adaptive'}
+Current GPA: {float(student_profile.current_gpa)}
+Total Credits: {student_profile.total_credits}
+
+Current Courses ({len(courses_info)}):
+{chr(10).join([f"- {c['title']} ({c['subject']}): {c['progress']:.1f}% complete, Status: {c['status']}" + (f", Score: {c['final_score']:.1f}%" if c['final_score'] else "") for c in courses_info]) if courses_info else "No courses enrolled yet"}
+
+Completed Courses: {len([c for c in courses_info if c['status'] == 'completed'])}
+In Progress: {len([c for c in courses_info if c['status'] == 'active'])}
+"""
+
+        # Generate AI guidance based on type
+        try:
+            gemini = GeminiService() if GeminiService else None
+
+            if guidance_type == 'comprehensive':
+                ai_prompt = f"""{student_context}
+
+Provide comprehensive career guidance for this student with:
+
+1. **Career Recommendations** (3-4 career paths):
+   - Career title
+   - Match percentage (0-100)
+   - Salary range (realistic for their region)
+   - Required skills
+   - Skills they already have from courses
+   - Missing skills they need to develop
+   - Preparation timeline
+   - Industry sectors
+
+2. **Skill Gap Analysis**:
+   - Current skills (from courses)
+   - High-demand market skills they're missing
+   - Priority level for each skill (critical/high/medium)
+   - Learning resources for each skill gap
+
+3. **Training Recommendations**:
+   - Specific training programs or courses
+   - Duration and cost
+   - Career outcomes
+
+4. **Next Steps** (5-6 actionable items with timelines)
+
+Format as JSON:
+{{
+    "career_recommendations": [
+        {{
+            "title": "...",
+            "match_percentage": 85,
+            "salary_range": {{"min": 50000, "max": 90000}},
+            "required_skills": ["...", "..."],
+            "student_has": ["..."],
+            "needs_to_learn": ["..."],
+            "preparation_timeline": "...",
+            "industries": ["...", "..."]
+        }}
+    ],
+    "skill_gaps": [
+        {{
+            "skill": "...",
+            "priority": "critical/high/medium",
+            "market_demand": "Very High/High/Medium",
+            "learning_resources": ["...", "..."],
+            "estimated_time": "..."
+        }}
+    ],
+    "training_programs": [
+        {{
+            "title": "...",
+            "provider": "...",
+            "duration": "...",
+            "cost": "...",
+            "career_outcomes": ["...", "..."]
+        }}
+    ],
+    "next_steps": [
+        {{
+            "step": "...",
+            "timeline": "...",
+            "priority": "high/medium/low"
+        }}
+    ],
+    "motivational_message": "..."
+}}"""
+
+                if gemini and hasattr(gemini, 'generate_content'):
+                    ai_response = gemini.generate_content(ai_prompt)
+
+                    # Parse JSON response
+                    import json
+                    import re
+                    json_match = re.search(r'\{.*\}', ai_response, re.DOTALL)
+                    if json_match:
+                        guidance_data = json.loads(json_match.group())
+                        guidance_data['ai_powered'] = True
+                        guidance_data['model'] = 'Gemini 1.5 Flash'
+                        return Response(guidance_data, status=drf_status.HTTP_200_OK)
+
+            # Fallback to structured mock data
+            raise Exception("Using fallback data")
+
+        except Exception as e:
+            print(f"AI Career Guidance Error: {str(e)}")
+
+            # Fallback comprehensive career guidance
+            subjects_studied = list(set([c['subject'] for c in courses_info]))
+            has_programming = any(
+                'programming' in c['title'].lower() or 'python' in c['title'].lower() for c in courses_info)
+            has_data = any('data' in c['title'].lower() for c in courses_info)
+            has_ml = any('machine learning' in c['title'].lower() or 'ai' in c['title'].lower() for c in courses_info)
+
+            career_recommendations = []
+
+            if has_programming:
+                career_recommendations.append({
+                    'title': 'Software Developer',
+                    'match_percentage': 80,
+                    'salary_range': {'min': 40000, 'max': 85000},
+                    'required_skills': ['Programming', 'Problem Solving', 'Version Control', 'Testing'],
+                    'student_has': ['Programming'],
+                    'needs_to_learn': ['Version Control (Git)', 'Software Testing', 'System Design'],
+                    'preparation_timeline': '6-9 months',
+                    'industries': ['Technology', 'Finance', 'E-commerce', 'Startups']
+                })
+
+            if has_data or has_programming:
+                career_recommendations.append({
+                    'title': 'Data Analyst',
+                    'match_percentage': 75,
+                    'salary_range': {'min': 35000, 'max': 70000},
+                    'required_skills': ['Data Analysis', 'SQL', 'Excel', 'Visualization'],
+                    'student_has': ['Data Analysis Basics'] if has_data else [],
+                    'needs_to_learn': ['SQL', 'Tableau/Power BI', 'Statistical Analysis'],
+                    'preparation_timeline': '4-6 months',
+                    'industries': ['Technology', 'Consulting', 'Healthcare', 'Retail']
+                })
+
+            if has_ml or has_programming:
+                career_recommendations.append({
+                    'title': 'AI/ML Engineer',
+                    'match_percentage': 70 if has_ml else 60,
+                    'salary_range': {'min': 55000, 'max': 110000},
+                    'required_skills': ['Machine Learning', 'Python', 'Deep Learning', 'Mathematics'],
+                    'student_has': ['Python'] if has_programming else [],
+                    'needs_to_learn': ['Machine Learning Algorithms', 'TensorFlow/PyTorch', 'Advanced Math'],
+                    'preparation_timeline': '10-15 months',
+                    'industries': ['AI Research', 'Technology Giants', 'Startups', 'Autonomous Systems']
+                })
+
+            if not career_recommendations:
+                career_recommendations.append({
+                    'title': 'Technology Trainee',
+                    'match_percentage': 65,
+                    'salary_range': {'min': 25000, 'max': 45000},
+                    'required_skills': ['Basic Programming', 'Problem Solving', 'Communication'],
+                    'student_has': [],
+                    'needs_to_learn': ['Programming Fundamentals', 'Web Development', 'Database Basics'],
+                    'preparation_timeline': '3-6 months',
+                    'industries': ['Technology', 'IT Services', 'Consulting']
+                })
+
+            skill_gaps = [
+                {
+                    'skill': 'Python Programming',
+                    'priority': 'critical' if not has_programming else 'low',
+                    'market_demand': 'Very High',
+                    'learning_resources': ['Python for Everybody (Coursera)', 'Codecademy Python', 'Real Python'],
+                    'estimated_time': '2-3 months'
+                },
+                {
+                    'skill': 'Data Analysis',
+                    'priority': 'high' if not has_data else 'medium',
+                    'market_demand': 'High',
+                    'learning_resources': ['Google Data Analytics Certificate', 'DataCamp', 'Kaggle Learn'],
+                    'estimated_time': '2-4 months'
+                },
+                {
+                    'skill': 'Machine Learning',
+                    'priority': 'high' if not has_ml else 'medium',
+                    'market_demand': 'Very High',
+                    'learning_resources': ['Andrew Ng ML Course (Coursera)', 'Fast.ai', 'Hands-On ML Book'],
+                    'estimated_time': '4-6 months'
+                }
+            ]
+
+            training_programs = [
+                {
+                    'title': 'Complete Python Developer Bootcamp',
+                    'provider': 'Udemy',
+                    'duration': '12 weeks',
+                    'cost': '$99 (frequently on sale $12-15)',
+                    'career_outcomes': ['Python Developer', 'Backend Engineer', 'Data Analyst']
+                },
+                {
+                    'title': 'Google Data Analytics Professional Certificate',
+                    'provider': 'Coursera',
+                    'duration': '6 months',
+                    'cost': '$49/month',
+                    'career_outcomes': ['Data Analyst', 'Business Analyst', 'Data Visualization Specialist']
+                },
+                {
+                    'title': 'Machine Learning Specialization',
+                    'provider': 'Stanford (Coursera)',
+                    'duration': '3 months',
+                    'cost': '$49/month',
+                    'career_outcomes': ['ML Engineer', 'Data Scientist', 'AI Researcher']
+                }
+            ]
+
+            next_steps = [
+                {'step': 'Complete current enrolled courses with excellence', 'timeline': 'Ongoing',
+                 'priority': 'high'},
+                {'step': 'Start building a GitHub portfolio with projects', 'timeline': '1 month', 'priority': 'high'},
+                {'step': 'Enroll in a specialized skill course (Python/ML/Data)', 'timeline': '2 weeks',
+                 'priority': 'high'},
+                {'step': 'Join tech communities and networking events', 'timeline': '1 month', 'priority': 'medium'},
+                {'step': 'Apply for internships or entry-level positions', 'timeline': '3-4 months',
+                 'priority': 'medium'},
+                {'step': 'Build 2-3 portfolio projects demonstrating skills', 'timeline': '2-3 months',
+                 'priority': 'high'}
+            ]
+
+            guidance_data = {
+                'career_recommendations': career_recommendations,
+                'skill_gaps': skill_gaps,
+                'training_programs': training_programs,
+                'next_steps': next_steps,
+                'motivational_message': 'Your learning journey is progressing well! Focus on building practical skills and a strong portfolio to stand out in the job market. Every course you complete brings you closer to your career goals.',
+                'ai_powered': False,
+                'model': 'Fallback (Gemini not available)'
+            }
+
+            return Response(guidance_data, status=drf_status.HTTP_200_OK)
+
+    except StudentProfile.DoesNotExist:
+        return Response({'error': 'Student profile not found'}, status=drf_status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        import traceback
+        print(f"Career Guidance Error: {traceback.format_exc()}")
+        return Response({'error': f'Server error: {str(e)}'}, status=drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class LearningInsightsView(APIView):
@@ -580,7 +1089,7 @@ class LearningInsightsView(APIView):
 
     def get(self, request):
         if request.user.user_type != 'student':
-            return Response({'error': 'Student access only'}, status=drf_drf_status.HTTP_403_FORBIDDEN)
+            return Response({'error': 'Student access only'}, status=drf_status.HTTP_403_FORBIDDEN)
 
         try:
             student_profile = StudentProfile.objects.get(user=request.user)
@@ -658,7 +1167,7 @@ class LearningInsightsView(APIView):
             })
 
         except StudentProfile.DoesNotExist:
-            return Response({'error': 'Student profile not found'}, status=drf_drf_drf_status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'Student profile not found'}, status=drf_status.HTTP_404_NOT_FOUND)
 
 
 @api_view(['GET'])
@@ -787,7 +1296,7 @@ def get_ai_progress_analysis(request):
 
         return Response(progress_analysis)
     except Exception as e:
-        return Response({'error': str(e)}, status=drf_drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({'error': str(e)}, status=drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['GET'])
@@ -796,7 +1305,7 @@ def get_personalized_learning_path(request):
     """AI-generated personalized learning path - Fixed for frontend compatibility"""
     try:
         if request.user.user_type != 'student':
-            return Response({'error': 'Student access only'}, status=drf_drf_status.HTTP_403_FORBIDDEN)
+            return Response({'error': 'Student access only'}, status=drf_status.HTTP_403_FORBIDDEN)
 
         student_profile = StudentProfile.objects.get(user=request.user)
 
@@ -964,9 +1473,9 @@ def get_personalized_learning_path(request):
         return Response(learning_data)
 
     except StudentProfile.DoesNotExist:
-        return Response({'error': 'Student profile not found'}, status=drf_drf_drf_status.HTTP_404_NOT_FOUND)
+        return Response({'error': 'Student profile not found'}, status=drf_status.HTTP_404_NOT_FOUND)
     except Exception as e:
-        return Response({'error': f'Server error: {str(e)}'}, status=drf_drf_drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({'error': f'Server error: {str(e)}'}, status=drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['GET'])
@@ -1007,7 +1516,7 @@ def get_engagement_analytics(request):
 
         return Response(engagement_data)
     except Exception as e:
-        return Response({'error': str(e)}, status=drf_drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({'error': str(e)}, status=drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['POST'])
@@ -1016,7 +1525,7 @@ def generate_ai_assessment(request):
     """Generate AI-powered assessment questions using Gemini"""
     try:
         if request.user.user_type != 'student':
-            return Response({'error': 'Student access only'}, status=drf_drf_status.HTTP_403_FORBIDDEN)
+            return Response({'error': 'Student access only'}, status=drf_status.HTTP_403_FORBIDDEN)
 
         student_profile = StudentProfile.objects.get(user=request.user)
 
@@ -1040,7 +1549,7 @@ def generate_ai_assessment(request):
                     assessment_type=assessment_type
                 )
                 print(f" Generated assessment: {assessment_data.get('assessment_title', 'Unknown')}")
-                return Response(assessment_data, status=drf_drf_status.HTTP_200_OK)
+                return Response(assessment_data, status=drf_status.HTTP_200_OK)
             except Exception as e:
                 print(f" Gemini AI error: {str(e)}")
                 # Continue to fallback
@@ -1066,15 +1575,15 @@ def generate_ai_assessment(request):
                 'type': 'multiple_choice' if assessment_type != 'essay' else 'essay'
             })
 
-        return Response(assessment_data, status=drf_drf_status.HTTP_200_OK)
+        return Response(assessment_data, status=drf_status.HTTP_200_OK)
 
     except StudentProfile.DoesNotExist:
-        return Response({'error': 'Student profile not found'}, status=drf_drf_drf_status.HTTP_404_NOT_FOUND)
+        return Response({'error': 'Student profile not found'}, status=drf_status.HTTP_404_NOT_FOUND)
     except Exception as e:
         print(f" Server error in generate_ai_assessment: {str(e)}")
         import traceback
         traceback.print_exc()
-        return Response({'error': f'Server error: {str(e)}'}, status=drf_drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({'error': f'Server error: {str(e)}'}, status=drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['GET'])
@@ -1083,7 +1592,7 @@ def get_ai_learning_insights(request):
     """Get AI-powered learning insights and recommendations using Gemini"""
     try:
         if request.user.user_type != 'student':
-            return Response({'error': 'Student access only'}, status=drf_drf_status.HTTP_403_FORBIDDEN)
+            return Response({'error': 'Student access only'}, status=drf_status.HTTP_403_FORBIDDEN)
 
         student_profile = StudentProfile.objects.get(user=request.user)
 
@@ -1178,12 +1687,12 @@ def get_ai_learning_insights(request):
             'average_score': round(total_score / scored_courses, 1) if scored_courses > 0 else 0
         }
 
-        return Response(insights_data, status=drf_drf_status.HTTP_200_OK)
+        return Response(insights_data, status=drf_status.HTTP_200_OK)
 
     except StudentProfile.DoesNotExist:
-        return Response({'error': 'Student profile not found'}, status=drf_drf_status.HTTP_404_NOT_FOUND)
+        return Response({'error': 'Student profile not found'}, status=drf_status.HTTP_404_NOT_FOUND)
     except Exception as e:
-        return Response({'error': f'Server error: {str(e)}'}, status=drf_drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({'error': f'Server error: {str(e)}'}, status=drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['GET'])
@@ -1197,7 +1706,7 @@ def get_available_courses(request):
     if not hasattr(request.user, 'user_type') or request.user.user_type != 'student':
         return Response({
             'error': 'Only students can view available courses'
-        }, status=drf_drf_drf_status.HTTP_403_FORBIDDEN)
+        }, status=drf_status.HTTP_403_FORBIDDEN)
 
     try:
         from courses.models import Course, CourseEnrollment
@@ -1267,13 +1776,13 @@ def get_available_courses(request):
     except StudentProfile.DoesNotExist:
         return Response({
             'error': 'Student profile not found'
-        }, status=drf_drf_drf_status.HTTP_404_NOT_FOUND)
+        }, status=drf_status.HTTP_404_NOT_FOUND)
     except Exception as e:
         import traceback
         print(f"Error getting available courses: {traceback.format_exc()}")
         return Response({
             'error': f'Server error: {str(e)}'
-        }, status=drf_drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
+        }, status=drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['GET'])
@@ -1286,7 +1795,7 @@ def get_my_enrollments(request):
     if not hasattr(request.user, 'user_type') or request.user.user_type != 'student':
         return Response({
             'error': 'Only students can view enrollments'
-        }, status=drf_drf_drf_status.HTTP_403_FORBIDDEN)
+        }, status=drf_status.HTTP_403_FORBIDDEN)
 
     try:
         from courses.models import CourseEnrollment
@@ -1348,11 +1857,11 @@ def get_my_enrollments(request):
     except StudentProfile.DoesNotExist:
         return Response({
             'error': 'Student profile not found'
-        }, status=drf_drf_drf_status.HTTP_404_NOT_FOUND)
+        }, status=drf_status.HTTP_404_NOT_FOUND)
     except Exception as e:
         return Response({
             'error': f'Failed to fetch enrollments: {str(e)}'
-        }, status=drf_drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
+        }, status=drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['GET'])
@@ -1360,7 +1869,7 @@ def get_my_enrollments(request):
 def get_student_assignments(request):
     """Get all assignments for student's enrolled courses - REAL DATA ONLY"""
     if request.user.user_type != 'student':
-        return Response({'error': 'Student access only'}, status=drf_drf_status.HTTP_403_FORBIDDEN)
+        return Response({'error': 'Student access only'}, status=drf_status.HTTP_403_FORBIDDEN)
 
     try:
         import os
@@ -1382,7 +1891,7 @@ def get_student_assignments(request):
                 'submitted_count': 0,
                 'graded_count': 0,
                 'message': 'No active course enrollments. Enroll in courses to see assignments.'
-            }, status=drf_drf_drf_status.HTTP_200_OK)
+            }, status=drf_status.HTTP_200_OK)
 
         # Get assignments from enrolled courses
         from courses.models import Assignment, AssignmentSubmission
@@ -1400,7 +1909,7 @@ def get_student_assignments(request):
                 'submitted_count': 0,
                 'graded_count': 0,
                 'message': 'No assignments published yet. Your teachers will publish assignments soon.'
-            }, status=drf_drf_drf_status.HTTP_200_OK)
+            }, status=drf_status.HTTP_200_OK)
 
         assignments_data = []
         for assignment in assignments:
@@ -1485,14 +1994,14 @@ def get_student_assignments(request):
             'submitted_count': submitted_count,
             'graded_count': graded_count,
             'enrolled_courses_count': len(enrolled_courses)
-        }, status=drf_drf_drf_status.HTTP_200_OK)
+        }, status=drf_status.HTTP_200_OK)
 
     except StudentProfile.DoesNotExist:
-        return Response({'error': 'Student profile not found'}, status=drf_drf_status.HTTP_404_NOT_FOUND)
+        return Response({'error': 'Student profile not found'}, status=drf_status.HTTP_404_NOT_FOUND)
     except Exception as e:
         import traceback
         print(f"Error fetching assignments: {traceback.format_exc()}")
-        return Response({'error': f'Server error: {str(e)}'}, status=drf_drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({'error': f'Server error: {str(e)}'}, status=drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['POST'])
@@ -1500,7 +2009,7 @@ def get_student_assignments(request):
 def submit_assignment(request):
     """Submit an assignment with file upload and AI detection"""
     if request.user.user_type != 'student':
-        return Response({'error': 'Student access only'}, status=drf_drf_status.HTTP_403_FORBIDDEN)
+        return Response({'error': 'Student access only'}, status=drf_status.HTTP_403_FORBIDDEN)
 
     try:
         student_profile = StudentProfile.objects.get(user=request.user)
@@ -1508,14 +2017,14 @@ def submit_assignment(request):
         # Get assignment ID
         assignment_id = request.data.get('assignment_id')
         if not assignment_id:
-            return Response({'error': 'assignment_id is required'}, status=drf_drf_status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'assignment_id is required'}, status=drf_status.HTTP_400_BAD_REQUEST)
 
         # Get assignment
         from courses.models import Assignment, AssignmentSubmission
         try:
             assignment = Assignment.objects.get(id=assignment_id)
         except Assignment.DoesNotExist:
-            return Response({'error': 'Assignment not found'}, status=drf_drf_status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'Assignment not found'}, status=drf_status.HTTP_404_NOT_FOUND)
 
         # Check if student is enrolled in the course
         if not CourseEnrollment.objects.filter(
@@ -1523,11 +2032,11 @@ def submit_assignment(request):
                 course=assignment.course,
                 status='active'
         ).exists():
-            return Response({'error': 'You are not enrolled in this course'}, status=drf_drf_status.HTTP_403_FORBIDDEN)
+            return Response({'error': 'You are not enrolled in this course'}, status=drf_status.HTTP_403_FORBIDDEN)
 
         # Check if already submitted
         if AssignmentSubmission.objects.filter(assignment=assignment, student=student_profile).exists():
-            return Response({'error': 'You have already submitted this assignment'}, status=drf_drf_status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'You have already submitted this assignment'}, status=drf_status.HTTP_400_BAD_REQUEST)
 
         # Get submission data
         submission_text = request.data.get('submission_text', '')
@@ -1536,7 +2045,7 @@ def submit_assignment(request):
         # Validate - need at least one of text or file
         if not submission_text and not file_upload:
             return Response({'error': 'Please provide either text submission or file upload'},
-                            status=drf_drf_drf_status.HTTP_400_BAD_REQUEST)
+                            status=drf_status.HTTP_400_BAD_REQUEST)
 
         # Check if late
         is_late = timezone.now() > assignment.due_date
@@ -1588,14 +2097,14 @@ def submit_assignment(request):
         if ai_detection_result:
             response_data['ai_detection'] = ai_detection_result
 
-        return Response(response_data, status=drf_drf_drf_status.HTTP_201_CREATED)
+        return Response(response_data, status=drf_status.HTTP_201_CREATED)
 
     except StudentProfile.DoesNotExist:
-        return Response({'error': 'Student profile not found'}, status=drf_drf_status.HTTP_404_NOT_FOUND)
+        return Response({'error': 'Student profile not found'}, status=drf_status.HTTP_404_NOT_FOUND)
     except Exception as e:
         import traceback
         print(f"Error submitting assignment: {traceback.format_exc()}")
-        return Response({'error': f'Server error: {str(e)}'}, status=drf_drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({'error': f'Server error: {str(e)}'}, status=drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['GET'])
@@ -1603,7 +2112,7 @@ def submit_assignment(request):
 def get_assignment_detail(request, assignment_id):
     """Get detailed information about a specific assignment"""
     if request.user.user_type != 'student':
-        return Response({'error': 'Student access only'}, status=drf_drf_status.HTTP_403_FORBIDDEN)
+        return Response({'error': 'Student access only'}, status=drf_status.HTTP_403_FORBIDDEN)
 
     try:
         student_profile = StudentProfile.objects.get(user=request.user)
@@ -1613,7 +2122,7 @@ def get_assignment_detail(request, assignment_id):
         try:
             assignment = Assignment.objects.select_related('course').get(id=assignment_id)
         except Assignment.DoesNotExist:
-            return Response({'error': 'Assignment not found'}, status=drf_drf_status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'Assignment not found'}, status=drf_status.HTTP_404_NOT_FOUND)
 
         # Check if student is enrolled
         if not CourseEnrollment.objects.filter(
@@ -1621,7 +2130,7 @@ def get_assignment_detail(request, assignment_id):
                 course=assignment.course,
                 status='active'
         ).exists():
-            return Response({'error': 'You are not enrolled in this course'}, status=drf_drf_status.HTTP_403_FORBIDDEN)
+            return Response({'error': 'You are not enrolled in this course'}, status=drf_status.HTTP_403_FORBIDDEN)
 
         # Get submission if exists
         try:
@@ -1681,8 +2190,8 @@ def get_assignment_detail(request, assignment_id):
         return Response(assignment_data)
 
     except StudentProfile.DoesNotExist:
-        return Response({'error': 'Student profile not found'}, status=drf_drf_status.HTTP_404_NOT_FOUND)
+        return Response({'error': 'Student profile not found'}, status=drf_status.HTTP_404_NOT_FOUND)
     except Exception as e:
         import traceback
         print(f"Error getting assignment detail: {traceback.format_exc()}")
-        return Response({'error': f'Server error: {str(e)}'}, status=drf_drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({'error': f'Server error: {str(e)}'}, status=drf_status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -316,7 +316,7 @@ def get_skill_gap_analysis(request):
         # Analyze current skills from enrolled courses
         for enrollment in enrollments:
             course_title = enrollment.course.title.lower()
-            progress = float(enrollment.progress_percentage)
+            progress = float(enrollment.completion_percentage)
 
             if 'python' in course_title:
                 skill_gap_analysis['current_skills'].append({

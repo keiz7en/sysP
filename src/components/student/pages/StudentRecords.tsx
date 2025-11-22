@@ -29,6 +29,18 @@ interface TranscriptData {
     gpa_by_semester: {
         [semester: string]: number
     }
+    ai_feedback: {
+        overall_assessment: string
+        strengths: string[]
+        improvements: string[]
+        recommendations: string[]
+        next_steps: string[]
+        motivational_message: string
+        risk_level: 'low' | 'medium' | 'high'
+        risk_explanation: string
+        ai_powered: boolean
+        model: string
+    }
 }
 
 const StudentRecords: React.FC = () => {
@@ -526,6 +538,196 @@ const StudentRecords: React.FC = () => {
                                 </div>
                             ))}
                         </div>
+                    </div>
+                </motion.div>
+            )}
+
+            {/* AI-Powered Academic Analysis */}
+            {transcriptData?.ai_feedback && (
+                <motion.div
+                    initial={{opacity: 0, y: 20}}
+                    animate={{opacity: 1, y: 0}}
+                    transition={{delay: 0.4}}
+                    style={{
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        borderRadius: '12px',
+                        padding: '2rem',
+                        marginTop: '2rem',
+                        color: 'white'
+                    }}
+                >
+                    <div style={{display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem'}}>
+                        <div style={{fontSize: '2.5rem'}}>🤖</div>
+                        <div>
+                            <h3 style={{margin: 0, fontSize: '1.5rem', fontWeight: '700'}}>
+                                AI-Powered Academic Analysis
+                            </h3>
+                            <p style={{margin: '0.25rem 0 0 0', opacity: 0.9, fontSize: '0.9rem'}}>
+                                {transcriptData.ai_feedback.ai_powered ? `Powered by ${transcriptData.ai_feedback.model}` : 'Analysis based on your academic data'}
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Overall Assessment */}
+                    <div style={{
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        padding: '1.5rem',
+                        borderRadius: '8px',
+                        marginBottom: '1.5rem'
+                    }}>
+                        <h4 style={{margin: '0 0 0.75rem 0', fontSize: '1.1rem', fontWeight: '600'}}>
+                            📊 Overall Performance Assessment
+                        </h4>
+                        <p style={{margin: 0, lineHeight: '1.6', fontSize: '1rem'}}>
+                            {transcriptData.ai_feedback.overall_assessment}
+                        </p>
+                    </div>
+
+                    {/* Risk Level */}
+                    <div style={{
+                        background: transcriptData.ai_feedback.risk_level === 'low' ? 'rgba(16, 185, 129, 0.2)' :
+                            transcriptData.ai_feedback.risk_level === 'medium' ? 'rgba(245, 158, 11, 0.2)' :
+                                'rgba(239, 68, 68, 0.2)',
+                        padding: '1rem',
+                        borderRadius: '8px',
+                        marginBottom: '1.5rem',
+                        border: '2px solid rgba(255, 255, 255, 0.3)'
+                    }}>
+                        <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem'}}>
+                            <span style={{fontSize: '1.5rem'}}>
+                                {transcriptData.ai_feedback.risk_level === 'low' ? '✅' :
+                                    transcriptData.ai_feedback.risk_level === 'medium' ? '⚠️' : '🚨'}
+                            </span>
+                            <h4 style={{margin: 0, fontSize: '1.1rem', fontWeight: '600', textTransform: 'capitalize'}}>
+                                {transcriptData.ai_feedback.risk_level} Risk Level
+                            </h4>
+                        </div>
+                        <p style={{margin: 0, fontSize: '0.9rem', opacity: 0.95}}>
+                            {transcriptData.ai_feedback.risk_explanation}
+                        </p>
+                    </div>
+
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+                        gap: '1rem',
+                        marginBottom: '1.5rem'
+                    }}>
+                        {/* Strengths */}
+                        <div style={{
+                            background: 'rgba(16, 185, 129, 0.15)',
+                            padding: '1.5rem',
+                            borderRadius: '8px',
+                            border: '1px solid rgba(255, 255, 255, 0.2)'
+                        }}>
+                            <h4 style={{
+                                margin: '0 0 1rem 0',
+                                fontSize: '1.1rem',
+                                fontWeight: '600',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem'
+                            }}>
+                                <span style={{fontSize: '1.3rem'}}>💪</span> Your Strengths
+                            </h4>
+                            <ul style={{margin: 0, paddingLeft: '1.25rem', lineHeight: '1.8'}}>
+                                {transcriptData.ai_feedback.strengths?.map((strength: string, idx: number) => (
+                                    <li key={idx} style={{marginBottom: '0.5rem'}}>{strength}</li>
+                                ))}
+                            </ul>
+                        </div>
+
+                        {/* Areas for Improvement */}
+                        <div style={{
+                            background: 'rgba(245, 158, 11, 0.15)',
+                            padding: '1.5rem',
+                            borderRadius: '8px',
+                            border: '1px solid rgba(255, 255, 255, 0.2)'
+                        }}>
+                            <h4 style={{
+                                margin: '0 0 1rem 0',
+                                fontSize: '1.1rem',
+                                fontWeight: '600',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem'
+                            }}>
+                                <span style={{fontSize: '1.3rem'}}>📈</span> Areas for Improvement
+                            </h4>
+                            <ul style={{margin: 0, paddingLeft: '1.25rem', lineHeight: '1.8'}}>
+                                {transcriptData.ai_feedback.improvements?.map((improvement: string, idx: number) => (
+                                    <li key={idx} style={{marginBottom: '0.5rem'}}>{improvement}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    </div>
+
+                    {/* Recommendations */}
+                    <div style={{
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        padding: '1.5rem',
+                        borderRadius: '8px',
+                        marginBottom: '1.5rem'
+                    }}>
+                        <h4 style={{
+                            margin: '0 0 1rem 0',
+                            fontSize: '1.1rem',
+                            fontWeight: '600',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem'
+                        }}>
+                            <span style={{fontSize: '1.3rem'}}>💡</span> Personalized Recommendations
+                        </h4>
+                        <ul style={{margin: 0, paddingLeft: '1.25rem', lineHeight: '1.8'}}>
+                            {transcriptData.ai_feedback.recommendations?.map((rec: string, idx: number) => (
+                                <li key={idx} style={{marginBottom: '0.5rem'}}>{rec}</li>
+                            ))}
+                        </ul>
+                    </div>
+
+                    {/* Next Steps */}
+                    <div style={{
+                        background: 'rgba(59, 130, 246, 0.2)',
+                        padding: '1.5rem',
+                        borderRadius: '8px',
+                        marginBottom: '1.5rem'
+                    }}>
+                        <h4 style={{
+                            margin: '0 0 1rem 0',
+                            fontSize: '1.1rem',
+                            fontWeight: '600',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem'
+                        }}>
+                            <span style={{fontSize: '1.3rem'}}>🎯</span> Next Steps
+                        </h4>
+                        <ul style={{margin: 0, paddingLeft: '1.25rem', lineHeight: '1.8'}}>
+                            {transcriptData.ai_feedback.next_steps?.map((step: string, idx: number) => (
+                                <li key={idx} style={{marginBottom: '0.5rem'}}>{step}</li>
+                            ))}
+                        </ul>
+                    </div>
+
+                    {/* Motivational Message */}
+                    <div style={{
+                        background: 'linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.1) 100%)',
+                        padding: '1.5rem',
+                        borderRadius: '8px',
+                        textAlign: 'center',
+                        border: '2px solid rgba(255, 255, 255, 0.3)'
+                    }}>
+                        <div style={{fontSize: '2rem', marginBottom: '0.75rem'}}>✨</div>
+                        <p style={{
+                            margin: 0,
+                            fontSize: '1.1rem',
+                            fontWeight: '500',
+                            fontStyle: 'italic',
+                            lineHeight: '1.6'
+                        }}>
+                            "{transcriptData.ai_feedback.motivational_message}"
+                        </p>
                     </div>
                 </motion.div>
             )}

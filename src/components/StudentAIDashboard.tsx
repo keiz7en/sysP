@@ -1,5 +1,4 @@
 import React, {useState, useEffect} from 'react';
-import axios from 'axios';
 
 // API Configuration
 const API_BASE_URL = 'http://localhost:8000/api';
@@ -7,22 +6,26 @@ const API_BASE_URL = 'http://localhost:8000/api';
 // Get auth token from localStorage
 const getAuthToken = () => localStorage.getItem('token');
 
-// Axios instance with auth
-const api = axios.create({
-    baseURL: API_BASE_URL,
-    headers: {
-        'Content-Type': 'application/json',
-    },
-});
-
-// Add auth token to requests
-api.interceptors.request.use((config) => {
+// Fetch helper with auth
+const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
     const token = getAuthToken();
-    if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
+    const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        ...(token && {Authorization: `Bearer ${token}`}),
+        ...options.headers,
+    };
+
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        ...options,
+        headers,
+    });
+
+    if (!response.ok) {
+        throw new Error(`API Error: ${response.statusText}`);
     }
-    return config;
-});
+
+    return response.json();
+};
 
 // AI Dashboard Component
 const StudentAIDashboard: React.FC = () => {
@@ -45,8 +48,8 @@ const StudentAIDashboard: React.FC = () => {
 
     const loadAIDashboard = async () => {
         try {
-            const response = await api.get('/students/ai/dashboard/');
-            setAiStatus(response.data.dashboard);
+            const response = await apiFetch('/students/ai/dashboard/');
+            setAiStatus(response.dashboard);
         } catch (error) {
             console.error('Error loading AI dashboard:', error);
         }
@@ -56,8 +59,10 @@ const StudentAIDashboard: React.FC = () => {
     const getAcademicAnalysis = async () => {
         setLoading(true);
         try {
-            const response = await api.post('/students/ai/academic-analysis/');
-            setAcademicAnalysis(response.data.analysis);
+            const response = await apiFetch('/students/ai/academic-analysis/', {
+                method: 'POST',
+            });
+            setAcademicAnalysis(response.analysis);
             setActiveTab('academic');
         } catch (error) {
             console.error('Error:', error);
@@ -70,11 +75,11 @@ const StudentAIDashboard: React.FC = () => {
     const generatePersonalizedContent = async (topic: string, difficulty: string) => {
         setLoading(true);
         try {
-            const response = await api.post('/students/ai/personalized-content/', {
-                topic,
-                difficulty,
+            const response = await apiFetch('/students/ai/personalized-content/', {
+                method: 'POST',
+                body: JSON.stringify({topic, difficulty}),
             });
-            setPersonalizedContent(response.data.content);
+            setPersonalizedContent(response.content);
             setActiveTab('learning');
         } catch (error) {
             console.error('Error:', error);
@@ -87,12 +92,11 @@ const StudentAIDashboard: React.FC = () => {
     const generateAIQuiz = async (topic: string, difficulty: string, numQuestions: number) => {
         setLoading(true);
         try {
-            const response = await api.post('/students/ai/generate-quiz/', {
-                topic,
-                difficulty,
-                num_questions: numQuestions,
+            const response = await apiFetch('/students/ai/generate-quiz/', {
+                method: 'POST',
+                body: JSON.stringify({topic, difficulty, num_questions: numQuestions}),
             });
-            setAiQuiz(response.data.quiz);
+            setAiQuiz(response.quiz);
             setActiveTab('quiz');
         } catch (error) {
             console.error('Error:', error);
@@ -105,10 +109,11 @@ const StudentAIDashboard: React.FC = () => {
     const getCareerGuidance = async (interests: string) => {
         setLoading(true);
         try {
-            const response = await api.post('/students/ai/career-guidance/', {
-                interests,
+            const response = await apiFetch('/students/ai/career-guidance/', {
+                method: 'POST',
+                body: JSON.stringify({interests}),
             });
-            setCareerGuidance(response.data.guidance);
+            setCareerGuidance(response.guidance);
             setActiveTab('career');
         } catch (error) {
             console.error('Error:', error);
@@ -126,12 +131,12 @@ const StudentAIDashboard: React.FC = () => {
         setChatInput('');
 
         try {
-            const response = await api.post('/students/ai/chatbot/', {
-                message: chatInput,
-                context: 'Student support',
+            const response = await apiFetch('/students/ai/chatbot/', {
+                method: 'POST',
+                body: JSON.stringify({message: chatInput, context: 'Student support'}),
             });
 
-            const aiMessage = {role: 'ai', content: response.data.response};
+            const aiMessage = {role: 'ai', content: response.response};
             setChatMessages((prev) => [...prev, aiMessage]);
         } catch (error) {
             console.error('Error:', error);
@@ -592,7 +597,7 @@ const styles = {
         display: 'flex',
         gap: '10px',
         marginBottom: '20px',
-        overflowX: 'auto',
+        overflowX: 'auto' as const,
     },
     tab: {
         padding: '12px 24px',

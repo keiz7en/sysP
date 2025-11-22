@@ -74,4 +74,9 @@ urlpatterns = [
 
     # Comprehensive AI Dashboard
     path('ai/dashboard/', ai_comprehensive_dashboard, name='ai-dashboard'),
+
+    # AI-powered features
+    path('ai/assessment/', views.generate_ai_assessment, name='generate-ai-assessment'),
+    path('ai/insights/', views.get_ai_learning_insights, name='ai-learning-insights'),
+    path('ai/career-guidance/', views.ai_career_guidance, name='ai-career-guidance'),
 ]

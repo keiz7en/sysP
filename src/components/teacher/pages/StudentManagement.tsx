@@ -134,7 +134,7 @@ const StudentManagement: React.FC = () => {
         }
 
         try {
-            await teacherAPI.removeStudent(token!, studentId)
+            await teacherAPI.removeStudent(token!, studentId.toString())
             toast.success('Student removed successfully')
             fetchStudents()
         } catch (error: any) {

@@ -436,231 +436,301 @@ const AuthScreen: React.FC = () => {
 
                         </motion.form>
                     ) : (
-                        /* Registration Form */
-                        <motion.form
-                            key="register"
-                            initial={{opacity: 0, x: 20}}
-                            animate={{opacity: 1, x: 0}}
-                            exit={{opacity: 0, x: -20}}
-                            onSubmit={handleRegister}
-                            style={{display: 'grid', gap: '1rem'}}
-                        >
-                            {/* Username */}
-                            <div>
+                            userType === 'admin' ? (
+                                /* Admin Registration Blocked */
+                                <motion.div
+                                    key="admin-blocked"
+                                    initial={{opacity: 0}}
+                                    animate={{opacity: 1}}
+                                    style={{
+                                        padding: '3rem 1rem',
+                                        textAlign: 'center'
+                                    }}
+                            >
+                                <div style={{fontSize: '4rem', marginBottom: '1rem'}}>🔒</div>
+                                <h3 style={{
+                                    fontSize: '1.5rem',
+                                    fontWeight: '700',
+                                    color: '#1f2937',
+                                    marginBottom: '1rem'
+                                }}>
+                                    Admin Registration Disabled
+                                </h3>
+                                <p style={{
+                                    fontSize: '1rem',
+                                    color: '#64748b',
+                                    marginBottom: '1.5rem',
+                                    lineHeight: '1.6'
+                                }}>
+                                    Admin accounts cannot be created through registration.
+                                    <br/>
+                                    Please contact the system administrator or use an existing admin account to
+                                    login.
+                                </p>
+                                <button
+                                    onClick={() => setIsLogin(true)}
+                                    style={{
+                                        padding: '12px 24px',
+                                        backgroundColor: '#6366f1',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '8px',
+                                        fontSize: '1rem',
+                                        fontWeight: '600',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s'
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#4f46e5'}
+                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#6366f1'}
+                                >
+                                    Go to Login
+                                </button>
+                            </motion.div>
+                        ) : (
+                            /* Registration Form - Students & Teachers */
+                            <motion.form
+                                key="register"
+                                initial={{opacity: 0, x: 20}}
+                                animate={{opacity: 1, x: 0}}
+                                exit={{opacity: 0, x: -20}}
+                                onSubmit={handleRegister}
+                                style={{display: 'grid', gap: '1rem'}}
+                            >
+                                {/* Username */}
+                                <div>
+                                    <input
+                                        type="text"
+                                        placeholder="Username"
+                                        value={registerForm.username}
+                                        onChange={(e) => {
+                                            setRegisterForm({...registerForm, username: e.target.value})
+                                            clearErrors('username')
+                                        }}
+                                        style={{
+                                            width: '100%',
+                                            padding: '16px',
+                                            border: `2px solid ${errors.username ? '#ef4444' : '#e2e8f0'}`,
+                                            borderRadius: '12px',
+                                            fontSize: '16px',
+                                            boxSizing: 'border-box'
+                                        }}
+                                    />
+                                    {errors.username && (
+                                        <p style={{color: '#ef4444', fontSize: '0.8rem', margin: '0.25rem 0 0 0'}}>
+                                            {errors.username}
+                                        </p>
+                                    )}
+                                </div>
+
+                                {/* Name Fields */}
+                                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem'}}>
+                                    <div>
+                                        <input
+                                            type="text"
+                                            placeholder="First Name"
+                                            value={registerForm.first_name}
+                                            onChange={(e) => {
+                                                setRegisterForm({...registerForm, first_name: e.target.value})
+                                                clearErrors('first_name')
+                                            }}
+                                            style={{
+                                                padding: '16px',
+                                                border: `2px solid ${errors.first_name ? '#ef4444' : '#e2e8f0'}`,
+                                                borderRadius: '12px',
+                                                fontSize: '16px',
+                                                width: '100%',
+                                                boxSizing: 'border-box'
+                                            }}
+                                        />
+                                        {errors.first_name && (
+                                            <p style={{
+                                                color: '#ef4444',
+                                                fontSize: '0.8rem',
+                                                margin: '0.25rem 0 0 0'
+                                            }}>
+                                                {errors.first_name}
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <input
+                                            type="text"
+                                            placeholder="Last Name"
+                                            value={registerForm.last_name}
+                                            onChange={(e) => {
+                                                setRegisterForm({...registerForm, last_name: e.target.value})
+                                                clearErrors('last_name')
+                                            }}
+                                            style={{
+                                                padding: '16px',
+                                                border: `2px solid ${errors.last_name ? '#ef4444' : '#e2e8f0'}`,
+                                                borderRadius: '12px',
+                                                fontSize: '16px',
+                                                width: '100%',
+                                                boxSizing: 'border-box'
+                                            }}
+                                        />
+                                        {errors.last_name && (
+                                            <p style={{
+                                                color: '#ef4444',
+                                                fontSize: '0.8rem',
+                                                margin: '0.25rem 0 0 0'
+                                            }}>
+                                                {errors.last_name}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Email */}
+                                <div>
+                                    <input
+                                        type="email"
+                                        placeholder="Email address"
+                                        value={registerForm.email}
+                                        onChange={(e) => {
+                                            setRegisterForm({...registerForm, email: e.target.value})
+                                            clearErrors('email')
+                                        }}
+                                        style={{
+                                            width: '100%',
+                                            padding: '16px',
+                                            border: `2px solid ${errors.email ? '#ef4444' : '#e2e8f0'}`,
+                                            borderRadius: '12px',
+                                            fontSize: '16px',
+                                            boxSizing: 'border-box'
+                                        }}
+                                    />
+                                    {errors.email && (
+                                        <p style={{color: '#ef4444', fontSize: '0.8rem', margin: '0.25rem 0 0 0'}}>
+                                            {errors.email}
+                                        </p>
+                                    )}
+                                </div>
+
+                                {/* Phone and Address */}
+                                <input
+                                    type="tel"
+                                    placeholder="Phone Number (optional)"
+                                    value={registerForm.phone_number}
+                                    onChange={(e) => setRegisterForm({
+                                        ...registerForm,
+                                        phone_number: e.target.value
+                                    })}
+                                    style={{
+                                        width: '100%',
+                                        padding: '16px',
+                                        border: '2px solid #e2e8f0',
+                                        borderRadius: '12px',
+                                        fontSize: '16px',
+                                        boxSizing: 'border-box'
+                                    }}
+                                />
+
                                 <input
                                     type="text"
-                                    placeholder="Username"
-                                    value={registerForm.username}
-                                    onChange={(e) => {
-                                        setRegisterForm({...registerForm, username: e.target.value})
-                                        clearErrors('username')
-                                    }}
+                                    placeholder="Address (optional)"
+                                    value={registerForm.address}
+                                    onChange={(e) => setRegisterForm({...registerForm, address: e.target.value})}
                                     style={{
                                         width: '100%',
                                         padding: '16px',
-                                        border: `2px solid ${errors.username ? '#ef4444' : '#e2e8f0'}`,
+                                        border: '2px solid #e2e8f0',
                                         borderRadius: '12px',
                                         fontSize: '16px',
                                         boxSizing: 'border-box'
                                     }}
                                 />
-                                {errors.username && (
-                                    <p style={{color: '#ef4444', fontSize: '0.8rem', margin: '0.25rem 0 0 0'}}>
-                                        {errors.username}
-                                    </p>
-                                )}
-                            </div>
 
-                            {/* Name Fields */}
-                            <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem'}}>
-                                <div>
-                                    <input
-                                        type="text"
-                                        placeholder="First Name"
-                                        value={registerForm.first_name}
-                                        onChange={(e) => {
-                                            setRegisterForm({...registerForm, first_name: e.target.value})
-                                            clearErrors('first_name')
-                                        }}
-                                        style={{
-                                            padding: '16px',
-                                            border: `2px solid ${errors.first_name ? '#ef4444' : '#e2e8f0'}`,
-                                            borderRadius: '12px',
-                                            fontSize: '16px',
-                                            width: '100%',
-                                            boxSizing: 'border-box'
-                                        }}
-                                    />
-                                    {errors.first_name && (
-                                        <p style={{color: '#ef4444', fontSize: '0.8rem', margin: '0.25rem 0 0 0'}}>
-                                            {errors.first_name}
-                                        </p>
-                                    )}
+                                {/* Password Fields */}
+                                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem'}}>
+                                    <div>
+                                        <input
+                                            type="password"
+                                            placeholder="Password"
+                                            value={registerForm.password}
+                                            onChange={(e) => {
+                                                setRegisterForm({...registerForm, password: e.target.value})
+                                                clearErrors('password')
+                                            }}
+                                            style={{
+                                                padding: '16px',
+                                                border: `2px solid ${errors.password ? '#ef4444' : '#e2e8f0'}`,
+                                                borderRadius: '12px',
+                                                fontSize: '16px',
+                                                width: '100%',
+                                                boxSizing: 'border-box'
+                                            }}
+                                        />
+                                        {errors.password && (
+                                            <p style={{
+                                                color: '#ef4444',
+                                                fontSize: '0.8rem',
+                                                margin: '0.25rem 0 0 0'
+                                            }}>
+                                                {errors.password}
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <input
+                                            type="password"
+                                            placeholder="Confirm Password"
+                                            value={registerForm.confirmPassword}
+                                            onChange={(e) => {
+                                                setRegisterForm({...registerForm, confirmPassword: e.target.value})
+                                                clearErrors('confirmPassword')
+                                            }}
+                                            style={{
+                                                padding: '16px',
+                                                border: `2px solid ${errors.confirmPassword ? '#ef4444' : '#e2e8f0'}`,
+                                                borderRadius: '12px',
+                                                fontSize: '16px',
+                                                width: '100%',
+                                                boxSizing: 'border-box'
+                                            }}
+                                        />
+                                        {errors.confirmPassword && (
+                                            <p style={{
+                                                color: '#ef4444',
+                                                fontSize: '0.8rem',
+                                                margin: '0.25rem 0 0 0'
+                                            }}>
+                                                {errors.confirmPassword}
+                                            </p>
+                                        )}
+                                    </div>
                                 </div>
-                                <div>
-                                    <input
-                                        type="text"
-                                        placeholder="Last Name"
-                                        value={registerForm.last_name}
-                                        onChange={(e) => {
-                                            setRegisterForm({...registerForm, last_name: e.target.value})
-                                            clearErrors('last_name')
-                                        }}
-                                        style={{
-                                            padding: '16px',
-                                            border: `2px solid ${errors.last_name ? '#ef4444' : '#e2e8f0'}`,
-                                            borderRadius: '12px',
-                                            fontSize: '16px',
-                                            width: '100%',
-                                            boxSizing: 'border-box'
-                                        }}
-                                    />
-                                    {errors.last_name && (
-                                        <p style={{color: '#ef4444', fontSize: '0.8rem', margin: '0.25rem 0 0 0'}}>
-                                            {errors.last_name}
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
 
-                            {/* Email */}
-                            <div>
-                                <input
-                                    type="email"
-                                    placeholder="Email address"
-                                    value={registerForm.email}
-                                    onChange={(e) => {
-                                        setRegisterForm({...registerForm, email: e.target.value})
-                                        clearErrors('email')
-                                    }}
+                                <button
+                                    type="submit"
+                                    disabled={isLoading}
                                     style={{
                                         width: '100%',
                                         padding: '16px',
-                                        border: `2px solid ${errors.email ? '#ef4444' : '#e2e8f0'}`,
+                                        backgroundColor: isLoading ? '#94a3b8' : '#10b981',
+                                        color: 'white',
+                                        border: 'none',
                                         borderRadius: '12px',
                                         fontSize: '16px',
-                                        boxSizing: 'border-box'
+                                        fontWeight: 600,
+                                        cursor: isLoading ? 'not-allowed' : 'pointer',
+                                        transition: 'all 0.2s',
+                                        marginTop: '0.5rem',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '0.5rem'
                                     }}
-                                />
-                                {errors.email && (
-                                    <p style={{color: '#ef4444', fontSize: '0.8rem', margin: '0.25rem 0 0 0'}}>
-                                        {errors.email}
-                                    </p>
-                                )}
-                            </div>
+                                >
+                                    {isLoading ? '⏳ Creating Account...' : '✨ Create Account'}
+                                </button>
 
-                            {/* Phone and Address */}
-                            <input
-                                type="tel"
-                                placeholder="Phone Number (optional)"
-                                value={registerForm.phone_number}
-                                onChange={(e) => setRegisterForm({...registerForm, phone_number: e.target.value})}
-                                style={{
-                                    width: '100%',
-                                    padding: '16px',
-                                    border: '2px solid #e2e8f0',
-                                    borderRadius: '12px',
-                                    fontSize: '16px',
-                                    boxSizing: 'border-box'
-                                }}
-                            />
-
-                            <input
-                                type="text"
-                                placeholder="Address (optional)"
-                                value={registerForm.address}
-                                onChange={(e) => setRegisterForm({...registerForm, address: e.target.value})}
-                                style={{
-                                    width: '100%',
-                                    padding: '16px',
-                                    border: '2px solid #e2e8f0',
-                                    borderRadius: '12px',
-                                    fontSize: '16px',
-                                    boxSizing: 'border-box'
-                                }}
-                            />
-
-                            {/* Password Fields */}
-                            <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem'}}>
-                                <div>
-                                    <input
-                                        type="password"
-                                        placeholder="Password"
-                                        value={registerForm.password}
-                                        onChange={(e) => {
-                                            setRegisterForm({...registerForm, password: e.target.value})
-                                            clearErrors('password')
-                                        }}
-                                        style={{
-                                            padding: '16px',
-                                            border: `2px solid ${errors.password ? '#ef4444' : '#e2e8f0'}`,
-                                            borderRadius: '12px',
-                                            fontSize: '16px',
-                                            width: '100%',
-                                            boxSizing: 'border-box'
-                                        }}
-                                    />
-                                    {errors.password && (
-                                        <p style={{color: '#ef4444', fontSize: '0.8rem', margin: '0.25rem 0 0 0'}}>
-                                            {errors.password}
-                                        </p>
-                                    )}
-                                </div>
-                                <div>
-                                    <input
-                                        type="password"
-                                        placeholder="Confirm Password"
-                                        value={registerForm.confirmPassword}
-                                        onChange={(e) => {
-                                            setRegisterForm({...registerForm, confirmPassword: e.target.value})
-                                            clearErrors('confirmPassword')
-                                        }}
-                                        style={{
-                                            padding: '16px',
-                                            border: `2px solid ${errors.confirmPassword ? '#ef4444' : '#e2e8f0'}`,
-                                            borderRadius: '12px',
-                                            fontSize: '16px',
-                                            width: '100%',
-                                            boxSizing: 'border-box'
-                                        }}
-                                    />
-                                    {errors.confirmPassword && (
-                                        <p style={{color: '#ef4444', fontSize: '0.8rem', margin: '0.25rem 0 0 0'}}>
-                                            {errors.confirmPassword}
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-
-                            <button
-                                type="submit"
-                                disabled={isLoading}
-                                style={{
-                                    width: '100%',
-                                    padding: '16px',
-                                    backgroundColor: isLoading ? '#94a3b8' : '#10b981',
-                                    color: 'white',
-                                    border: 'none',
-                                    borderRadius: '12px',
-                                    fontSize: '16px',
-                                    fontWeight: 600,
-                                    cursor: isLoading ? 'not-allowed' : 'pointer',
-                                    transition: 'all 0.2s',
-                                    marginTop: '0.5rem',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: '0.5rem'
-                                }}
-                            >
-                                {isLoading && <span>⏳</span>}
-                                {isLoading ? 'Creating Account...' : '✨ Create Account'}
-                            </button>
-
-                        </motion.form>
-                    )}
+                            </motion.form>
+                        )
+                    )
+                    }
                 </AnimatePresence>
-
                 {/* Information Footer */}
                 <div style={{
                     textAlign: 'center',
