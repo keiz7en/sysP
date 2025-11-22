@@ -8,6 +8,7 @@ import TeacherApprovals from './pages/TeacherApprovals'
 import StudentApprovals from './pages/StudentApprovals'
 import SubjectApprovals from './pages/SubjectApprovals'
 import SystemSettings from './pages/SystemSettings'
+import AdminExams from './pages/AdminExams'
 import {useAuth} from '../../contexts/AuthContext'
 
 const AdminDashboard: React.FC = () => {
@@ -21,6 +22,13 @@ const AdminDashboard: React.FC = () => {
             icon: '🏠',
             path: '/admin',
             description: 'Overview & Analytics'
+        },
+        {
+            id: 'exams',
+            label: 'Exams',
+            icon: '📝',
+            path: '/admin/exams',
+            description: 'Manage all exams (Quiz/Mid/Final)'
         },
         {
             id: 'users',
@@ -88,6 +96,7 @@ const AdminDashboard: React.FC = () => {
                 <main style={{flex: 1, padding: '2rem'}}>
                     <Routes>
                         <Route index element={<AdminHome/>}/>
+                        <Route path="exams" element={<AdminExams/>}/>
                         <Route path="users" element={<UserManagement/>}/>
                         <Route path="teachers" element={<TeacherApprovals/>}/>
                         <Route path="students" element={<StudentApprovals/>}/>

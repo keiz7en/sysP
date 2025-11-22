@@ -3,6 +3,7 @@ import {motion, AnimatePresence} from 'framer-motion'
 import {useAuth} from '../../../contexts/AuthContext'
 import {enrollmentAPI} from '../../../services/api'
 import toast from 'react-hot-toast'
+import {getCourseByCode, CourseSyllabus as StandardSyllabus, CourseUnit} from '../../../data/courseSyllabi'
 
 interface Course {
     id: number
@@ -36,8 +37,11 @@ interface Enrollment {
 
 interface CourseSyllabus {
     course_title: string
+    course_code: string
     course_id: number
-    chapters: string[]
+    credits: number
+    level: string
+    units: CourseUnit[]
     description: string
 }
 
@@ -137,21 +141,30 @@ const StudentCourses: React.FC = () => {
     const fetchSyllabus = async (courseId: number) => {
         try {
             setLoadingSyllabus(true)
-            const response = await fetch(`http://localhost:8000/api/courses/${courseId}/syllabus/`, {
-                headers: {
-                    'Authorization': `Token ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            })
 
-            if (response.ok) {
-                const data = await response.json()
-                setSelectedSyllabus(data)
-            } else {
-                console.error('Failed to fetch syllabus')
+            // Find the enrolled course to get its course code
+            const enrolledCourse = enrolledCourses.find(c => c.course_id === courseId)
+
+            if (enrolledCourse) {
+                const syllabus = getCourseByCode(enrolledCourse.course_code)
+
+                if (syllabus) {
+                    setSelectedSyllabus({
+                        course_title: syllabus.title,
+                        course_code: syllabus.code,
+                        course_id: courseId,
+                        credits: syllabus.credits,
+                        level: syllabus.level,
+                        units: syllabus.units,
+                        description: `A comprehensive ${syllabus.level.toLowerCase()}-level course covering ${syllabus.units.length} major topics in ${syllabus.title}.`
+                    })
+                } else {
+                    toast.error('Syllabus not found for this course')
+                }
             }
         } catch (error) {
-            console.error('Error fetching syllabus:', error)
+            console.error('Error loading syllabus:', error)
+            toast.error('Failed to load syllabus')
         } finally {
             setLoadingSyllabus(false)
         }
@@ -1031,6 +1044,24 @@ const StudentCourses: React.FC = () => {
                                     }}>
                                         {selectedSyllabus.course_title}
                                     </h2>
+                                    <div style={{
+                                        fontSize: '0.95rem',
+                                        color: '#6b7280',
+                                        marginBottom: '0.5rem'
+                                    }}>
+                                        {selectedSyllabus.course_code} • {selectedSyllabus.credits} Credits
+                                    </div>
+                                    <span style={{
+                                        padding: '0.3rem 0.7rem',
+                                        backgroundColor: `${getDifficultyColor(selectedSyllabus.level)}20`,
+                                        color: getDifficultyColor(selectedSyllabus.level),
+                                        borderRadius: '6px',
+                                        fontSize: '0.8rem',
+                                        fontWeight: '600',
+                                        textTransform: 'capitalize'
+                                    }}>
+                                        {selectedSyllabus.level}
+                                    </span>
                                 </div>
                                 <button
                                     onClick={() => setSelectedSyllabus(null)}
@@ -1073,42 +1104,54 @@ const StudentCourses: React.FC = () => {
                                     alignItems: 'center',
                                     gap: '0.5rem'
                                 }}>
-                                    🤖 AI-Generated Course Syllabus
+                                    📑 Standardized Course Units
                                 </h3>
                                 <div style={{display: 'grid', gap: '0.75rem'}}>
-                                    {selectedSyllabus.chapters.map((chapter, index) => (
+                                    {selectedSyllabus.units.map((unit, index) => (
                                         <div key={index} style={{
-                                            display: 'flex',
-                                            alignItems: 'flex-start',
                                             padding: '1rem',
                                             backgroundColor: '#f9fafb',
                                             borderRadius: '10px',
                                             border: '1px solid #e5e7eb'
                                         }}>
-                                            <div style={{
-                                                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                                                color: 'white',
-                                                borderRadius: '50%',
-                                                width: '30px',
-                                                height: '30px',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                fontSize: '0.9rem',
-                                                fontWeight: '700',
-                                                flexShrink: 0,
-                                                marginRight: '1rem'
-                                            }}>
-                                                {index + 1}
-                                            </div>
-                                            <div style={{flex: 1}}>
+                                            <div style={{display: 'flex', alignItems: 'flex-start', gap: '1rem'}}>
                                                 <div style={{
-                                                    color: '#374151',
-                                                    fontWeight: '600',
+                                                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                                    color: 'white',
+                                                    borderRadius: '50%',
+                                                    width: '30px',
+                                                    height: '30px',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
                                                     fontSize: '0.95rem',
-                                                    lineHeight: 1.5
+                                                    fontWeight: '700',
+                                                    flexShrink: 0
                                                 }}>
-                                                    {chapter}
+                                                    {index + 1}
+                                                </div>
+                                                <div style={{flex: 1}}>
+                                                    <div style={{
+                                                        color: '#374151',
+                                                        fontWeight: '700',
+                                                        fontSize: '1rem',
+                                                        marginBottom: '0.5rem'
+                                                    }}>
+                                                        {unit.title}
+                                                    </div>
+                                                    <ul style={{
+                                                        margin: 0,
+                                                        paddingLeft: '1.2em',
+                                                        color: '#6b7280',
+                                                        fontSize: '0.95rem'
+                                                    }}>
+                                                        {unit.topics.map((topic, i) => (
+                                                            <li key={i} style={{
+                                                                marginBottom: '0.3em',
+                                                                lineHeight: 1.6
+                                                            }}>{topic}</li>
+                                                        ))}
+                                                    </ul>
                                                 </div>
                                             </div>
                                         </div>
@@ -1125,7 +1168,7 @@ const StudentCourses: React.FC = () => {
                                 fontSize: '0.85rem',
                                 textAlign: 'center'
                             }}>
-                                💡 This syllabus is AI-generated and may be updated by your instructor
+                                💡 This syllabus is standardized for this course. Instructors may make minor adjustments.
                             </div>
                         </motion.div>
                     </motion.div>

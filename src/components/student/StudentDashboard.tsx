@@ -40,6 +40,13 @@ const StudentDashboard: React.FC = () => {
             description: '24/7 AI-powered academic support, career guidance, and personalized help'
         },
         {
+            id: 'exams',
+            label: 'Exams',
+            icon: '📝',
+            path: '/student/exams',
+            description: 'Take quizzes, mid-terms, and final exams'
+        },
+        {
             id: 'courses',
             label: 'My Courses',
             icon: '📚',
@@ -69,10 +76,10 @@ const StudentDashboard: React.FC = () => {
         },
         {
             id: 'assessments',
-            label: 'AI Assessments',
+            label: 'AI Practice & Assessment',
             icon: '⚡',
             path: '/student/assessments',
-            description: 'Automated testing and grading'
+            description: 'Practice with AI-generated questions'
         },
         {
             id: 'insights',
@@ -90,10 +97,10 @@ const StudentDashboard: React.FC = () => {
         },
         {
             id: 'chat',
-            label: 'Fact AI Check',
-            icon: '🔍',
+            label: 'Course AI Assistant',
+            icon: '🎓',
             path: '/student/chat',
-            description: 'AI-powered fact checking and verification'
+            description: 'AI guidance restricted to your enrolled courses'
         },
         {
             id: 'profile',
@@ -147,6 +154,7 @@ const StudentDashboard: React.FC = () => {
                     <Routes>
                         <Route index element={<StudentHome/>}/>
                         <Route path="ai-assistant" element={<AILearningAssistant/>}/>
+                        <Route path="exams" element={<AcademicAutomation/>}/>
                         <Route path="courses" element={<StudentCourses/>}/>
                         <Route path="records" element={<StudentRecords/>}/>
                         <Route path="learning" element={<AdaptiveLearning/>}/>

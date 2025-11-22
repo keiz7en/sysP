@@ -19,6 +19,7 @@ import AssignmentManagement from './pages/AssignmentManagement'
 import Gradebook from './pages/Gradebook'
 import StudentApprovals from './pages/StudentApprovals'
 import EnrollmentRequests from './pages/EnrollmentRequests'
+import TeacherExams from './pages/TeacherExams'
 
 const TeacherDashboard: React.FC = () => {
     const { user } = useAuth()
@@ -33,9 +34,16 @@ const TeacherDashboard: React.FC = () => {
             description: 'Overview & Analytics'
         },
         {
+            id: 'exams',
+            label: 'Exams',
+            icon: '📝',
+            path: '/teacher/exams',
+            description: 'Create and manage exams (Quiz/Mid/Final)'
+        },
+        {
             id: 'subjects',
             label: 'Subject Management',
-            icon: '�',
+            icon: '📖',
             path: '/teacher/subjects',
             description: 'Request and manage subjects'
         },
@@ -63,7 +71,7 @@ const TeacherDashboard: React.FC = () => {
         {
             id: 'students',
             label: 'Student Management',
-            icon: '�',
+            icon: '👨‍🎓',
             path: '/teacher/students',
             description: 'View your students'
         },
@@ -157,6 +165,7 @@ const TeacherDashboard: React.FC = () => {
                 >
                     <Routes>
                         <Route index element={<TeacherHome />} />
+                        <Route path="exams" element={<TeacherExams/>}/>
                         <Route path="subjects" element={<TeacherSubjectManagement />} />
                         <Route path="courses" element={<CourseManagement />} />
                         <Route path="approvals" element={<StudentApprovals />} />

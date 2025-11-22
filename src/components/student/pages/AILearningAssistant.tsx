@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../../contexts/AuthContext';
 import { aiStudentAPI } from '../../../services/api';
 import toast from 'react-hot-toast';
+import {getCourseByCode} from '../../../data/courseSyllabi';
 
 interface CourseModule {
     id: number;
@@ -95,71 +96,60 @@ const AILearningAssistant: React.FC = () => {
         }
     };
 
-    // Load course modules for the selected course using syllabus endpoint
+    // Load course modules for the selected course using standardized syllabi from courseSyllabi.ts
     const loadCourseModules = async (courseId: number) => {
         if (!token) return;
+
         try {
-            const response = await fetch(`http://localhost:8000/api/courses/${courseId}/syllabus/`, {
+            // First fetch the course details to get the course code
+            const dashResponse = await fetch('http://localhost:8000/api/students/dashboard/', {
                 headers: {
                     'Authorization': `Token ${token}`,
                     'Content-Type': 'application/json'
                 }
             });
-            if (response.ok) {
-                const data = await response.json();
-                // The syllabus endpoint returns: {chapters: string[], ai_generated: boolean, description: string, ...}
-                if (Array.isArray(data.chapters) && data.chapters.length > 0) {
-                    // Chapters come as strings like "1. Introduction to Python"
-                    // Parse them to extract order and title
-                    const modulesArray: CourseModule[] = data.chapters.map((chapterStr: string, idx: number) => {
-                        // If chapter already has a number prefix (e.g., "1. Title"), parse it
-                        const match = chapterStr.match(/^(\d+)\.\s*(.+)$/);
-                        if (match) {
-                            return {
-                                id: idx + 1,
-                                title: match[2].trim(), // Just the title without number
-                                description: '',
-                                order: parseInt(match[1]),
-                            };
-                        } else {
-                            // If no number prefix, add one
-                            return {
-                                id: idx + 1,
-                                title: chapterStr,
-                                description: '',
-                                order: idx + 1,
-                            };
-                        }
-                    });
-                    setCourseModules(modulesArray);
-                    setSelectedChapter(modulesArray[0].title);
-                    setSyllabusInfo({aiGenerated: !!data.ai_generated, description: data.description || ''});
-                } else {
-                    // Fallback: No chapters
-                    const fallbackChapters = [
-                        {id: 1, title: 'Introduction & Fundamentals', description: '', order: 1},
-                        {id: 2, title: 'Core Concepts', description: '', order: 2},
-                        {id: 3, title: 'Advanced Topics', description: '', order: 3},
-                        {id: 4, title: 'Practical Applications', description: '', order: 4},
-                        {id: 5, title: 'Final Review', description: '', order: 5}
-                    ];
-                    setCourseModules(fallbackChapters);
-                    setSelectedChapter('Introduction & Fundamentals');
-                    setSyllabusInfo({aiGenerated: false, description: ''});
+
+            if (dashResponse.ok) {
+                const dashData = await dashResponse.json();
+                const courseEnrollment = dashData.current_enrollments?.find(
+                    (enrollment: any) => enrollment.course_id === courseId
+                );
+
+                if (courseEnrollment) {
+                    const courseCode = courseEnrollment.course_code;
+                    const syllabus = getCourseByCode(courseCode);
+
+                    if (syllabus && syllabus.units.length > 0) {
+                        // Use standardized syllabus
+                        const modulesArray: CourseModule[] = syllabus.units.map((unit, idx) => ({
+                            id: idx + 1,
+                            title: unit.title,
+                            description: unit.topics.join(', '),
+                            order: unit.number,
+                        }));
+
+                        setCourseModules(modulesArray);
+                        setSelectedChapter(modulesArray[0].title);
+                        setSyllabusInfo({
+                            aiGenerated: false,
+                            description: `Standardized ${syllabus.level} level course with ${syllabus.units.length} comprehensive units.`
+                        });
+                        return;
+                    }
                 }
-            } else {
-                // If request fails, set fallback chapters
-                const fallbackChapters = [
-                    {id: 1, title: 'Introduction & Fundamentals', description: '', order: 1},
-                    {id: 2, title: 'Core Concepts', description: '', order: 2},
-                    {id: 3, title: 'Advanced Topics', description: '', order: 3},
-                    {id: 4, title: 'Practical Applications', description: '', order: 4},
-                    {id: 5, title: 'Final Review', description: '', order: 5}
-                ];
-                setCourseModules(fallbackChapters);
-                setSelectedChapter('Introduction & Fundamentals');
-                setSyllabusInfo({aiGenerated: false, description: ''});
             }
+
+            // Fallback to default chapters if no syllabus found
+            const fallbackChapters = [
+                {id: 1, title: 'Introduction & Fundamentals', description: '', order: 1},
+                {id: 2, title: 'Core Concepts', description: '', order: 2},
+                {id: 3, title: 'Advanced Topics', description: '', order: 3},
+                {id: 4, title: 'Practical Applications', description: '', order: 4},
+                {id: 5, title: 'Final Review', description: '', order: 5}
+            ];
+            setCourseModules(fallbackChapters);
+            setSelectedChapter('Introduction & Fundamentals');
+            setSyllabusInfo({aiGenerated: false, description: ''});
         } catch (error) {
             console.error('Error loading course syllabus:', error);
             // Set default chapters if API fails

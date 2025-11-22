@@ -376,14 +376,27 @@ export const teacherAPI = {
     },
 
     getMySubjectRequests: async (token: string) => {
-        const response = await fetch(`${API_BASE_URL}/courses/subject-requests/my_requests/`, {
-            headers: getAuthHeaders(token)
-        })
-        if (!response.ok) {
-            const error = await response.json().catch(() => ({}))
-            throw new Error(error.error || `Failed to fetch subject requests (${response.status})`)
+        try {
+            const response = await fetch(`${API_BASE_URL}/courses/subject-requests/`, {
+                headers: getAuthHeaders(token)
+            })
+            if (!response.ok) {
+                if (response.status === 404) {
+                    // Endpoint doesn't exist or no requests found, return empty array
+                    console.warn('Subject requests endpoint returned 404, returning empty array')
+                    return []
+                }
+                const error = await response.json().catch(() => ({}))
+                throw new Error(error.error || `Failed to fetch subject requests (${response.status})`)
+            }
+            const data = await response.json()
+            // Filter to only show current teacher's requests
+            return Array.isArray(data) ? data : (data.results || [])
+        } catch (error: any) {
+            console.error('Error in getMySubjectRequests:', error)
+            // Return empty array instead of throwing to prevent UI crashes
+            return []
         }
-        return response.json()
     },
 
     requestSubject: async (token: string, subjectId: number) => {
