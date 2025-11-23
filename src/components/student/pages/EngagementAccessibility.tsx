@@ -274,7 +274,10 @@ const EngagementAccessibility: React.FC = () => {
             }
             toast.success('⏹️ Stopped')
         } else {
-            toast.info(`Voice command received: "${command}". Feature coming soon!`)
+            toast(`Voice command received: "${command}". Feature coming soon!`, {
+                icon: 'ℹ️',
+                duration: 4000
+            })
             speakText(`I heard ${command}. This feature is coming soon.`)
         }
     }
